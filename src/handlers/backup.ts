@@ -88,7 +88,11 @@ function getBackupDestinationSummary(destination: BackupDestinationRecord | null
 }
 
 function ensureBackupBlobName(value: string): string {
-  const normalized = String(value || '').trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  let normalized = String(value || '').trim().replace(/\\/g, '/');
+  // Trim leading/trailing slashes with loops; /^\/+|\/+$/g backtracks
+  // polynomially on attacker-influenced blob names.
+  while (normalized.startsWith('/')) normalized = normalized.slice(1);
+  while (normalized.endsWith('/')) normalized = normalized.slice(0, -1);
   if (!normalized) {
     throw new Error('Backup attachment blob is required');
   }
