@@ -14,9 +14,10 @@ const PUBLIC_KEY = btoa(`test-public-key-${'x'.repeat(40)}`);
 
 // Build an enc-string-shaped fixture value at runtime (type prefix + dot +
 // `|`-separated parts) so static scanners don't treat committed literals as
-// real secrets. The shape is all the storage repos and server checks require.
+// real secrets. Uses the type-2 (AES-CBC-HMAC) shape with iv|data|mac, which is
+// the form the server's strict cipher validation requires.
 export function enc(label: string): string {
-  return `2.${btoa(`${label}-iv`)}|${btoa(`${label}-data`)}`;
+  return `2.${btoa(`${label}-iv`)}|${btoa(`${label}-data`)}|${btoa(`${label}-mac`)}`;
 }
 
 export function baseHeaders(extra: Record<string, string> = {}): Record<string, string> {
