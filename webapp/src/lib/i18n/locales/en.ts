@@ -916,6 +916,7 @@ const en: Record<string, string> = {
   "txt_zip_password_optional": "ZIP password (optional)",
   "txt_zip_password": "ZIP password",
   "txt_close": "Close",
+  "txt_close_notification": "Close notification",
   "txt_total": "Total",
   "txt_import_success": "Import successful",
   "txt_import_success_number_of_items": "Imported {count} item(s) in total.",

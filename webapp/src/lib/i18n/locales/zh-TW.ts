@@ -916,6 +916,7 @@ const zhTW: Record<string, string> = {
   "txt_zip_password_optional": "ZIP 密碼（可選）",
   "txt_zip_password": "ZIP 密碼",
   "txt_close": "關閉",
+  "txt_close_notification": "關閉通知",
   "txt_total": "總計",
   "txt_import_success": "數據導入成功",
   "txt_import_success_number_of_items": "一共導入了 {count} 個項目。",
