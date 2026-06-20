@@ -58,30 +58,24 @@ jobs:
         run: |
           gitleaks git . --report-format sarif --report-path results.sarif --no-banner || true
 
-      - name: Install Trivy
-        if: env.ACT != 'true'
-        run: |
-          # Homebrew is preinstalled on GitHub ubuntu runners but isn't on PATH
-          # for `run:` shells, so load its env explicitly, then install Trivy and
-          # expose its bin dir to subsequent steps via GITHUB_PATH.
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          brew install trivy
-          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
-          trivy --version
-
       - name: Dependency Scan (Trivy)
         if: env.ACT != 'true'
-        run: |
-          # Token-free SCA: scan lockfiles (package-lock.json) for known
-          # vulnerable dependencies using Trivy's advisory databases.
-          # No '|| true' / continue-on-error: Trivy exits 0 even when it finds
-          # vulnerabilities (no --exit-code set), so only a genuine tool/run
-          # failure fails this step — i.e. "couldn't scan" stays visible.
-          # --include-dev-deps: Trivy excludes devDependencies by default, but
-          # this project's dependency vulns live in the build toolchain (dev
-          # deps), so include them or the scan is effectively blind here.
-          trivy fs --scanners vuln --include-dev-deps --severity CRITICAL,HIGH,MEDIUM \
-            --format json --output trivy_deps.json .
+        # Official action installs Trivy and manages the vuln-DB cache, so no
+        # brew/PATH handling. exit-code 0 keeps findings non-blocking, while a
+        # genuine tool/run failure still fails the step ("couldn't scan" stays
+        # visible). TRIVY_INCLUDE_DEV_DEPS: this project's dependency vulns live
+        # in the build toolchain (dev deps), which Trivy excludes by default.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: CRITICAL,HIGH,MEDIUM
+          format: json
+          output: trivy_deps.json
+          exit-code: '0'
+        env:
+          TRIVY_INCLUDE_DEV_DEPS: 'true'
 
       - name: Check for Dockerfile
         id: check_docker
@@ -94,8 +88,14 @@ jobs:
 
       - name: Container Config Scan (Trivy)
         if: steps.check_docker.outputs.exists == 'true'
-        run: |
-          trivy config . --format json --output trivy_result.json --severity CRITICAL,HIGH
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          format: json
+          output: trivy_result.json
+          exit-code: '0'
 
       - name: Generate Security Report
         run: |
