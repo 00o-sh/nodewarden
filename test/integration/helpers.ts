@@ -113,14 +113,51 @@ export async function authenticate(label = 'admin'): Promise<Session> {
 }
 
 // Re-login an existing account to obtain a token that reflects the current
-// security stamp. Useful after operations (key/api-key/password changes) that
-// rotate the stamp and invalidate previously issued access tokens.
+// security stamp (operations like key/api-key/password changes rotate it and
+// invalidate previously issued access tokens).
 export async function freshToken(account: TestAccount): Promise<string> {
   const res = await login(account);
   if (res.status !== 200) {
     throw new Error(`re-login failed (${res.status}): ${await res.text()}`);
   }
   return ((await res.json()) as { access_token: string }).access_token;
+}
+
+// A random base32 (RFC 4648) secret for seeding a test authenticator.
+export function randomBase32(length = 32): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  let out = '';
+  for (const b of bytes) out += alphabet[b % 32];
+  return out;
+}
+
+// Compute the current 6-digit TOTP for a base32 secret (SHA-1, 30s step) — the
+// same algorithm the server verifies against.
+export async function totpToken(secret: string, nowMs: number = Date.now()): Promise<string> {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0;
+  let value = 0;
+  const bytes: number[] = [];
+  for (const ch of secret.toUpperCase().replace(/[^A-Z2-7]/g, '')) {
+    value = (value << 5) | alphabet.indexOf(ch);
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((value >> bits) & 0xff);
+    }
+  }
+  const key = await crypto.subtle.importKey('raw', new Uint8Array(bytes), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
+  const buf = new Uint8Array(8);
+  let counter = Math.floor(nowMs / 1000 / 30);
+  for (let i = 7; i >= 0; i--) {
+    buf[i] = counter & 0xff;
+    counter = Math.floor(counter / 256);
+  }
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', key, buf));
+  const off = sig[sig.length - 1] & 0x0f;
+  const bin = ((sig[off] & 0x7f) << 24) | ((sig[off + 1] & 0xff) << 16) | ((sig[off + 2] & 0xff) << 8) | (sig[off + 3] & 0xff);
+  return String(bin % 1_000_000).padStart(6, '0');
 }
 
 // Authenticated JSON API request against the worker.
