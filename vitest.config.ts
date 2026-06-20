@@ -17,14 +17,14 @@ export default defineConfig({
       reporter: ['text-summary', 'json-summary', 'html'],
       reportsDirectory: 'coverage',
       // Ratcheting floor: CI fails if coverage drops below these. Raise them as
-      // new tests land so coverage can only move up. Current focus is the
-      // D1/R2-backed handlers (Bucket A); the backup-uploader, WebAuthn, and
-      // Durable Object internals are deliberately excluded as low-value to test.
+      // new tests land so coverage can only move up. Coverage now includes the
+      // backup subsystem (local export/import plus the remote WebDAV/S3 flows,
+      // exercised end-to-end with real in-memory servers rather than mocks).
       thresholds: {
-        lines: 73,
-        statements: 69,
-        functions: 82,
-        branches: 56,
+        lines: 76,
+        statements: 73,
+        functions: 85,
+        branches: 58,
       },
     },
   },
