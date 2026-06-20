@@ -1,0 +1,11 @@
+# Snyk (https://snyk.io) policy file
+# Suppresses confirmed false positives from Snyk Code (SAST).
+version: v1.25.0
+
+# Paths excluded from scanning.
+exclude:
+  global:
+    # Demo-only fixture data: fake vault entries and placeholder passwords
+    # (e.g. "correct-horse-battery-staple", "demo-*-password-2026") used to
+    # populate the public demo build (`npm run build:demo`). Not real secrets.
+    - webapp/src/lib/demo.ts
