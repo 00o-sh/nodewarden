@@ -21,6 +21,7 @@ export type UserStatus = 'active' | 'banned';
 
 // Sample JWT secret used by `.dev.vars.example`.
 // If runtime JWT_SECRET equals this value, treat it as unsafe.
+// deepcode ignore HardcodedNonCryptoSecret: not a real secret — a fixed sentinel compared against the runtime JWT_SECRET to reject the unchanged example value; never used to sign tokens.
 export const DEFAULT_DEV_SECRET = 'Enter-your-JWT-key-here-at-least-32-characters';
 
 // Attachment model
