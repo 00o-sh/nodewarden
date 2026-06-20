@@ -1,11 +1,31 @@
 # Snyk (https://snyk.io) policy file
-# Suppresses confirmed false positives from Snyk Code (SAST).
+# Suppresses confirmed Snyk Code (SAST) false positives.
+#
+# NOTE: the `ignore:` block below applies to Snyk Code only when
+# "Consistent Ignores" is enabled for the Snyk organization
+# (Org Settings -> Snyk Code). Each key is a finding issue ID, taken
+# from the `#issue-<uuid>` fragment in the portal URL for that finding.
 version: v1.25.0
 
-# Paths excluded from scanning.
+# Paths excluded from scanning entirely.
 exclude:
   global:
     # Demo-only fixture data: fake vault entries and placeholder passwords
     # (e.g. "correct-horse-battery-staple", "demo-*-password-2026") used to
     # populate the public demo build (`npm run build:demo`). Not real secrets.
     - webapp/src/lib/demo.ts
+
+# Per-finding ignores for confirmed false positives.
+ignore:
+  # src/types/index.ts — DEFAULT_DEV_SECRET. A fixed sentinel compared against
+  # the runtime JWT_SECRET to reject the unchanged example placeholder; it is
+  # never used to sign tokens, so it is not a credential.
+  a9411df2-4e95-4b66-be97-1e1ec501fce5:
+    - '*':
+        reason: 'False positive: sentinel value, not a credential. Compared against runtime JWT_SECRET to reject the unchanged example; never used to sign tokens.'
+        expires: 2027-06-20T00:00:00.000Z
+  # --- Add remaining confirmed false positives below as their issue IDs are known ---
+  # webapp/src/lib/api/auth.ts:15  SESSION_KEY            (localStorage key name, not a secret)
+  # src/router-public.ts:155       icon SHA-256 hash      (public image content hash, not a credential)
+  # src/handlers/sync.ts           caches.default.match() (Cache API, not a regex -> not ReDoS)
+  # src/index.ts / src/router.ts   routing dispatch       (linear anchored route regexes -> not ReDoS)
