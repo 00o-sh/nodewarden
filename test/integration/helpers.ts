@@ -112,6 +112,17 @@ export async function authenticate(label = 'admin'): Promise<Session> {
   return { account, accessToken: body.access_token, refreshToken: body.refresh_token };
 }
 
+// Re-login an existing account to obtain a token that reflects the current
+// security stamp. Useful after operations (key/api-key/password changes) that
+// rotate the stamp and invalidate previously issued access tokens.
+export async function freshToken(account: TestAccount): Promise<string> {
+  const res = await login(account);
+  if (res.status !== 200) {
+    throw new Error(`re-login failed (${res.status}): ${await res.text()}`);
+  }
+  return ((await res.json()) as { access_token: string }).access_token;
+}
+
 // Authenticated JSON API request against the worker.
 export async function api(
   method: string,
@@ -126,4 +137,32 @@ export async function api(
     headers,
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
+}
+
+// Create a login cipher via the API and return its parsed response.
+export async function createCipher(
+  accessToken: string,
+  overrides: Record<string, unknown> = {}
+): Promise<any> {
+  const res = await api('POST', '/api/ciphers', accessToken, {
+    type: 1,
+    name: enc('item'),
+    notes: enc('notes'),
+    favorite: false,
+    login: { username: enc('user'), password: enc('pass'), uris: [] },
+    ...overrides,
+  });
+  if (res.status !== 200) {
+    throw new Error(`createCipher failed (${res.status}): ${await res.text()}`);
+  }
+  return res.json();
+}
+
+// Create a folder via the API and return its parsed response.
+export async function createFolder(accessToken: string, name = enc('folder')): Promise<any> {
+  const res = await api('POST', '/api/folders', accessToken, { name });
+  if (res.status !== 200) {
+    throw new Error(`createFolder failed (${res.status}): ${await res.text()}`);
+  }
+  return res.json();
 }

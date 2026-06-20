@@ -61,3 +61,6 @@ BITWARDEN_COMPATIBILITY_ANALYSIS.md
 .mcp.json
 opencode.jsonc
 .cursor/
+
+# Test coverage reports
+coverage/

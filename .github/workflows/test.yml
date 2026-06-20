@@ -26,5 +26,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
+      - name: Run tests with coverage
+        # Runs the full suite and enforces the coverage thresholds in
+        # vitest.config.ts (the ratcheting floor).
+        run: npm run coverage
