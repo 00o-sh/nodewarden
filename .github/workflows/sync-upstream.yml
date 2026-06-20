@@ -43,9 +43,12 @@ jobs:
 
       - name: Resolve target commit
         id: resolve
+        env:
+          # Pass the user-supplied input via env, never inline ${{ }} in the
+          # script, so its contents can't be interpreted as shell code.
+          MANUAL_INPUT: ${{ github.event.inputs.target_commit }}
         run: |
           TRIGGER="${{ github.event_name }}"
-          MANUAL_INPUT="${{ github.event.inputs.target_commit }}"
 
           if [ "$TRIGGER" = "schedule" ]; then
             # Auto mode: resolve latest upstream release tag
