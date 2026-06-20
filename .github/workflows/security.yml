@@ -16,8 +16,6 @@ jobs:
       contents: read
       security-events: write
       actions: read
-    env:
-      SECURITY_SNYK_TOKEN: ${{ secrets.SECURITY_SNYK_TOKEN }}
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
@@ -61,39 +59,25 @@ jobs:
         run: |
           gitleaks git . --report-format sarif --report-path results.sarif --no-banner || true
 
-      - name: Install Project Dependencies
-        if: env.SECURITY_SNYK_TOKEN != ''
-        env:
-          SECURITY_PACKAGE: ${{ vars.SECURITY_PACKAGE || '' }}
-        run: |
-          echo "Preparing dependency lock files for security scanning..."
-          if [ -z "$SECURITY_PACKAGE" ]; then
-            echo "SECURITY_PACKAGE is empty, installing in root..."
-            npm install --package-lock-only
-          else
-            echo "SECURITY_PACKAGE is set to: $SECURITY_PACKAGE"
-            # Split by comma and install
-            IFS=',' read -ra PACKAGES <<< "$SECURITY_PACKAGE"
-            for pkg in "${PACKAGES[@]}"; do
-              if [ -d "$pkg" ]; then
-                echo "Installing in "$pkg"..."
-                npm install --prefix "$pkg" --package-lock-only
-              else
-                echo "Warning: Directory $pkg not found, skipping."
-              fi
-            done
-          fi
-
-      - name: Dependency Scan
-        id: snyk
-        if: env.SECURITY_SNYK_TOKEN != ''
+      - name: Install Trivy
+        if: env.ACT != 'true'
         continue-on-error: true
         run: |
-          npm install -g snyk          
-          snyk auth ${{ secrets.SECURITY_SNYK_TOKEN }}
-          snyk test --all-projects --json-file-output=snyk_result.json > snyk_result.txt || true
-        env:
-          SECURITY_SNYK_TOKEN: ${{ secrets.SECURITY_SNYK_TOKEN }}
+          VERSION="0.56.1"
+          echo "Installing Trivy $VERSION..."
+          # Pin the installer to the matching version tag (not the mutable main
+          # branch) and download-then-run instead of piping straight into sh.
+          curl -fsSL "https://raw.githubusercontent.com/aquasecurity/trivy/v${VERSION}/contrib/install.sh" -o trivy-install.sh
+          sh trivy-install.sh -b /usr/local/bin "v$VERSION"
+
+      - name: Dependency Scan (Trivy)
+        if: env.ACT != 'true'
+        continue-on-error: true
+        run: |
+          # Token-free SCA: scan lockfiles (package-lock.json) for known
+          # vulnerable dependencies using Trivy's advisory databases.
+          trivy fs --scanners vuln --severity CRITICAL,HIGH,MEDIUM \
+            --format json --output trivy_deps.json . || true
 
       - name: Check for Dockerfile
         id: check_docker
@@ -104,16 +88,10 @@ jobs:
             echo "exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Container Security Scan (Trivy)
+      - name: Container Config Scan (Trivy)
         if: steps.check_docker.outputs.exists == 'true'
         continue-on-error: true
         run: |
-          VERSION="0.56.1"
-          echo "Installing Trivy $VERSION..."
-          # Pin the installer to the matching version tag (not the mutable main
-          # branch) and download-then-run instead of piping straight into sh.
-          curl -fsSL "https://raw.githubusercontent.com/aquasecurity/trivy/v${VERSION}/contrib/install.sh" -o trivy-install.sh
-          sh trivy-install.sh -b /usr/local/bin "v$VERSION"
           trivy config . --format json --output trivy_result.json --severity CRITICAL,HIGH || true
 
       - name: Generate Security Report
@@ -143,8 +121,7 @@ jobs:
           path: |
             security-report.md
             security-report-cn.md
-            snyk_result.txt
-            snyk_result.json
+            trivy_deps.json
             trivy_result.json
             results.sarif
             sarif-results/*.sarif

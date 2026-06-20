@@ -10,7 +10,7 @@ class SecurityReport {
     constructor() {
         this.results = {
             codeql: { status: 'PASS', findings: [], alertCount: 0, rulesCount: 0 },
-            snyk: { status: 'PASS', findings: [], vulnCount: 0 },
+            deps: { status: 'PASS', findings: [], vulnCount: 0 },
             gitleaks: { status: 'PASS', findings: [], leaksCount: 0 },
             trivy: { status: 'PASS', findings: [], misconfigCount: 0 },
             coverage: { actions: 0, js: 0, ts: 0 },
@@ -182,35 +182,34 @@ class SecurityReport {
         if (totalAlerts > 0) this.results.codeql.status = 'INFO';
     }
 
-    async parseSnyk() {
-        const jsonPath = 'snyk_result.json';
+    async parseDeps() {
+        // Dependency (SCA) results from `trivy fs --scanners vuln`.
+        const jsonPath = 'trivy_deps.json';
         if (!fs.existsSync(jsonPath)) return;
 
         try {
             const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-            const projects = Array.isArray(data) ? data : [data];
             let vulnTotal = 0;
             let findings = [];
 
-            for (const proj of projects) {
-                const vulns = proj.vulnerabilities || [];
-                vulnTotal += vulns.length;
-                vulns.forEach(v => {
+            (data.Results || []).forEach(res => {
+                (res.Vulnerabilities || []).forEach(v => {
+                    vulnTotal++;
                     findings.push({
-                        pkg: `${v.packageName}@${v.version}`,
-                        severity: v.severity,
-                        title: v.title,
-                        url: v.url,
-                        fixedIn: Array.isArray(v.fixedIn) ? v.fixedIn.join(', ') : (v.fixedIn || 'N/A')
+                        pkg: `${v.PkgName}@${v.InstalledVersion}`,
+                        severity: String(v.Severity || 'UNKNOWN').toLowerCase(),
+                        title: v.Title || v.VulnerabilityID,
+                        url: v.PrimaryURL || '',
+                        fixedIn: v.FixedVersion || 'N/A'
                     });
                 });
-            }
+            });
 
-            this.results.snyk.vulnCount = vulnTotal;
-            this.results.snyk.findings = findings;
-            if (vulnTotal > 0) this.results.snyk.status = 'WARN';
+            this.results.deps.vulnCount = vulnTotal;
+            this.results.deps.findings = findings;
+            if (vulnTotal > 0) this.results.deps.status = 'WARN';
         } catch (e) {
-            console.error('Error parsing Snyk JSON:', e.message);
+            console.error('Error parsing Trivy dependency JSON:', e.message);
         }
     }
 
@@ -291,15 +290,15 @@ class SecurityReport {
     // --- Renderers ---
 
     generateMarkdown(localeKey) {
-        const { codeql, snyk, gitleaks, coverage } = this.results;
+        const { codeql, deps, gitleaks, coverage } = this.results;
         const t = this.locales[localeKey];
 
         // Calculate Grade
         let grade = 'A+';
         let gradeColor = 'success';
         if (gitleaks.status === 'FAIL') { grade = 'D'; gradeColor = 'red'; }
-        else if (snyk.vulnCount > 10 || this.results.trivy.misconfigCount > 5) { grade = 'C'; gradeColor = 'orange'; }
-        else if (snyk.vulnCount > 0 || codeql.alertCount > 0 || this.results.trivy.misconfigCount > 0) { grade = 'B'; gradeColor = 'blue'; }
+        else if (deps.vulnCount > 10 || this.results.trivy.misconfigCount > 5) { grade = 'C'; gradeColor = 'orange'; }
+        else if (deps.vulnCount > 0 || codeql.alertCount > 0 || this.results.trivy.misconfigCount > 0) { grade = 'B'; gradeColor = 'blue'; }
 
         const badge = (label, value, color) => `![${label}](https://img.shields.io/badge/${label.replace(/ /g, '_')}-${value}-${color}?style=for-the-badge)`;
 
@@ -316,7 +315,7 @@ class SecurityReport {
         md += `| ${t.tool} | ${t.status} | ${t.findings} |\n`;
         md += `| :--- | :--- | :--- |\n`;
         md += `| **Credential Leak (Gitleaks)** | ${this.getBadge(gitleaks.status)} | \`${gitleaks.leaksCount}\` ${t.leaks} |\n`;
-        md += `| **Dependency Scan (Snyk)** | ${this.getBadge(snyk.status)} | \`${snyk.vulnCount}\` ${t.vulns} |\n`;
+        md += `| **Dependency Scan (Trivy)** | ${this.getBadge(deps.status)} | \`${deps.vulnCount}\` ${t.vulns} |\n`;
         md += `| **Static Analysis (CodeQL)** | ${this.getBadge(codeql.status)} | \`${codeql.alertCount}\` ${t.alerts} |\n`;
         md += `| **Container Scan (Trivy)** | ${this.getBadge(this.results.trivy.status)} | \`${this.results.trivy.misconfigCount}\` ${t.findings} |\n\n`;
 
@@ -356,12 +355,12 @@ class SecurityReport {
             md += `${t.trivySafe}\n`;
         }
 
-        // Snyk Section
+        // Dependency (Trivy SCA) Section
         md += `\n### ${t.snykTitle}\n`;
-        if (snyk.findings.length > 0) {
+        if (deps.findings.length > 0) {
             md += `| ${t.package} | ${t.severity} | ${t.description} | ${t.fixPlan} |\n`;
             md += `| :--- | :---: | :--- | :--- |\n`;
-            snyk.findings.forEach(f => {
+            deps.findings.forEach(f => {
                 const icon = f.severity === 'critical' ? '🔴' : (f.severity === 'high' ? '🟠' : '🟡');
                 md += `| \`${f.pkg}\` | ${icon} ${f.severity} | [${f.title}](${f.url}) | ${f.fixedIn === 'N/A' ? 'No fix' : `Upgrade to \`${f.fixedIn}\``} |\n`;
             });
@@ -448,7 +447,7 @@ class SecurityReport {
     async run() {
         console.log('--- Security Report Generation Started ---');
         await this.parseCodeQL();
-        await this.parseSnyk();
+        await this.parseDeps();
         await this.parseGitleaks();
         await this.parseTrivy();
 
