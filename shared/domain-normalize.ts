@@ -114,10 +114,11 @@ function extractHost(input: string): string {
     if (colonIndex > -1 && raw.indexOf(':') === colonIndex) raw = raw.slice(0, colonIndex);
   }
 
-  return raw
-    .replace(/^\*+\./, '')
-    .replace(/^\.+/, '')
-    .replace(/\.+$/, '');
+  // Leading patterns are start-anchored (linear). The trailing-dot strip uses a
+  // loop instead of /\.+$/, which backtracks polynomially on hostile input.
+  let host = raw.replace(/^\*+\./, '').replace(/^\.+/, '');
+  while (host.endsWith('.')) host = host.slice(0, -1);
+  return host;
 }
 
 function isValidHost(host: string): boolean {
