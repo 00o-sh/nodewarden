@@ -13,7 +13,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # `write` is required only to publish the coverage badge to the `badges`
+      # branch on pushes to main. The badge step is skipped on pull requests.
+      contents: write
     steps:
       - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
 
@@ -30,3 +32,10 @@ jobs:
         # Runs the full suite and enforces the coverage thresholds in
         # vitest.config.ts (the ratcheting floor).
         run: npm run coverage
+
+      - name: Publish coverage badge
+        # Self-contained auto-updating badge: only on pushes to main.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/publish-coverage-badge.sh
