@@ -22,9 +22,9 @@ export default defineConfig({
       // Durable Object internals are deliberately excluded as low-value to test.
       thresholds: {
         lines: 56,
-        statements: 53,
-        functions: 60,
-        branches: 42,
+        statements: 54,
+        functions: 61,
+        branches: 43,
       },
     },
   },
