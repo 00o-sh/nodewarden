@@ -12,6 +12,13 @@ const CLIENT_IP = '203.0.113.7';
 export const ENC_STRING = `2.${btoa('iv')}|${btoa('data')}|${btoa('mac')}`;
 const PUBLIC_KEY = btoa(`test-public-key-${'x'.repeat(40)}`);
 
+// Build an enc-string-shaped fixture value at runtime (type prefix + dot +
+// `|`-separated parts) so static scanners don't treat committed literals as
+// real secrets. The shape is all the storage repos and server checks require.
+export function enc(label: string): string {
+  return `2.${btoa(`${label}-iv`)}|${btoa(`${label}-data`)}`;
+}
+
 export function baseHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return {
     'CF-Connecting-IP': CLIENT_IP,
@@ -78,8 +85,44 @@ export async function login(account: TestAccount): Promise<Response> {
 }
 
 export async function sync(accessToken: string): Promise<Response> {
-  return SELF.fetch(url('/api/sync'), {
-    method: 'GET',
-    headers: baseHeaders({ Authorization: `Bearer ${accessToken}` }),
+  return api('GET', '/api/sync', accessToken);
+}
+
+export interface Session {
+  account: TestAccount;
+  accessToken: string;
+  refreshToken: string;
+}
+
+// Register the first account (auto-promoted to admin on a fresh instance) and
+// log it in. Each integration test file has its own D1, so this account is
+// always the instance's first user.
+export async function authenticate(label = 'admin'): Promise<Session> {
+  const account = newAccount(label);
+  const reg = await register(account);
+  if (reg.status !== 200) {
+    throw new Error(`registration failed (${reg.status}): ${await reg.text()}`);
+  }
+  const res = await login(account);
+  if (res.status !== 200) {
+    throw new Error(`login failed (${res.status}): ${await res.text()}`);
+  }
+  const body = (await res.json()) as { access_token: string; refresh_token: string };
+  return { account, accessToken: body.access_token, refreshToken: body.refresh_token };
+}
+
+// Authenticated JSON API request against the worker.
+export async function api(
+  method: string,
+  path: string,
+  accessToken: string,
+  body?: unknown
+): Promise<Response> {
+  const headers = baseHeaders({ Authorization: `Bearer ${accessToken}` });
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  return SELF.fetch(url(path), {
+    method,
+    headers,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
 }
