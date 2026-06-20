@@ -8,5 +8,24 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     projects: ['vitest.unit.config.ts', 'vitest.workers.config.ts'],
+    coverage: {
+      // v8 coverage cannot run inside the workerd (Workers) isolate, so use
+      // istanbul instrumentation, which works across both the node and workers
+      // projects.
+      provider: 'istanbul',
+      include: ['src/**', 'shared/**'],
+      reporter: ['text-summary', 'json-summary', 'html'],
+      reportsDirectory: 'coverage',
+      // Ratcheting floor: CI fails if coverage drops below these. Raise them as
+      // new tests land so coverage can only move up. Current focus is the
+      // D1/R2-backed handlers (Bucket A); the backup-uploader, WebAuthn, and
+      // Durable Object internals are deliberately excluded as low-value to test.
+      thresholds: {
+        lines: 52,
+        statements: 50,
+        functions: 56,
+        branches: 39,
+      },
+    },
   },
 });

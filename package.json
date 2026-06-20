@@ -19,7 +19,8 @@
     "deploy:kv": "node scripts/ensure-kv.cjs && wrangler deploy -c wrangler.kv.toml",
     "deploy:demo": "npm run build:demo && wrangler pages deploy dist --project-name nw-demo",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "keywords": [
     "bitwarden",
@@ -49,7 +50,10 @@
     "@cloudflare/workers-types": "^4.20260131.0",
     "@preact/preset-vite": "^2.10.3",
     "@types/node": "^25.2.3",
+    "@vitest/coverage-istanbul": "^4.1.9",
+    "@vitest/coverage-v8": "^4.1.9",
     "autoprefixer": "^10.4.21",
+    "istanbul-lib-coverage": "^3.2.2",
     "opencc-js": "^1.0.5",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
