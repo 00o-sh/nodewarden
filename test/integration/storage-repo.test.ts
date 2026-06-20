@@ -2,6 +2,7 @@ import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { StorageService } from '../../src/services/storage';
 import type { Cipher, Folder, User } from '../../src/types';
+import { enc } from './helpers';
 
 // Tier 3: exercise the storage repos directly against a live D1 binding,
 // isolating the persistence/SQL layer from routing and auth. This is the fast
@@ -20,10 +21,10 @@ function makeUser(overrides: Partial<User> = {}): User {
     email: `repo-${crypto.randomUUID()}@vault.test`,
     name: 'Repo Test',
     masterPasswordHint: null,
-    masterPasswordHash: 'server-hash',
-    key: '2.key|payload',
-    privateKey: '2.priv|payload',
-    publicKey: 'public-key',
+    masterPasswordHash: enc('mph'),
+    key: enc('key'),
+    privateKey: enc('priv'),
+    publicKey: btoa('public-key'),
     kdfType: 0,
     kdfIterations: 600000,
     kdfMemory: undefined,
@@ -48,11 +49,11 @@ function makeCipher(userId: string, overrides: Partial<Cipher> = {}): Cipher {
     userId,
     type: 1,
     folderId: null,
-    name: '2.name|payload',
+    name: enc('name'),
     notes: null,
     favorite: false,
     reprompt: 0,
-    login: { username: '2.u|p', password: '2.p|p' },
+    login: { username: enc('u'), password: enc('p') },
     createdAt: now,
     updatedAt: now,
     archivedAt: null,
@@ -66,7 +67,7 @@ function makeFolder(userId: string, overrides: Partial<Folder> = {}): Folder {
   return {
     id: crypto.randomUUID(),
     userId,
-    name: '2.folder|payload',
+    name: enc('folder'),
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -114,11 +115,12 @@ describe('cipher repo', () => {
   it('round-trips structured login JSON', async () => {
     const owner = makeUser();
     await storage.createUser(owner);
-    const cipher = makeCipher(owner.id, { login: { username: '2.user|x', password: '2.pass|x' } });
+    const username = enc('user');
+    const cipher = makeCipher(owner.id, { login: { username, password: enc('pass') } });
     await storage.saveCipher(cipher);
 
     const stored = await storage.getCipher(cipher.id);
-    expect((stored as any)?.login?.username).toBe('2.user|x');
+    expect((stored as any)?.login?.username).toBe(username);
   });
 
   it('deletes a cipher scoped to its owner', async () => {

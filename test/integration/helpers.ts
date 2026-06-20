@@ -12,6 +12,13 @@ const CLIENT_IP = '203.0.113.7';
 export const ENC_STRING = `2.${btoa('iv')}|${btoa('data')}|${btoa('mac')}`;
 const PUBLIC_KEY = btoa(`test-public-key-${'x'.repeat(40)}`);
 
+// Build an enc-string-shaped fixture value at runtime (type prefix + dot +
+// `|`-separated parts) so static scanners don't treat committed literals as
+// real secrets. The shape is all the storage repos and server checks require.
+export function enc(label: string): string {
+  return `2.${btoa(`${label}-iv`)}|${btoa(`${label}-data`)}`;
+}
+
 export function baseHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return {
     'CF-Connecting-IP': CLIENT_IP,
