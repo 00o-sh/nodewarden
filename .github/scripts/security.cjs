@@ -183,33 +183,51 @@ class SecurityReport {
     }
 
     async parseDeps() {
-        // Dependency (SCA) results from `trivy fs --scanners vuln`.
-        const jsonPath = 'trivy_deps.json';
-        if (!fs.existsSync(jsonPath)) return;
+        // Dependency (SCA) results from `trivy fs --scanners vuln` (SARIF).
+        // SARIF is also uploaded to the GitHub Security tab; this parses the
+        // same file for the markdown dashboard. Defensive throughout so a
+        // format change can never throw and fail the report step.
+        const sarifPath = 'trivy_deps.sarif';
+        if (!fs.existsSync(sarifPath)) return;
+
+        const field = (text, label) => {
+            const m = String(text || '').match(new RegExp(`${label}:\\s*(.+)`));
+            return m ? m[1].trim() : '';
+        };
 
         try {
-            const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+            const data = JSON.parse(fs.readFileSync(sarifPath, 'utf8'));
             let vulnTotal = 0;
             let findings = [];
 
-            (data.Results || []).forEach(res => {
-                (res.Vulnerabilities || []).forEach(v => {
+            for (const run of data.runs || []) {
+                const rules = {};
+                for (const r of (run.tool && run.tool.driver && run.tool.driver.rules) || []) {
+                    rules[r.id] = r;
+                }
+                for (const res of run.results || []) {
                     vulnTotal++;
+                    const rule = rules[res.ruleId] || {};
+                    const msg = (res.message && res.message.text) || '';
+                    const pkg = field(msg, 'Package');
+                    const installed = field(msg, 'Installed Version');
+                    const tags = (rule.properties && rule.properties.tags) || [];
+                    const sevTag = tags.find(t => /^(critical|high|medium|low|unknown)$/i.test(t));
                     findings.push({
-                        pkg: `${v.PkgName}@${v.InstalledVersion}`,
-                        severity: String(v.Severity || 'UNKNOWN').toLowerCase(),
-                        title: v.Title || v.VulnerabilityID,
-                        url: v.PrimaryURL || '',
-                        fixedIn: v.FixedVersion || 'N/A'
+                        pkg: pkg ? (installed ? `${pkg}@${installed}` : pkg) : (res.ruleId || 'unknown'),
+                        severity: (field(msg, 'Severity') || sevTag || 'unknown').toLowerCase(),
+                        title: (rule.shortDescription && rule.shortDescription.text) || res.ruleId || 'vulnerability',
+                        url: rule.helpUri || '',
+                        fixedIn: field(msg, 'Fixed Version') || 'N/A'
                     });
-                });
-            });
+                }
+            }
 
             this.results.deps.vulnCount = vulnTotal;
             this.results.deps.findings = findings;
             if (vulnTotal > 0) this.results.deps.status = 'WARN';
         } catch (e) {
-            console.error('Error parsing Trivy dependency JSON:', e.message);
+            console.error('Error parsing Trivy SARIF:', e.message);
         }
     }
 
