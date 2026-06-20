@@ -19,20 +19,24 @@ jobs:
   sync-global-domains:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
 
       - name: Sync generated Bitwarden domains
-        run: npm run domains:sync -- --ref "${{ inputs.bitwarden_ref || 'main' }}"
+        env:
+          # Pass the user-supplied input via env, never inline ${{ }} in the
+          # script, so its contents can't be interpreted as shell code.
+          BITWARDEN_REF: ${{ inputs.bitwarden_ref || 'main' }}
+        run: npm run domains:sync -- --ref "$BITWARDEN_REF"
 
       - name: Verify custom domains were not touched
         run: git diff --exit-code -- src/static/global_domains.custom.json
 
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@c5a7806660adbe173f04e3e038b0ccdcd758773c # v6
         with:
           branch: chore/sync-bitwarden-global-domains
           delete-branch: true

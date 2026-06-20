@@ -19,14 +19,14 @@ jobs:
     env:
       SECURITY_SNYK_TOKEN: ${{ secrets.SECURITY_SNYK_TOKEN }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           fetch-depth: 0
 
       - name: Initialize CodeQL
         if: env.ACT != 'true'
         continue-on-error: true
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
         with:
           languages: javascript-typescript, actions
           build-mode: none
@@ -35,7 +35,7 @@ jobs:
       - name: Perform CodeQL Analysis
         if: env.ACT != 'true'
         continue-on-error: true
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
         with:
           upload: true
           output: sarif-results
@@ -45,8 +45,13 @@ jobs:
         continue-on-error: true
         run: |
           GITLEAKS_VERSION="8.28.0"
-          curl -sSL -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          tar -xzf gitleaks.tar.gz gitleaks
+          ASSET="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          BASE="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -fsSL -o "$ASSET" "${BASE}/${ASSET}"
+          curl -fsSL -o gitleaks_checksums.txt "${BASE}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          # Verify the downloaded tarball against the release's published checksums.
+          sha256sum --ignore-missing -c gitleaks_checksums.txt
+          tar -xzf "$ASSET" gitleaks
           chmod +x gitleaks
           sudo mv gitleaks /usr/local/bin/gitleaks
 
@@ -105,7 +110,10 @@ jobs:
         run: |
           VERSION="0.56.1"
           echo "Installing Trivy $VERSION..."
-          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin "v$VERSION"
+          # Pin the installer to the matching version tag (not the mutable main
+          # branch) and download-then-run instead of piping straight into sh.
+          curl -fsSL "https://raw.githubusercontent.com/aquasecurity/trivy/v${VERSION}/contrib/install.sh" -o trivy-install.sh
+          sh trivy-install.sh -b /usr/local/bin "v$VERSION"
           trivy config . --format json --output trivy_result.json --severity CRITICAL,HIGH || true
 
       - name: Generate Security Report
@@ -120,7 +128,7 @@ jobs:
           cat security-report-cn.md >> $GITHUB_STEP_SUMMARY
 
       - name: Upload Gitleaks Results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
         if: always()
         with:
           sarif_file: results.sarif
@@ -128,7 +136,7 @@ jobs:
 
       - name: Upload Security Report Artifacts
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: security-report
           if-no-files-found: ignore
