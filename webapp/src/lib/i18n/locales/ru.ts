@@ -916,6 +916,7 @@ const ru: Record<string, string> = {
   "txt_zip_password_optional": "ZIP-пароль (необязательно)",
   "txt_zip_password": "ZIP-пароль",
   "txt_close": "Закрыть",
+  "txt_close_notification": "Закрыть уведомление",
   "txt_total": "Итого",
   "txt_import_success": "Импорт выполнен успешно.",
   "txt_import_success_number_of_items": "Всего импортировано {count} элементов.",

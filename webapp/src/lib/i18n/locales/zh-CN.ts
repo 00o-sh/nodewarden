@@ -916,6 +916,7 @@ const zhCN: Record<string, string> = {
   "txt_zip_password_optional": "ZIP 密码（可选）",
   "txt_zip_password": "ZIP 密码",
   "txt_close": "关闭",
+  "txt_close_notification": "关闭通知",
   "txt_total": "总计",
   "txt_import_success": "数据导入成功",
   "txt_import_success_number_of_items": "一共导入了 {count} 个项目。",

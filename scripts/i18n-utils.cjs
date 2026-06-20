@@ -15,6 +15,38 @@ const localeFiles = [
   ['es', 'es.ts', 'es', 'Spanish'],
 ];
 
+// CONTRACT:
+// Keys that are intentionally identical to English in every locale (protocol
+// names, log enums, punctuation, etc.). Shared by i18n-validate.cjs (so they
+// don't trip the mostly-English guard) and i18n-report.cjs (so they don't count
+// as untranslated). Keep this the single source of truth.
+const intentionallyEnglishKeys = new Set([
+  'txt_backup_destination_detail_note',
+  'txt_backup_protocol_webdav',
+  'txt_backup_protocol_s3',
+  'txt_backup_recommend_group_webdav',
+  'txt_backup_recommend_group_s3',
+  'txt_backup_destination_name_default_webdav',
+  'txt_backup_destination_name_default_s3',
+  'txt_dash',
+  'txt_text_3',
+]);
+
+const intentionallyEnglishPrefixes = [
+  'txt_log_action_',
+  'txt_log_meta_',
+  'txt_log_reason_',
+  'txt_log_target_type_',
+  'txt_log_trigger_',
+];
+
+function isIntentionallyEnglishKey(key) {
+  return (
+    intentionallyEnglishKeys.has(key) ||
+    intentionallyEnglishPrefixes.some((prefix) => key.startsWith(prefix))
+  );
+}
+
 function readLocale(fileName, variableName) {
   let code = fs.readFileSync(path.join(localeDir, fileName), 'utf8');
   code = code
@@ -41,4 +73,7 @@ module.exports = {
   localeDir,
   readLocale,
   writeLocale,
+  intentionallyEnglishKeys,
+  intentionallyEnglishPrefixes,
+  isIntentionallyEnglishKey,
 };

@@ -916,6 +916,7 @@ const es: Record<string, string> = {
   "txt_zip_password_optional": "Contraseña ZIP (opcional)",
   "txt_zip_password": "Contraseña ZIP",
   "txt_close": "Cerrar",
+  "txt_close_notification": "Cerrar notificación",
   "txt_total": "Total",
   "txt_import_success": "Importación correcta",
   "txt_import_success_number_of_items": "Importados {count} elemento(s) en total.",
