@@ -42,8 +42,10 @@ tmp/
 .tmp/
 .tmp-bitwarden-clients/
 
-nodewarden.wiki/
-wiki/
+# Local clones of the GitHub wiki repo (kept out of the code repo). Anchored to
+# the root so the tracked docs/wiki/ translation source is not also ignored.
+/nodewarden.wiki/
+/wiki/
 AGENTS.md
 settings.json
 .claude/
