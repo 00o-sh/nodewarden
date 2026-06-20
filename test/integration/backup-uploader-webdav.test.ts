@@ -65,7 +65,7 @@ function webdavDestination() {
   (record as any).destination = {
     baseUrl: 'https://dav.test',
     username: 'dav-user',
-    password: 'dav-pass',
+    password: `pw-${crypto.randomUUID()}`,
     remotePath: 'nodewarden',
   };
   return record;

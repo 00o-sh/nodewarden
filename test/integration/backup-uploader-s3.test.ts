@@ -63,7 +63,7 @@ function s3Destination() {
     addressingStyle: 'path-style',
     region: 'auto',
     accessKeyId: 'AKIA-test',
-    secretAccessKey: 'secret-test-key',
+    secretAccessKey: `sk-${crypto.randomUUID()}`,
     rootPath: 'nodewarden',
   };
   return record;

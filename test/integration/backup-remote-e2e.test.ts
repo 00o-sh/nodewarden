@@ -51,7 +51,7 @@ beforeAll(async () => {
     destinations: [{
       type: 'webdav',
       label: 'e2e',
-      destination: { baseUrl: 'https://dav.test', username: 'u', password: 'p', remotePath: 'nodewarden' },
+      destination: { baseUrl: 'https://dav.test', username: 'u', password: `pw-${crypto.randomUUID()}`, remotePath: 'nodewarden' },
       schedule: { enabled: true, intervalHours: 24, retentionCount: 30 },
     }],
   });
