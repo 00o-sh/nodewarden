@@ -325,6 +325,7 @@ async function decryptAttachmentFileName(
     const fileName = await decryptStr(rawFileName, itemKeys.enc, itemKeys.mac);
     if (fileName) return { fileName, source: 'item' };
   } catch {
+    // Fall through to try the legacy user-key filename.
     // 继续尝试旧 user key 文件名。
   }
 
@@ -333,6 +334,7 @@ async function decryptAttachmentFileName(
       const fileName = await decryptStr(rawFileName, userKeys.enc, userKeys.mac);
       if (fileName) return { fileName, source: 'user' };
     } catch {
+      // Keep the original filename.
       // 保留原始文件名。
     }
   }
@@ -428,6 +430,7 @@ export async function downloadCipherAttachmentDecrypted(
       usedCandidate = candidate;
       break;
     } catch {
+      // Move on to try the next legacy attachment format.
       // 继续尝试下一种旧附件格式。
     }
   }
@@ -457,6 +460,8 @@ export async function downloadCipherAttachmentDecrypted(
       await repairCipherAttachmentMetadata(authedFetch, cid, aid, metadata);
     }
   } catch {
+    // A repair failure does not affect this download; the legacy attachment
+    // content was already decrypted successfully.
     // 修复失败不影响本次下载，旧附件内容已经成功解密。
   }
 

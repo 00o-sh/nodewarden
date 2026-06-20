@@ -21,7 +21,7 @@ body:
     id: problem
     attributes:
       label: Problem Statement / 现存问题
-      description: "What is difficult or missing today?"
+      description: "What is difficult or missing today? / 当前有什么困难或缺失？"
     validations:
       required: true
 
@@ -29,7 +29,7 @@ body:
     id: proposal
     attributes:
       label: Proposed Solution / 建议方案
-      description: "Describe your expected behavior, UI flow, API changes, etc."
+      description: "Describe your expected behavior, UI flow, API changes, etc. / 描述你期望的行为、UI 流程、API 变更等。"
     validations:
       required: true
 
@@ -37,7 +37,7 @@ body:
     id: alternatives
     attributes:
       label: Alternatives Considered / 备选方案
-      description: "Any alternatives or workarounds you've considered."
+      description: "Any alternatives or workarounds you've considered. / 你考虑过的任何备选方案或变通方法。"
     validations:
       required: false
 
@@ -45,7 +45,7 @@ body:
     id: impact
     attributes:
       label: Expected Impact / 预期价值
-      description: "Who benefits? Any performance/security/maintenance concerns?"
+      description: "Who benefits? Any performance/security/maintenance concerns? / 谁会受益？是否有性能/安全/维护方面的顾虑？"
     validations:
       required: true
 
@@ -59,4 +59,4 @@ body:
     id: extra
     attributes:
       label: Additional Context / 补充信息
-      description: "Mockups, references, related links, etc."
+      description: "Mockups, references, related links, etc. / 原型图、参考资料、相关链接等。"

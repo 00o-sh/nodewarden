@@ -23,7 +23,7 @@ body:
     id: version
     attributes:
       label: Version / 版本
-      description: "Which version of NodeWarden are you using? Please provide the exact version or commit hash."
+      description: "Which version of NodeWarden are you using? Please provide the exact version or commit hash. / 你使用的是哪个版本的 NodeWarden？请提供准确的版本号或 commit hash。"
       placeholder: "1.0.0"
     validations:
       required: true
@@ -33,10 +33,10 @@ body:
     attributes:
       label: Steps to Reproduce / 复现步骤
       placeholder: |
-        1. Start service with ...
-        2. Open ...
-        3. Click ...
-        4. Observe ...
+        1. Start service with ... / 使用 ... 启动服务
+        2. Open ... / 打开 ...
+        3. Click ... / 点击 ...
+        4. Observe ... / 观察到 ...
     validations:
       required: true
 
@@ -58,7 +58,7 @@ body:
     id: logs
     attributes:
       label: Logs and Screenshots / 日志与截图
-      description: "Please paste key logs (docker logs / browser console / network errors)."
+      description: "Please paste key logs (docker logs / browser console / network errors). / 请粘贴关键日志（docker logs / 浏览器控制台 / 网络错误）。"
       render: shell
     validations:
       required: false
@@ -67,4 +67,4 @@ body:
     id: extra
     attributes:
       label: Additional Context / 补充信息
-      description: "Any workaround, frequency, impact scope, etc."
+      description: "Any workaround, frequency, impact scope, etc. / 任何临时解决方法、出现频率、影响范围等。"
