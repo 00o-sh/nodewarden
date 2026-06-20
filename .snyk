@@ -14,6 +14,11 @@ exclude:
     # (e.g. "correct-horse-battery-staple", "demo-*-password-2026") used to
     # populate the public demo build (`npm run build:demo`). Not real secrets.
     - webapp/src/lib/demo.ts
+    # Test code (Vitest unit + integration). Not shipped to production; SAST
+    # app-vulnerability heuristics misfire on test fixtures, synthetic
+    # credentials, and the in-test WebDAV/S3/WebSocket servers used to exercise
+    # the real code paths without mocks.
+    - test/**
 
 # Per-finding ignores for confirmed false positives.
 ignore:
