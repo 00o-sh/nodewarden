@@ -77,7 +77,10 @@ jobs:
           # No '|| true' / continue-on-error: Trivy exits 0 even when it finds
           # vulnerabilities (no --exit-code set), so only a genuine tool/run
           # failure fails this step — i.e. "couldn't scan" stays visible.
-          trivy fs --scanners vuln --severity CRITICAL,HIGH,MEDIUM \
+          # --include-dev-deps: Trivy excludes devDependencies by default, but
+          # this project's dependency vulns live in the build toolchain (dev
+          # deps), so include them or the scan is effectively blind here.
+          trivy fs --scanners vuln --include-dev-deps --severity CRITICAL,HIGH,MEDIUM \
             --format json --output trivy_deps.json .
 
       - name: Check for Dockerfile
