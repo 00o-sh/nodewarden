@@ -1,0 +1,12 @@
+# Gitleaks configuration for NodeWarden.
+# Extends the default ruleset and allowlists known false positives.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Demo fixture data: placeholder credentials for the public demo build (npm run build:demo), not real secrets."
+paths = [
+  '''webapp/src/lib/demo\.ts''',
+  '''webapp/src/lib/demo\.empty\.ts''',
+]

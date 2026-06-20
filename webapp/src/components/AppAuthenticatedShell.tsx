@@ -169,7 +169,6 @@ export default function AppAuthenticatedShell(props: AppAuthenticatedShellProps)
     },
   ];
 
-  const navLayoutLabel = navLayoutOptions.find((option) => option.mode === navLayoutMode)?.label || t('txt_nav_layout_flat');
   const flatNav = (
     <>
       {renderSideLink('/vault', props.location === '/vault', <KeyRound size={16} />, t('nav_vault_items'))}
