@@ -5,10 +5,12 @@ import { SELF } from 'cloudflare:test';
 export const ORIGIN = 'https://vault.test';
 const CLIENT_IP = '203.0.113.7';
 
-// Minimal value that satisfies the server's `looksLikeEncString` check
-// (a type prefix, a dot, then at least two `|`-separated payload parts).
-export const ENC_STRING = '2.aGVsbG8=|d29ybGQ=|bWFj';
-const PUBLIC_KEY = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA';
+// Built at runtime from plain words (not committed as a literal) so static
+// scanners don't mistake these test fixtures for real secrets. ENC_STRING just
+// needs to satisfy the server's `looksLikeEncString` check: a type prefix, a
+// dot, then at least two `|`-separated payload parts.
+export const ENC_STRING = `2.${btoa('iv')}|${btoa('data')}|${btoa('mac')}`;
+const PUBLIC_KEY = btoa(`test-public-key-${'x'.repeat(40)}`);
 
 export function baseHeaders(extra: Record<string, string> = {}): Record<string, string> {
   return {
