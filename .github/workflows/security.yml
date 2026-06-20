@@ -63,12 +63,13 @@ jobs:
         if: env.ACT != 'true'
         continue-on-error: true
         run: |
-          VERSION="0.56.1"
-          echo "Installing Trivy $VERSION..."
-          # Pin the installer to the matching version tag (not the mutable main
-          # branch) and download-then-run instead of piping straight into sh.
-          curl -fsSL "https://raw.githubusercontent.com/aquasecurity/trivy/v${VERSION}/contrib/install.sh" -o trivy-install.sh
-          sh trivy-install.sh -b /usr/local/bin "v$VERSION"
+          # Homebrew is preinstalled on GitHub ubuntu runners but isn't on PATH
+          # for `run:` shells, so load its env explicitly, then install Trivy and
+          # expose its bin dir to subsequent steps via GITHUB_PATH.
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew install trivy
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+          trivy --version
 
       - name: Dependency Scan (Trivy)
         if: env.ACT != 'true'
