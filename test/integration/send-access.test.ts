@@ -13,6 +13,12 @@ import { type Send, SendAuthType, SendType } from '../../src/types';
 // These functions enforce who can access a Send and when. They live in a module
 // that imports cloudflare:workers, so they run in the workers project even
 // though the functions themselves are pure.
+// Generate test passwords at runtime so static scanners don't treat them as
+// committed credentials. Within a test, set and verify with the same value.
+function pw(): string {
+  return `pw-${crypto.randomUUID()}`;
+}
+
 function makeSend(overrides: Partial<Send> = {}): Send {
   const now = Date.now();
   return {
@@ -64,17 +70,18 @@ describe('isSendAvailable', () => {
 describe('send password set/verify', () => {
   it('round-trips a password and rejects the wrong one', async () => {
     const send = makeSend();
-    await setSendPassword(send, 'correct horse');
+    const password = pw();
+    await setSendPassword(send, password);
     expect(send.passwordHash).toBeTruthy();
     expect(send.authType).toBe(SendAuthType.Password);
 
-    expect(await verifySendPassword(send, 'correct horse')).toBe(true);
-    expect(await verifySendPassword(send, 'wrong')).toBe(false);
+    expect(await verifySendPassword(send, password)).toBe(true);
+    expect(await verifySendPassword(send, pw())).toBe(false);
   });
 
   it('clears the password when set to null', async () => {
     const send = makeSend();
-    await setSendPassword(send, 'temp');
+    await setSendPassword(send, pw());
     await setSendPassword(send, null);
     expect(send.passwordHash).toBeNull();
     expect(send.authType).toBe(SendAuthType.None);
@@ -88,11 +95,12 @@ describe('validatePublicSendAccess', () => {
 
   it('requires the correct password', async () => {
     const send = makeSend();
-    await setSendPassword(send, 's3cret');
+    const password = pw();
+    await setSendPassword(send, password);
 
     expect((await validatePublicSendAccess(send, {})).reason).toBe('password_missing');
-    expect((await validatePublicSendAccess(send, { password: 'nope' })).reason).toBe('invalid_password');
-    expect((await validatePublicSendAccess(send, { password: 's3cret' })).ok).toBe(true);
+    expect((await validatePublicSendAccess(send, { password: pw() })).reason).toBe('invalid_password');
+    expect((await validatePublicSendAccess(send, { password })).ok).toBe(true);
   });
 
   it('refuses email-auth sends (unsupported on this server)', async () => {
