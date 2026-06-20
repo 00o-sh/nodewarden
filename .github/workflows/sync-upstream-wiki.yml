@@ -1,0 +1,118 @@
+name: Sync upstream wiki
+
+# Detect-and-flag sync from the UPSTREAM wiki (shuaiplus/NodeWarden), whose pages
+# are Chinese. Translation needs a human in the loop, so this workflow does not
+# translate or publish anything on its own: it clones the upstream wiki, diffs it
+# against the committed Chinese snapshot in docs/wiki/.upstream/, and if upstream
+# has changed it opens (or updates) a tracking issue with the diff.
+#
+# To resolve the issue, a maintainer re-translates the changed pages into
+# docs/wiki/*.md AND refreshes the snapshot in docs/wiki/.upstream/ (including
+# UPSTREAM_COMMIT) in the same PR. Merging that PR advances the snapshot and lets
+# the `Sync wiki` workflow publish the new English pages.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: sync-upstream-wiki
+  cancel-in-progress: true
+
+env:
+  UPSTREAM_WIKI: https://github.com/shuaiplus/NodeWarden.wiki.git
+  SNAPSHOT_DIR: docs/wiki/.upstream
+  ISSUE_LABEL: wiki-sync
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Clone upstream wiki
+        run: git clone --depth 1 "$UPSTREAM_WIKI" /tmp/upstream-wiki
+
+      - name: Diff against snapshot
+        id: diff
+        run: |
+          # Compare only the Markdown pages; ignore the snapshot's own bookkeeping
+          # files and the upstream clone's .git.
+          diff -ruN \
+            --exclude='.git' --exclude='UPSTREAM_COMMIT' --exclude='README.md' \
+            "$SNAPSHOT_DIR" /tmp/upstream-wiki > /tmp/wiki.diff || true
+
+          if [ ! -s /tmp/wiki.diff ]; then
+            echo "Upstream wiki unchanged since last translation."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "upstream_sha=$(git -C /tmp/upstream-wiki rev-parse HEAD)"
+            echo "snapshot_sha=$(cat "$SNAPSHOT_DIR/UPSTREAM_COMMIT" 2>/dev/null || echo unknown)"
+          } >> "$GITHUB_OUTPUT"
+
+          diff -rq \
+            --exclude='.git' --exclude='UPSTREAM_COMMIT' --exclude='README.md' \
+            "$SNAPSHOT_DIR" /tmp/upstream-wiki > /tmp/wiki.files || true
+
+      - name: Build issue body
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          {
+            echo "The upstream wiki (\`shuaiplus/NodeWarden\`) changed since the last"
+            echo "translation. The English pages in \`docs/wiki/\` may be out of date."
+            echo
+            echo "- Snapshot was at: \`${{ steps.diff.outputs.snapshot_sha }}\`"
+            echo "- Upstream is now at: \`${{ steps.diff.outputs.upstream_sha }}\`"
+            echo
+            echo "### Changed pages"
+            echo
+            echo '```'
+            cat /tmp/wiki.files
+            echo '```'
+            echo
+            echo "### Diff (Chinese source)"
+            echo
+            echo '```diff'
+            # Keep well under GitHub's ~65k issue-body limit.
+            head -c 50000 /tmp/wiki.diff
+            echo
+            echo '```'
+            echo
+            echo "### To resolve"
+            echo
+            echo "1. Re-translate the changed pages into \`docs/wiki/*.md\`."
+            echo "2. Refresh the snapshot in \`docs/wiki/.upstream/\` (including"
+            echo "   \`UPSTREAM_COMMIT\`) so the next run diffs cleanly."
+            echo "3. Open a PR with both changes. Merging it lets the \`Sync wiki\`"
+            echo "   workflow publish the updated English pages, and closes this issue."
+          } > /tmp/issue-body.md
+
+      - name: Open or update tracking issue
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "$ISSUE_LABEL" --color FBCA04 \
+            --description "Upstream wiki changed; needs re-translation" --force
+
+          TITLE="Upstream wiki changed — re-translation needed"
+          EXISTING=$(gh issue list --label "$ISSUE_LABEL" --state open \
+            --json number --jq '.[0].number')
+
+          if [ -n "$EXISTING" ]; then
+            echo "Updating existing issue #$EXISTING"
+            gh issue comment "$EXISTING" --body-file /tmp/issue-body.md
+          else
+            echo "Creating new tracking issue"
+            gh issue create --title "$TITLE" --label "$ISSUE_LABEL" \
+              --body-file /tmp/issue-body.md
+          fi

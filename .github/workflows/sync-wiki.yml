@@ -12,6 +12,7 @@ on:
     branches: [main]
     paths:
       - 'docs/wiki/**'
+      - '!docs/wiki/.upstream/**' # the Chinese snapshot is never published
       - 'scripts/publish-wiki.sh'
       - '.github/workflows/sync-wiki.yml'
   workflow_dispatch:

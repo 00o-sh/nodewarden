@@ -23,16 +23,25 @@ runs).
 
 Source: upstream wiki commit `000076b` (`Add initial Chinese wiki`).
 
-## How to re-pull from upstream
+## Staying in sync with upstream
 
-The upstream wiki is public and clones anonymously:
+The [`Sync upstream wiki`](../../.github/workflows/sync-upstream-wiki.yml)
+workflow runs weekly (and on demand). It clones the upstream wiki and diffs it
+against the Chinese snapshot in [`.upstream/`](.upstream/); if upstream changed,
+it opens a `wiki-sync` tracking issue with the diff. Translation stays a human
+step — nothing is auto-translated or auto-published.
+
+To resolve such an issue (or to re-pull manually):
 
 ```bash
 git clone https://github.com/shuaiplus/NodeWarden.wiki.git
 ```
 
-Translate each `*.md` page into English, keeping the English filenames above so
-the page URLs and the cross-links in `Home.md` / `_Sidebar.md` stay valid.
+1. Translate each changed `*.md` page into English, keeping the English
+   filenames above so the page URLs and the cross-links in `Home.md` /
+   `_Sidebar.md` stay valid.
+2. Refresh the snapshot in `.upstream/` (copy the new upstream pages there and
+   update `.upstream/UPSTREAM_COMMIT`) in the same PR.
 
 ## How to publish to the wiki
 
