@@ -21,10 +21,10 @@ export default defineConfig({
       // D1/R2-backed handlers (Bucket A); the backup-uploader, WebAuthn, and
       // Durable Object internals are deliberately excluded as low-value to test.
       thresholds: {
-        lines: 55,
-        statements: 52,
-        functions: 59,
-        branches: 40,
+        lines: 56,
+        statements: 53,
+        functions: 60,
+        branches: 42,
       },
     },
   },
