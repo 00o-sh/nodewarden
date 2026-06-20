@@ -17,7 +17,9 @@
     "i18n:validate": "node scripts/i18n-validate.cjs",
     "deploy": "wrangler deploy",
     "deploy:kv": "node scripts/ensure-kv.cjs && wrangler deploy -c wrangler.kv.toml",
-    "deploy:demo": "npm run build:demo && wrangler pages deploy dist --project-name nw-demo"
+    "deploy:demo": "npm run build:demo && wrangler pages deploy dist --project-name nw-demo",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "bitwarden",
@@ -53,6 +55,7 @@
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
+    "vitest": "^4.1.9",
     "wrangler": "^4.71.0"
   },
   "dependencies": {
