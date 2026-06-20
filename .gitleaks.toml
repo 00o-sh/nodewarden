@@ -5,8 +5,10 @@
 useDefault = true
 
 [allowlist]
-description = "Demo fixture data: placeholder credentials for the public demo build (npm run build:demo), not real secrets."
+description = "Placeholder/fixture values that are not real secrets: the public demo build (npm run build:demo) and the test suite (Vitest configs + test fixtures). Matched by path, so historical commits are covered too."
 paths = [
   '''webapp/src/lib/demo\.ts''',
   '''webapp/src/lib/demo\.empty\.ts''',
+  '''vitest\..*config\.ts''',
+  '''test/.*''',
 ]
