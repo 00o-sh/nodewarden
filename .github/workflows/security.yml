@@ -62,9 +62,14 @@ jobs:
       - name: Install Trivy
         if: env.ACT != 'true'
         continue-on-error: true
-        # Homebrew is preinstalled on GitHub ubuntu runners; this avoids the
-        # deprecated contrib/install.sh script and any release-asset guesswork.
-        run: brew install trivy
+        run: |
+          # Homebrew is preinstalled on GitHub ubuntu runners but isn't on PATH
+          # for `run:` shells, so load its env explicitly, then install Trivy and
+          # expose its bin dir to subsequent steps via GITHUB_PATH.
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew install trivy
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+          trivy --version
 
       - name: Dependency Scan (Trivy)
         if: env.ACT != 'true'
