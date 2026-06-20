@@ -351,10 +351,6 @@ export default function useVaultSendActions(options: UseVaultSendActionsOptions)
       });
     }
 
-    function removeCipherFromState(id: string) {
-      patchDecryptedCiphers((prev) => prev.filter((c) => c.id !== id));
-    }
-
     function patchCipherBatch(ids: string[], updater: (cipher: Cipher) => Cipher | null) {
       const idSet = new Set(ids.map((id) => String(id || '').trim()).filter(Boolean));
       if (!idSet.size) return;
