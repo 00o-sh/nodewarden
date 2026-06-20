@@ -71,8 +71,8 @@ jobs:
           scan-ref: .
           scanners: vuln
           severity: CRITICAL,HIGH,MEDIUM
-          format: json
-          output: trivy_deps.json
+          format: sarif
+          output: trivy_deps.sarif
           exit-code: '0'
         env:
           TRIVY_INCLUDE_DEV_DEPS: 'true'
@@ -115,6 +115,13 @@ jobs:
           sarif_file: results.sarif
           category: gitleaks
 
+      - name: Upload Trivy Dependency Results to GitHub Security
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4
+        if: always() && hashFiles('trivy_deps.sarif') != ''
+        with:
+          sarif_file: trivy_deps.sarif
+          category: trivy-deps
+
       - name: Upload Security Report Artifacts
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
@@ -124,7 +131,7 @@ jobs:
           path: |
             security-report.md
             security-report-cn.md
-            trivy_deps.json
+            trivy_deps.sarif
             trivy_result.json
             results.sarif
             sarif-results/*.sarif
