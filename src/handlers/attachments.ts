@@ -303,6 +303,8 @@ export async function handleGetAttachment(
 }
 
 // PUT /api/ciphers/{cipherId}/attachment/{attachmentId}/metadata
+// Fix up the encryption metadata of legacy attachments so official clients can
+// decrypt them under the current Bitwarden contract.
 // 修正旧附件的加密元数据，供官方客户端按当前 Bitwarden 契约解密。
 export async function handleUpdateAttachmentMetadata(
   request: Request,
