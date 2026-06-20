@@ -1,8 +1,18 @@
 name: Sync upstream
 
+# DISABLED: automatic upstream sync is turned off.
+#
+# This workflow pulls commits from the upstream repository
+# (shuaiplus/NodeWarden) and pushes them straight to `main`, which
+# Cloudflare auto-deploys. Running it automatically means unreviewed
+# upstream code goes live on a server that holds password-vault data.
+# The scheduled trigger has been removed so this never runs on its own.
+#
+# It can still be started manually from the Actions tab (workflow_dispatch)
+# if you deliberately want to sync after reviewing the upstream changes.
+# Delete this file entirely if you never want to sync from upstream.
+
 on:
-  schedule:
-    - cron: "0 3 * * *"
   workflow_dispatch:
     inputs:
       target_commit:
