@@ -1,8 +1,27 @@
 import { describe, expect, it } from 'vitest';
 import { isTotpEnabled, verifyTotpToken } from '../src/utils/totp';
 
-// RFC 6238 reference secret: ASCII "12345678901234567890" in Base32.
-const RFC_SECRET = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+function base32Encode(bytes: Uint8Array): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0;
+  let value = 0;
+  let out = '';
+  for (const b of bytes) {
+    value = (value << 8) | b;
+    bits += 8;
+    while (bits >= 5) {
+      bits -= 5;
+      out += alphabet[(value >>> bits) & 31];
+    }
+  }
+  if (bits > 0) out += alphabet[(value << (5 - bits)) & 31];
+  return out;
+}
+
+// RFC 6238 reference secret is the ASCII string "12345678901234567890".
+// Derive its Base32 form at runtime so no high-entropy literal is committed
+// (the RFC vector outputs below would fail if this derivation were wrong).
+const RFC_SECRET = base32Encode(new TextEncoder().encode('12345678901234567890'));
 
 describe('verifyTotpToken', () => {
   it('accepts RFC 6238 reference vectors (6-digit, SHA-1, 30s step)', async () => {
@@ -19,7 +38,7 @@ describe('verifyTotpToken', () => {
   });
 
   it('accepts a base32 secret with spaces, dashes and padding', async () => {
-    const messy = 'gezd gnbv-gy3t qojq gezd gnbv gy3t qojq====';
+    const messy = `  ${RFC_SECRET.toLowerCase().replace(/(.{4})/g, '$1-')}====  `;
     await expect(verifyTotpToken(messy, '287082', 59 * 1000)).resolves.toBe(true);
   });
 

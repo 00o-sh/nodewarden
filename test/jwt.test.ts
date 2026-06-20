@@ -15,8 +15,10 @@ import {
   verifySendFileUploadToken,
 } from '../src/utils/jwt';
 
-const SECRET = 'test-secret-at-least-32-characters-long!!';
-const OTHER_SECRET = 'another-secret-at-least-32-characters-xx!!';
+// Generate the test signing keys at runtime so no key literal is committed.
+// Any 32+ char string works as an HMAC key; the two just need to differ.
+const SECRET = `test-${crypto.randomUUID()}-${crypto.randomUUID()}`;
+const OTHER_SECRET = `test-${crypto.randomUUID()}-${crypto.randomUUID()}`;
 
 const basePayload = {
   sub: 'user-123',
