@@ -152,6 +152,7 @@ function normalizeIconHost(rawHost: string): string | null {
 const ICON_UPSTREAM_TIMEOUT_MS = 2500;
 const ICON_MAX_BUFFER_BYTES = 256 * 1024;
 const BITWARDEN_DEFAULT_GLOBE_ICON_BYTES = 500;
+// deepcode ignore HardcodedNonCryptoSecret: not a secret — SHA-256 of Bitwarden's public default globe icon, used to detect and reject that placeholder image when proxying favicons.
 const BITWARDEN_DEFAULT_GLOBE_ICON_SHA256 = 'aaa64871332ad5b7d28fe8874efb19c2d9cc2f1e6de75d52b080b438225a0783';
 
 type IconSource = {
