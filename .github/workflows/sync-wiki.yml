@@ -1,0 +1,36 @@
+name: Sync wiki
+
+# Publishes the English wiki pages in docs/wiki/ to this repository's GitHub
+# wiki. Actions can't run inside a wiki repo, so the sync lives here and pushes
+# into `<repo>.wiki.git` using the built-in GITHUB_TOKEN.
+#
+# The wiki must already be enabled (Settings -> Features -> Wikis) and seeded
+# with at least one page via the web UI, or the wiki repo won't exist to push to.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/wiki/**'
+      - 'scripts/publish-wiki.sh'
+      - '.github/workflows/sync-wiki.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-wiki
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Publish docs/wiki to the wiki
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WIKI_REPO: ${{ github.repository }}
+        run: bash scripts/publish-wiki.sh
