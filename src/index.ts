@@ -10,7 +10,7 @@ let dbInitialized = false;
 let dbInitError: string | null = null;
 let dbInitPromise: Promise<void> | null = null;
 
-function normalizeRequestUrl(request: Request): Request {
+export function normalizeRequestUrl(request: Request): Request {
   const url = new URL(request.url);
   const normalizedPathname = url.pathname.length <= 1 ? url.pathname : url.pathname.replace(/\/+$/, '');
   if (normalizedPathname === url.pathname) return request;
@@ -19,7 +19,7 @@ function normalizeRequestUrl(request: Request): Request {
   return new Request(url.toString(), request);
 }
 
-function isWorkerHandledPath(path: string): boolean {
+export function isWorkerHandledPath(path: string): boolean {
   return (
     path.startsWith('/api/') ||
     path.startsWith('/identity/') ||
@@ -32,7 +32,7 @@ function isWorkerHandledPath(path: string): boolean {
   );
 }
 
-function addSearchIndexHeaders(request: Request, response: Response): Response {
+export function addSearchIndexHeaders(request: Request, response: Response): Response {
   const url = new URL(request.url);
   const contentType = String(response.headers.get('Content-Type') || '').toLowerCase();
   const shouldNoIndex =
@@ -51,7 +51,7 @@ function addSearchIndexHeaders(request: Request, response: Response): Response {
   });
 }
 
-async function maybeServeAsset(request: Request, env: Env): Promise<Response | null> {
+export async function maybeServeAsset(request: Request, env: Env): Promise<Response | null> {
   if (!env.ASSETS) return null;
   if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   const url = new URL(request.url);
