@@ -1130,7 +1130,7 @@ export default function useVaultSendActions(options: UseVaultSendActionsOptions)
               if (!attachmentId) continue;
               const info = await getAttachmentDownloadInfo(authedFetch, cipherId, attachmentId);
               const fileResp = await fetch(info.url, { cache: 'no-store' });
-              if (!fileResp.ok) throw new Error(`Failed to download attachment ${attachmentId}`);
+              if (!fileResp.ok) throw new Error('Download attachment failed');
               const encryptedBytes = new Uint8Array(await fileResp.arrayBuffer());
 
               let fileEnc = itemEnc;
