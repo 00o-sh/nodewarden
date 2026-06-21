@@ -9,6 +9,10 @@ on:
       - main
   workflow_dispatch:
 
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -135,3 +139,53 @@ jobs:
             trivy_result.json
             results.sarif
             sarif-results/*.sarif
+
+  supply-chain:
+    # Verifies the integrity of the dependency tree against the registry and
+    # produces an SBOM. Kept separate from `scan` so a supply-chain finding is
+    # attributable on its own, and runs read-only.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies (locked)
+        run: npm ci
+
+      - name: Verify registry signatures / provenance
+        # Confirms every installed package matches the registry's published
+        # signature. Non-blocking (matches the project's "visible, not gating"
+        # scan policy) because not all transitive packages publish signatures
+        # yet — a genuine mismatch still shows up in the step summary.
+        continue-on-error: true
+        run: |
+          echo '## npm audit signatures' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          npm audit signatures 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Known-vulnerability audit
+        continue-on-error: true
+        run: |
+          echo '## npm audit (high+)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          npm audit --audit-level=high 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Generate SBOM (CycloneDX)
+        run: npm sbom --sbom-format cyclonedx --omit dev > sbom.cyclonedx.json
+
+      - name: Upload SBOM
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: sbom
+          if-no-files-found: warn
+          path: sbom.cyclonedx.json

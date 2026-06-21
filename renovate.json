@@ -1,6 +1,46 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended"
+    "config:recommended",
+    ":pinAllExceptPeerDependencies",
+    "security:openssf-scorecard",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "rangeStrategy": "pin",
+  "dependencyDashboard": true,
+  "semanticCommits": "enabled",
+  "configMigration": true,
+  "osvVulnerabilityAlerts": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 5am on monday"]
+  },
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "automerge": true,
+    "minimumReleaseAge": "0"
+  },
+  "packageRules": [
+    {
+      "description": "Soak non-security updates so freshly-published (possibly compromised) releases are not ingested immediately. Critical for a password-vault project.",
+      "matchUpdateTypes": ["patch", "minor", "major", "pin", "digest", "lockFileMaintenance"],
+      "minimumReleaseAge": "5 days"
+    },
+    {
+      "description": "Auto-merge low-risk updates after the soak window.",
+      "matchUpdateTypes": ["patch", "pin", "digest", "lockFileMaintenance"],
+      "automerge": true
+    },
+    {
+      "description": "Group dev tooling minor/patch updates to reduce PR noise.",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "dev dependencies"
+    },
+    {
+      "description": "Never auto-merge major upgrades; always review them by hand.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
+    }
   ]
 }
