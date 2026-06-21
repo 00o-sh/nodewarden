@@ -1,6 +1,6 @@
 import { SELF } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { ENC_STRING, Session, api, authenticate, baseHeaders, enc, url } from './helpers';
+import { ENC_STRING, Session, api, authenticate, baseHeaders, enc } from './helpers';
 
 // Authenticated Send handler branches the existing suites miss: the paginated
 // listing, the update-time validation/auth toggles, and file-send deletion
