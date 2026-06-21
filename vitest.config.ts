@@ -21,10 +21,10 @@ export default defineConfig({
       // backup subsystem (local export/import plus the remote WebDAV/S3 flows,
       // exercised end-to-end with real in-memory servers rather than mocks).
       thresholds: {
-        lines: 84,
+        lines: 85,
         statements: 81,
         functions: 91,
-        branches: 66,
+        branches: 67,
       },
     },
   },
