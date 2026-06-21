@@ -1,6 +1,6 @@
 import { SELF } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { ENC_STRING, Session, api, authenticate, baseHeaders, createCipher, createFolder, enc, url } from './helpers';
+import { Session, api, authenticate, baseHeaders, createCipher, createFolder, enc, url } from './helpers';
 
 // handleUpdateCipher edge branches: stale-update guard, key rejection, type
 // change (field null-out), custom-field clearing, folder ownership, the
