@@ -24,6 +24,10 @@ export default defineConfig({
         },
         d1Databases: ['DB'],
         r2Buckets: ['ATTACHMENTS'],
+        // A real in-memory KV namespace so the KV-backed blob storage path can
+        // be exercised directly. R2 (ATTACHMENTS) stays bound and preferred, so
+        // the worker's own attachment routes are unaffected by its presence.
+        kvNamespaces: ['ATTACHMENTS_KV'],
         durableObjects: {
           NOTIFICATIONS_HUB: 'NotificationsHub',
           BACKUP_TRANSFER_RUNNER: 'BackupTransferRunner',
