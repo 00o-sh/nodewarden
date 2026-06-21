@@ -30,6 +30,15 @@ const intentionallyEnglishKeys = new Set([
   'txt_backup_destination_name_default_s3',
   'txt_dash',
   'txt_text_3',
+  // Brand / product names, abbreviations, and protocol identifiers that stay
+  // English in every locale.
+  'txt_ios', // "iOS"
+  'txt_android', // "Android"
+  'txt_totp', // "TOTP"
+  'txt_uri_match_regular_expression', // "Regex"
+  'txt_nodewarden_send', // "NodeWarden Send"
+  'txt_backup_recommend_koofr_dav_self', // "Koofr"
+  'txt_backup_s3_addressing_virtual_hosted_style', // "virtual-hosted-style"
 ]);
 
 const intentionallyEnglishPrefixes = [
@@ -45,6 +54,37 @@ function isIntentionallyEnglishKey(key) {
     intentionallyEnglishKeys.has(key) ||
     intentionallyEnglishPrefixes.some((prefix) => key.startsWith(prefix))
   );
+}
+
+// CONTRACT:
+// Keys whose correct translation in a SPECIFIC locale happens to be byte-for-byte
+// identical to English (e.g. Spanish "Total" / "No", or an A-Z sort label). Unlike
+// intentionallyEnglishKeys, these ARE translated in other locales, so the exception
+// is scoped per locale. Used by i18n-report.cjs so the coverage figure isn't
+// dragged down by correct-but-identical strings.
+const verifiedSameAsEnglishByLocale = {
+  es: new Set([
+    'txt_no', // "No"
+    'txt_total', // "Total"
+    'txt_actor', // "Actor"
+    'txt_log_level_error', // "Error"
+    'txt_log_level_info', // "Info"
+    'txt_log_total', // " total"
+    'txt_uri_match_host', // "Host"
+    'txt_web', // "Web"
+    'txt_sort_name', // "A-Z"
+  ]),
+  'zh-CN': new Set([
+    'txt_sort_name', // "A-Z" (pinyin sort)
+  ]),
+  'zh-TW': new Set([
+    'txt_sort_name', // "A-Z" (pinyin sort)
+  ]),
+};
+
+function isVerifiedSameAsEnglish(locale, key) {
+  const set = verifiedSameAsEnglishByLocale[locale];
+  return Boolean(set && set.has(key));
 }
 
 function readLocale(fileName, variableName) {
@@ -76,4 +116,6 @@ module.exports = {
   intentionallyEnglishKeys,
   intentionallyEnglishPrefixes,
   isIntentionallyEnglishKey,
+  verifiedSameAsEnglishByLocale,
+  isVerifiedSameAsEnglish,
 };
