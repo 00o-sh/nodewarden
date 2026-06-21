@@ -16,8 +16,15 @@ beforeAll(async () => {
 });
 
 // The password-hint endpoint is rate-limited to 1/min per IP, so each lookup
-// uses a distinct client IP to stay independent.
-function passwordHint(body: unknown, ip = `198.51.100.${Math.floor(Math.random() * 250) + 1}`): Promise<Response> {
+// uses a *unique* client IP. A monotonic counter guarantees no two calls in
+// this file collide (a random IP from a small pool could, intermittently
+// tripping the limiter and returning 429).
+let hintIpCounter = 0;
+function nextHintIp(): string {
+  hintIpCounter += 1;
+  return `198.51.${Math.floor(hintIpCounter / 254) % 254}.${(hintIpCounter % 254) + 1}`;
+}
+function passwordHint(body: unknown, ip = nextHintIp()): Promise<Response> {
   return SELF.fetch(url('/api/accounts/password-hint'), {
     method: 'POST',
     headers: baseHeaders({ 'Content-Type': 'application/json', 'CF-Connecting-IP': ip }),
