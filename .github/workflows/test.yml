@@ -9,6 +9,11 @@ on:
       - main
   workflow_dispatch:
 
+# Minimal default token: read-only at the top level. The test job escalates
+# to contents: write only where it needs to (badge publishing on main).
+permissions:
+  contents: read
+
 # Cancel superseded runs on the same ref so a rapid push sequence does not
 # pile up redundant jobs (and racing badge pushes on main).
 concurrency:
