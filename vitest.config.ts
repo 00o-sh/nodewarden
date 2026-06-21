@@ -13,7 +13,11 @@ export default defineConfig({
       // istanbul instrumentation, which works across both the node and workers
       // projects.
       provider: 'istanbul',
-      include: ['src/**', 'shared/**'],
+      // Only instrument TypeScript sources. The `.json` data files under
+      // src/static (e.g. the global-domains rule sets) are not executable code;
+      // including them makes istanbul's uncovered-file pass try to parse JSON as
+      // JavaScript, which throws a SyntaxError.
+      include: ['src/**/*.ts', 'shared/**/*.ts'],
       reporter: ['text-summary', 'json-summary', 'html'],
       reportsDirectory: 'coverage',
       // Ratcheting floor: CI fails if coverage drops below these. Raise them as
