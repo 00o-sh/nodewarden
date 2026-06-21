@@ -26,8 +26,8 @@ export default defineConfig({
       // exercised end-to-end with real in-memory servers rather than mocks).
       thresholds: {
         lines: 88,
-        statements: 85,
-        functions: 93,
+        statements: 86,
+        functions: 94,
         branches: 72,
       },
     },
