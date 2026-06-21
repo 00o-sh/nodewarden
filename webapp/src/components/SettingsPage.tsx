@@ -356,7 +356,7 @@ export default function SettingsPage(props: SettingsPageProps) {
         </div>
         <div className="totp-grid">
           <div className="totp-qr">
-            <img src={qrDataUrl} alt="TOTP QR" />
+            <img src={qrDataUrl} alt={t('txt_totp_qr_alt')} />
           </div>
           <div>
             <div>

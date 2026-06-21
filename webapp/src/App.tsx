@@ -61,7 +61,7 @@ import useAdminActions from '@/hooks/useAdminActions';
 import useBackupActions from '@/hooks/useBackupActions';
 import useVaultSendActions from '@/hooks/useVaultSendActions';
 import { useToastManager } from '@/hooks/useToastManager';
-import { t } from '@/lib/i18n';
+import { t, translateError, translateServerError } from '@/lib/i18n';
 import { APP_NOTIFY_EVENT, type AppNotifyDetail } from '@/lib/app-notify';
 import { dispatchBackupProgress, type BackupProgressDetail } from '@/lib/backup-restore-progress';
 import { clearOfflineUnlockRecord } from '@/lib/offline-auth';
@@ -546,9 +546,9 @@ export default function App() {
         setRememberDevice(true);
         return;
       }
-      pushToast('error', result.message || t('txt_login_failed'));
+      pushToast('error', translateServerError(result.message, t('txt_login_failed')));
     } catch (error) {
-      pushToast('error', error instanceof Error ? error.message : t('txt_login_failed'));
+      pushToast('error', translateError(error, t('txt_login_failed')));
     } finally {
       setPendingAuthAction(null);
     }
@@ -574,9 +574,9 @@ export default function App() {
         pushToast('warning', t('txt_passkey_requires_master_password'));
         return;
       }
-      pushToast('error', result.message || t('txt_login_failed'));
+      pushToast('error', translateServerError(result.message, t('txt_login_failed')));
     } catch (error) {
-      pushToast('error', error instanceof Error ? error.message : t('txt_login_failed'));
+      pushToast('error', translateError(error, t('txt_login_failed')));
     } finally {
       setPendingAuthAction(null);
     }
@@ -601,9 +601,9 @@ export default function App() {
         pushToast('error', t('txt_account_passkey_direct_unlock_unavailable_error'));
         return;
       }
-      pushToast('error', result.message || t('txt_unlock_failed_master_password_is_incorrect'));
+      pushToast('error', translateServerError(result.message, t('txt_unlock_failed_master_password_is_incorrect')));
     } catch (error) {
-      pushToast('error', error instanceof Error ? error.message : t('txt_unlock_failed_master_password_is_incorrect'));
+      pushToast('error', translateError(error, t('txt_unlock_failed_master_password_is_incorrect')));
     } finally {
       setPendingAuthAction(null);
     }
@@ -620,7 +620,7 @@ export default function App() {
       const login = await completePasskeyPasswordLogin(pendingPasskeyPassword, passkeyPassword);
       await finalizeLogin(login);
     } catch (error) {
-      pushToast('error', error instanceof Error ? error.message : t('txt_unlock_failed_master_password_is_incorrect'));
+      pushToast('error', translateError(error, t('txt_unlock_failed_master_password_is_incorrect')));
     } finally {
       setPendingAuthAction(null);
     }
@@ -638,7 +638,7 @@ export default function App() {
       const login = await performTotpLogin(pendingTotp, totpCode, rememberDevice);
       await finalizeLogin(login, pendingTotpMode === 'unlock' ? t('txt_unlocked') : t('txt_login_success'));
     } catch (error) {
-      pushToast('error', error instanceof Error ? error.message : t('txt_totp_verify_failed'));
+      pushToast('error', translateError(error, t('txt_totp_verify_failed')));
     } finally {
       setTotpSubmitting(false);
     }
@@ -666,7 +666,7 @@ export default function App() {
       pushToast('error', t('txt_recovered_but_auto_login_failed_please_sign_in'));
       navigate('/login');
     } catch (error) {
-      pushToast('error', error instanceof Error ? error.message : t('txt_recover_2fa_failed'));
+      pushToast('error', translateError(error, t('txt_recover_2fa_failed')));
     }
   }
 
@@ -701,7 +701,7 @@ export default function App() {
         fallbackIterations: defaultKdfIterations,
       });
       if (!resp.ok) {
-        pushToast('error', resp.message);
+        pushToast('error', translateServerError(resp.message, t('txt_register_failed')));
         return;
       }
       setLoginValues({ email: registerValues.email.toLowerCase(), password: '' });
@@ -761,7 +761,7 @@ export default function App() {
         loading: false,
         hint: null,
       });
-      pushToast('error', error instanceof Error ? error.message : t('txt_password_hint_load_failed'));
+      pushToast('error', translateError(error, t('txt_password_hint_load_failed')));
     }
   }
 
@@ -800,7 +800,7 @@ export default function App() {
         setRememberDevice(true);
         return;
       }
-      pushToast('error', result.message || t('txt_unlock_failed_master_password_is_incorrect'));
+      pushToast('error', translateServerError(result.message, t('txt_unlock_failed_master_password_is_incorrect')));
     } catch {
       pushToast('error', t('txt_unlock_failed_master_password_is_incorrect'));
     } finally {
@@ -1144,7 +1144,7 @@ export default function App() {
       void queryClient.invalidateQueries({ queryKey: ['vault-core', vaultCacheKey] });
     }).catch((error) => {
       if (domainRulesSaveSeqRef.current !== saveSeq) return;
-      pushToast('error', error instanceof Error ? error.message : t('txt_domain_rules_save_failed'));
+      pushToast('error', translateError(error, t('txt_domain_rules_save_failed')));
       void domainRulesQuery.refetch();
     });
 
@@ -1246,7 +1246,7 @@ export default function App() {
         }
       } catch (error) {
         if (!active) return;
-        const message = error instanceof Error ? error.message : t('txt_decrypt_failed_2');
+        const message = translateError(error, t('txt_decrypt_failed_2'));
         setVaultDecryptError(message);
         setVaultInitialDecryptDone(true);
         pushToast('error', message);
@@ -1302,7 +1302,7 @@ export default function App() {
       } catch (error) {
         if (!active) return;
         setSendsDecryptDone(true);
-        pushToast('error', error instanceof Error ? error.message : t('txt_decrypt_failed_2'));
+        pushToast('error', translateError(error, t('txt_decrypt_failed_2')));
       }
     })();
 
@@ -1950,13 +1950,13 @@ export default function App() {
         onApprove={() => {
           if (!latestPendingAuthRequest) return;
           void approveAuthRequest(latestPendingAuthRequest).catch((error) => {
-            pushToast('error', error instanceof Error ? error.message : t('txt_auth_request_update_failed'));
+            pushToast('error', translateError(error, t('txt_auth_request_update_failed')));
           });
         }}
         onDeny={() => {
           if (!latestPendingAuthRequest) return;
           void denyAuthRequest(latestPendingAuthRequest).catch((error) => {
-            pushToast('error', error instanceof Error ? error.message : t('txt_auth_request_update_failed'));
+            pushToast('error', translateError(error, t('txt_auth_request_update_failed')));
           });
         }}
         onClose={() => setAuthRequestDialogDismissedId(latestPendingAuthRequest?.id || null)}
