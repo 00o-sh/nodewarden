@@ -22,6 +22,11 @@
   },
   "packageRules": [
     {
+      "description": "Do not let pinning rewrite .nvmrc to an exact Node patch. Cloudflare Workers Builds can only install the Node versions baked into its build image, so an exact patch pin (e.g. v24.17.0) fails at the tool-install step. Keep .nvmrc at the major (managed by hand).",
+      "matchManagers": ["nvm"],
+      "enabled": false
+    },
+    {
       "description": "Soak non-security updates so freshly-published (possibly compromised) releases are not ingested immediately. Critical for a password-vault project.",
       "matchUpdateTypes": ["patch", "minor", "major", "pin", "digest", "lockFileMaintenance"],
       "minimumReleaseAge": "5 days"
