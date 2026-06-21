@@ -11,7 +11,12 @@
 //   node scripts/i18n-report.cjs           # human-readable Markdown report
 //   node scripts/i18n-report.cjs --json     # machine-readable JSON
 //   node scripts/i18n-report.cjs --badge    # shields.io endpoint JSON (min locale)
-const { localeFiles, readLocale, isIntentionallyEnglishKey } = require('./i18n-utils.cjs');
+const {
+  localeFiles,
+  readLocale,
+  isIntentionallyEnglishKey,
+  isVerifiedSameAsEnglish,
+} = require('./i18n-utils.cjs');
 
 const localeNames = Object.fromEntries(localeFiles.map(([locale, , , name]) => [locale, name]));
 const locales = Object.fromEntries(
@@ -26,7 +31,9 @@ const report = [];
 for (const [locale, table] of Object.entries(locales)) {
   if (locale === 'en') continue;
   const missing = baseKeys.filter((key) => !(key in table));
-  const untranslated = translatableKeys.filter((key) => table[key] === base[key]);
+  const untranslated = translatableKeys.filter(
+    (key) => table[key] === base[key] && !isVerifiedSameAsEnglish(locale, key)
+  );
   const translated = translatableKeys.length - untranslated.length;
   const pct = translatableKeys.length === 0 ? 100 : (translated / translatableKeys.length) * 100;
   report.push({
