@@ -1,5 +1,4 @@
 import { env } from 'cloudflare:test';
-import { SELF } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   buildBackupArchive,
