@@ -15,7 +15,7 @@ export default defineConfig({
     cloudflareTest({
       main: './src/index.ts',
       miniflare: {
-        compatibilityDate: '2024-01-01',
+        compatibilityDate: '2026-01-31',
         bindings: {
           // Generated at runtime (not a committed literal) so static scanners
           // don't flag it. Comfortably exceeds the 32-char minimum and is never
