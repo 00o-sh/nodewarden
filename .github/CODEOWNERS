@@ -1,0 +1,10 @@
+# Code owners for NodeWarden.
+#
+# This is a fork; @00o-sh is the sole maintainer and owns the entire tree.
+# The last matching pattern takes precedence, so the catch-all below assigns
+# every path. Add more specific lines beneath it later to delegate areas.
+#
+# Required-review enforcement is controlled by the branch ruleset
+# (require_code_owner_review); this file just defines who the owner is.
+
+* @00o-sh
