@@ -12,8 +12,7 @@ on:
         type: string
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: sync-global-domains
@@ -22,6 +21,10 @@ concurrency:
 jobs:
   sync-global-domains:
     runs-on: ubuntu-latest
+    # Needs write to push the sync branch and open the pull request.
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 

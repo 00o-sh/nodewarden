@@ -9,6 +9,11 @@ on:
       - main
   workflow_dispatch:
 
+# Minimal default token: read-only at the top level. Each job escalates to
+# the specific write scopes it needs (e.g. security-events: write for SARIF).
+permissions:
+  contents: read
+
 concurrency:
   group: security-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
