@@ -14,11 +14,15 @@ const DEFAULT_SETTINGS: AliasGeneratorSettings = {
   recipients: [],
 };
 
+// Exactly 32 words so a 5-bit mask (byte & 31) selects uniformly from a byte
+// (256 is a multiple of 32) — unbiased without modulo/division.
 const RANDOM_WORDS = [
   'amber', 'basil', 'cedar', 'delta', 'ember', 'fable', 'glade', 'harbor',
   'indigo', 'jade', 'koala', 'lunar', 'maple', 'nimbus', 'opal', 'pebble',
   'quartz', 'raven', 'sage', 'tulip', 'umber', 'velvet', 'willow', 'zephyr',
+  'aspen', 'brook', 'coral', 'dune', 'flint', 'grove', 'hazel', 'ivory',
 ];
+const RANDOM_WORDS_MASK = RANDOM_WORDS.length - 1; // 31
 
 // Label-based validation (no ambiguous regex) to avoid polynomial backtracking
 // on attacker-influenced input. Each dot-separated label uses a single,
@@ -91,24 +95,16 @@ export async function saveAliasSettings(
   await storage.setConfigValue(ALIAS_SETTINGS_KEY, JSON.stringify(settings));
 }
 
-// Unbiased index in [0, n) from a CSPRNG using the multiply method (no modulo,
-// so no modulo-bias). The 2^32 scaling makes the residual bias negligible for
-// the small ranges used here.
-function randomIndex(n: number): number {
-  const value = crypto.getRandomValues(new Uint32Array(1))[0];
-  return Math.floor((value / 0x100000000) * n);
-}
-
 function randomLocalPart(format: string): string {
   const bytes = crypto.getRandomValues(new Uint8Array(8));
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   switch (format) {
     case 'uuid':
       return crypto.randomUUID();
-    case 'random_words': {
-      const pick = () => RANDOM_WORDS[randomIndex(RANDOM_WORDS.length)];
-      return `${pick()}.${pick()}.${randomIndex(1000)}`;
-    }
+    case 'random_words':
+      // Bitmask selection is uniform (no modulo/division bias) because the word
+      // list length is a power of two; a 4-hex-char suffix keeps aliases unique.
+      return `${RANDOM_WORDS[bytes[0] & RANDOM_WORDS_MASK]}.${RANDOM_WORDS[bytes[1] & RANDOM_WORDS_MASK]}.${hex.slice(0, 4)}`;
     case 'random_characters':
     default:
       return hex;

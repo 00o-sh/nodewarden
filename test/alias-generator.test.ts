@@ -73,7 +73,7 @@ describe('buildAliasAddress', () => {
 
   it('supports random_words format', () => {
     const { address } = buildAliasAddress(settings, { format: 'random_words' });
-    expect(address.split('@')[0]).toMatch(/^[a-z]+\.[a-z]+\.\d+$/);
+    expect(address.split('@')[0]).toMatch(/^[a-z]+\.[a-z]+\.[0-9a-f]{4}$/);
   });
 
   it('accepts a sanitized custom local part', () => {
