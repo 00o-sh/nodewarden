@@ -1,4 +1,4 @@
-import { SELF, env } from 'cloudflare:test';
+import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Session, api, authenticate } from './helpers';
 
