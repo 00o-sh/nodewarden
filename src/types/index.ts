@@ -14,6 +14,12 @@ export interface Env {
   WEBAUTHN_RP_ID?: string;
   WEBAUTHN_RP_NAME?: string;
   WEBAUTHN_ALLOWED_ORIGINS?: string;
+  // Cloudflare API credentials for the email-alias generator (optional).
+  // Only required for the "advanced" override path that creates explicit
+  // Email Routing rules (custom destination / disabling a catch-all alias).
+  // Default alias generation relies on a configured catch-all and needs neither.
+  CF_API_TOKEN?: string;
+  CF_ZONE_ID?: string;
 }
 
 export type UserRole = 'admin' | 'user';
@@ -72,6 +78,45 @@ export interface CustomEquivalentDomain {
   id: string;
   domains: string[];
   excluded: boolean;
+}
+
+// Email alias generator (Cloudflare Email Routing backed).
+// An alias is a generated forwarding address on one of the configured domains.
+// When `cfRuleId` is null the alias is delivered by the zone catch-all; when it
+// is set the alias has an explicit Email Routing rule (custom destination or a
+// "drop" rule used to disable a catch-all alias).
+export interface EmailAlias {
+  id: string;
+  userId: string;
+  address: string;
+  domain: string;
+  destination: string;
+  description: string | null;
+  active: boolean;
+  cfRuleId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Per-user token used by official Bitwarden clients' addy.io forwarder
+// (pasted into the "API access token" field). Only the SHA-256 hash is stored.
+export interface AliasApiToken {
+  id: string;
+  userId: string;
+  name: string;
+  tokenHash: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
+// Instance-level configuration for the alias generator, stored in `config`.
+export interface AliasGeneratorSettings {
+  enabled: boolean;
+  domains: string[];
+  defaultDomain: string | null;
+  defaultDestination: string | null;
+  // Selectable destinations for the webapp "advanced" override dropdown.
+  recipients: string[];
 }
 
 export interface GlobalEquivalentDomain {

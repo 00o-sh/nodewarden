@@ -84,6 +84,17 @@ import {
   handleListPendingAuthRequests,
   handleUpdateAuthRequest,
 } from './handlers/auth-requests';
+import {
+  handleCreateAlias,
+  handleCreateAliasToken,
+  handleDeleteAlias,
+  handleDeleteAliasToken,
+  handleGetAliasSettings,
+  handleListAliasTokens,
+  handleListAliases,
+  handleUpdateAlias,
+  handleUpdateAliasSettings,
+} from './handlers/email-aliases';
 
 export async function handleAuthenticatedRoute(
   request: Request,
@@ -374,6 +385,37 @@ export async function handleAuthenticatedRoute(
     if (method === 'GET') return handleGetDomains(env, userId);
     if (method === 'PUT' || method === 'POST') return handleUpdateDomains(request, env, userId);
     return null;
+  }
+
+  // Email alias generator (Cloudflare Email Routing backed).
+  if (path === '/api/email-aliases/settings') {
+    if (method === 'GET') return handleGetAliasSettings(env, currentUser);
+    if (method === 'PUT' || method === 'POST') return handleUpdateAliasSettings(request, env, currentUser);
+    return errorResponse('Method not allowed', 405);
+  }
+
+  if (path === '/api/email-aliases/tokens') {
+    if (method === 'GET') return handleListAliasTokens(env, userId);
+    if (method === 'POST') return handleCreateAliasToken(request, env, userId);
+    return errorResponse('Method not allowed', 405);
+  }
+
+  const aliasTokenMatch = path.match(/^\/api\/email-aliases\/tokens\/([a-f0-9-]+)$/i);
+  if (aliasTokenMatch && method === 'DELETE') {
+    return handleDeleteAliasToken(env, userId, aliasTokenMatch[1]);
+  }
+
+  if (path === '/api/email-aliases') {
+    if (method === 'GET') return handleListAliases(env, userId);
+    if (method === 'POST') return handleCreateAlias(request, env, userId);
+    return errorResponse('Method not allowed', 405);
+  }
+
+  const aliasMatch = path.match(/^\/api\/email-aliases\/([a-f0-9-]+)$/i);
+  if (aliasMatch) {
+    if (method === 'PUT' || method === 'POST') return handleUpdateAlias(request, env, userId, aliasMatch[1]);
+    if (method === 'DELETE') return handleDeleteAlias(env, userId, aliasMatch[1]);
+    return errorResponse('Method not allowed', 405);
   }
 
   const authenticatedDeviceResponse = await handleAuthenticatedDeviceRoute(request, env, userId, path, method);

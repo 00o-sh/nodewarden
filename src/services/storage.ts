@@ -125,6 +125,20 @@ import {
   saveUserDomainSettings as saveStoredUserDomainSettings,
 } from './storage-domain-rules-repo';
 import {
+  countEmailAliasesByUserId as countStoredEmailAliasesByUserId,
+  createAliasApiToken as createStoredAliasApiToken,
+  createEmailAlias as createStoredEmailAlias,
+  deleteAliasApiToken as deleteStoredAliasApiToken,
+  deleteEmailAlias as deleteStoredEmailAlias,
+  getActiveAliasApiTokenByHash as findStoredActiveAliasApiTokenByHash,
+  getEmailAliasByAddress as findStoredEmailAliasByAddress,
+  getEmailAliasById as findStoredEmailAliasById,
+  listAliasApiTokensByUserId as listStoredAliasApiTokensByUserId,
+  listEmailAliasesByUserId as listStoredEmailAliasesByUserId,
+  touchAliasApiTokenLastUsed as touchStoredAliasApiTokenLastUsed,
+  updateEmailAlias as updateStoredEmailAlias,
+} from './storage-email-alias-repo';
+import {
   consumeAccountPasskeyChallenge as consumeStoredAccountPasskeyChallenge,
   countAccountPasskeyCredentialsByUserId as countStoredAccountPasskeyCredentialsByUserId,
   deleteAccountPasskeyCredential as deleteStoredAccountPasskeyCredential,
@@ -143,8 +157,8 @@ const STORAGE_SCHEMA_VERSION_KEY = 'schema.version';
 // Bump this whenever src/services/storage-schema.ts or migrations/0001_init.sql
 // changes. Existing D1 installs only rerun ensureStorageSchema() when this value
 // differs from config.schema.version.
-const STORAGE_SCHEMA_VERSION = '2026-06-12-auth-requests';
-const REQUIRED_SCHEMA_TABLES = ['webauthn_credentials', 'webauthn_challenges', 'auth_requests'] as const;
+const STORAGE_SCHEMA_VERSION = '2026-06-22-email-aliases';
+const REQUIRED_SCHEMA_TABLES = ['webauthn_credentials', 'webauthn_challenges', 'auth_requests', 'email_aliases', 'alias_api_tokens'] as const;
 
 // D1-backed storage.
 // Contract:
@@ -356,6 +370,62 @@ export class StorageService {
       new Date().toISOString()
     );
     await this.updateRevisionDate(userId);
+  }
+
+  // --- Email aliases ---
+
+  async createEmailAlias(alias: import('../types').EmailAlias): Promise<void> {
+    await createStoredEmailAlias(this.db, alias);
+  }
+
+  async getEmailAliasById(userId: string, id: string) {
+    return findStoredEmailAliasById(this.db, userId, id);
+  }
+
+  async getEmailAliasByAddress(address: string) {
+    return findStoredEmailAliasByAddress(this.db, address);
+  }
+
+  async listEmailAliasesByUserId(userId: string) {
+    return listStoredEmailAliasesByUserId(this.db, userId);
+  }
+
+  async countEmailAliasesByUserId(userId: string): Promise<number> {
+    return countStoredEmailAliasesByUserId(this.db, userId);
+  }
+
+  async updateEmailAlias(
+    userId: string,
+    id: string,
+    update: { active?: boolean; description?: string | null; destination?: string; cfRuleId?: string | null }
+  ): Promise<boolean> {
+    return updateStoredEmailAlias(this.db, userId, id, update, new Date().toISOString());
+  }
+
+  async deleteEmailAlias(userId: string, id: string): Promise<boolean> {
+    return deleteStoredEmailAlias(this.db, userId, id);
+  }
+
+  // --- Alias API tokens (addy.io shim) ---
+
+  async createAliasApiToken(token: import('../types').AliasApiToken): Promise<void> {
+    await createStoredAliasApiToken(this.db, token);
+  }
+
+  async getActiveAliasApiTokenByHash(tokenHash: string) {
+    return findStoredActiveAliasApiTokenByHash(this.db, tokenHash);
+  }
+
+  async listAliasApiTokensByUserId(userId: string) {
+    return listStoredAliasApiTokensByUserId(this.db, userId);
+  }
+
+  async touchAliasApiTokenLastUsed(id: string): Promise<void> {
+    await touchStoredAliasApiTokenLastUsed(this.db, id, new Date().toISOString());
+  }
+
+  async deleteAliasApiToken(userId: string, id: string): Promise<boolean> {
+    return deleteStoredAliasApiToken(this.db, userId, id);
   }
 
   // --- Account passkeys / WebAuthn login credentials ---

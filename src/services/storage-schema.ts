@@ -142,6 +142,17 @@ const SCHEMA_STATEMENTS: readonly string[] = [
 
   'CREATE TABLE IF NOT EXISTS used_attachment_download_tokens (' +
   'jti TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)',
+
+  'CREATE TABLE IF NOT EXISTS email_aliases (' +
+  'id TEXT PRIMARY KEY, user_id TEXT NOT NULL, address TEXT NOT NULL UNIQUE, domain TEXT NOT NULL, destination TEXT NOT NULL, ' +
+  'description TEXT, active INTEGER NOT NULL DEFAULT 1, cf_rule_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, ' +
+  'FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)',
+  'CREATE INDEX IF NOT EXISTS idx_email_aliases_user_created ON email_aliases(user_id, created_at)',
+
+  'CREATE TABLE IF NOT EXISTS alias_api_tokens (' +
+  'id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE, last_used_at TEXT, created_at TEXT NOT NULL, ' +
+  'FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE)',
+  'CREATE INDEX IF NOT EXISTS idx_alias_api_tokens_user ON alias_api_tokens(user_id)',
 ];
 
 async function executeSchemaStatement(db: D1Database, statement: string): Promise<void> {

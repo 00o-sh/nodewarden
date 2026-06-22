@@ -21,6 +21,12 @@ export default defineConfig({
           // don't flag it. Comfortably exceeds the 32-char minimum and is never
           // the dev sentinel, so it passes the JWT_SECRET safety gate.
           JWT_SECRET: `itest-${crypto.randomUUID()}-${crypto.randomUUID()}`,
+          // Email-alias generator credentials. The alias integration test swaps
+          // globalThis.fetch for a faithful in-memory Cloudflare Email Routing
+          // server (routed only for api.cloudflare.com), so these drive the real
+          // rule create/delete paths end to end without hitting the network.
+          CF_API_TOKEN: 'itest-cf-token',
+          CF_ZONE_ID: 'itest-zone',
         },
         d1Databases: ['DB'],
         r2Buckets: ['ATTACHMENTS'],
