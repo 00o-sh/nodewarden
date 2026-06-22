@@ -134,8 +134,8 @@ Setup:
 
 1. In Cloudflare, enable **Email Routing** for your zone and verify a destination address (your real inbox); optionally enable **catch-all** to that address.
 2. Create a scoped **API token** (Zone → Email Routing: Edit) and set the Worker secrets `CF_API_TOKEN` and `CF_ZONE_ID`. *(Only required for advanced per-alias rules; default catch-all aliases work without it.)*
-3. As an admin, configure the alias domains and default destination via `PUT /api/email-aliases/settings`.
-4. Generate an **API access token** for your client and paste it (with your NodeWarden URL + domain) into the client's addy.io forwarder.
+3. Open the **Email Aliases** page in the web vault and (as an admin) enable the generator, then configure the alias domains and default destination.
+4. From the same page, generate and copy aliases directly, or create an **API access token** and paste it (with your NodeWarden URL + domain) into an official client's addy.io forwarder.
 
 ### Cloud Backup Notes
 

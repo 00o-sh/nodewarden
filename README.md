@@ -145,8 +145,8 @@ npm run dev:kv
 
 1. 在 Cloudflare 为你的域名启用 **Email Routing** 并验证一个目标地址（你的真实收件箱）；可选开启到该地址的 **catch-all**。
 2. 创建一个受限 **API Token**（Zone → Email Routing：Edit），并设置 Worker 机密 `CF_API_TOKEN` 与 `CF_ZONE_ID`。*（仅高级别名规则需要；默认 catch-all 别名无需此项。）*
-3. 以管理员身份通过 `PUT /api/email-aliases/settings` 配置别名域名与默认目标地址。
-4. 生成 **API 访问令牌**，连同 NodeWarden 地址与域名一起填入客户端的 addy.io 转发器。
+3. 在网页端打开 **邮箱别名** 页面，以管理员身份启用生成器，并配置别名域名与默认目标地址。
+4. 在同一页面可直接生成并复制别名；或生成 **API 访问令牌**，连同 NodeWarden 地址与域名一起填入官方客户端的 addy.io 转发器。
 
 ### 云端备份说明
 

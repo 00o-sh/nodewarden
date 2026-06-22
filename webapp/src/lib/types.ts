@@ -463,3 +463,35 @@ export interface DomainRules {
   globalEquivalentDomains: GlobalEquivalentDomain[];
   object: 'domains';
 }
+
+// Email alias generator (Cloudflare Email Routing backed)
+export interface EmailAlias {
+  id: string;
+  address: string;
+  domain: string;
+  destination: string;
+  description: string | null;
+  active: boolean;
+  managed: boolean;
+  createdAt: string;
+  updatedAt: string;
+  object: 'emailAlias';
+}
+
+export interface AliasApiToken {
+  id: string;
+  name: string;
+  lastUsedAt: string | null;
+  createdAt: string;
+  object: 'aliasApiToken';
+}
+
+export interface AliasGeneratorSettings {
+  enabled: boolean;
+  domains: string[];
+  defaultDomain: string | null;
+  defaultDestination: string | null;
+  recipients: string[];
+  cloudflareConfigured: boolean;
+  object: 'aliasSettings';
+}
