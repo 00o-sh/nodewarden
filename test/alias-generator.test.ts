@@ -12,8 +12,17 @@ describe('sanitizeAliasSettings', () => {
   it('normalizes domains/recipients and derives defaults', () => {
     const s = sanitizeAliasSettings({
       enabled: true,
-      domains: ['Alias.Test', '@mail.test', 'bad', 'alias.test'],
-      recipients: ['ME@Vault.Test', 'nope', 'two@vault.test'],
+      // Mix in invalid entries to exercise every validation branch: no dot,
+      // illegal label char, single-char TLD, over-length, and bad emails
+      // (no '@', leading '@', multiple '@', whitespace local, invalid domain).
+      domains: [
+        'Alias.Test', '@mail.test', 'bad', 'alias.test',
+        'foo_x.com', 'foo.c', `${'x'.repeat(260)}.com`,
+      ],
+      recipients: [
+        'ME@Vault.Test', 'nope', 'two@vault.test',
+        '@x.com', 'a@b@c.com', 'a b@c.com', 'a@bad',
+      ],
     });
     expect(s.enabled).toBe(true);
     expect(s.domains).toEqual(['alias.test', 'mail.test']);

@@ -20,18 +20,34 @@ const RANDOM_WORDS = [
   'quartz', 'raven', 'sage', 'tulip', 'umber', 'velvet', 'willow', 'zephyr',
 ];
 
+// Label-based validation (no ambiguous regex) to avoid polynomial backtracking
+// on attacker-influenced input. Each dot-separated label uses a single,
+// non-overlapping character class, and the TLD is letters only.
+const LABEL_RE = /^[a-z0-9-]+$/;
+const TLD_RE = /^[a-z]{2,}$/;
+
 function normalizeDomain(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim().toLowerCase().replace(/^@/, '');
-  if (!trimmed || !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(trimmed)) return null;
+  if (!trimmed || trimmed.length > 253) return null;
+  const labels = trimmed.split('.');
+  if (labels.length < 2) return null;
+  for (const label of labels) {
+    if (!LABEL_RE.test(label)) return null;
+  }
+  if (!TLD_RE.test(labels[labels.length - 1])) return null;
   return trimmed;
 }
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return null;
-  return trimmed;
+  const at = trimmed.indexOf('@');
+  // Exactly one '@', a non-empty local part with no whitespace, and a valid domain.
+  if (at <= 0 || at !== trimmed.lastIndexOf('@')) return null;
+  const local = trimmed.slice(0, at);
+  if (/\s/.test(local)) return null;
+  return normalizeDomain(trimmed.slice(at + 1)) ? trimmed : null;
 }
 
 export function sanitizeAliasSettings(raw: unknown): AliasGeneratorSettings {
@@ -75,6 +91,14 @@ export async function saveAliasSettings(
   await storage.setConfigValue(ALIAS_SETTINGS_KEY, JSON.stringify(settings));
 }
 
+// Unbiased index in [0, n) from a CSPRNG using the multiply method (no modulo,
+// so no modulo-bias). The 2^32 scaling makes the residual bias negligible for
+// the small ranges used here.
+function randomIndex(n: number): number {
+  const value = crypto.getRandomValues(new Uint32Array(1))[0];
+  return Math.floor((value / 0x100000000) * n);
+}
+
 function randomLocalPart(format: string): string {
   const bytes = crypto.getRandomValues(new Uint8Array(8));
   const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
@@ -82,8 +106,8 @@ function randomLocalPart(format: string): string {
     case 'uuid':
       return crypto.randomUUID();
     case 'random_words': {
-      const pick = () => RANDOM_WORDS[crypto.getRandomValues(new Uint32Array(1))[0] % RANDOM_WORDS.length];
-      return `${pick()}.${pick()}.${(crypto.getRandomValues(new Uint16Array(1))[0] % 1000)}`;
+      const pick = () => RANDOM_WORDS[randomIndex(RANDOM_WORDS.length)];
+      return `${pick()}.${pick()}.${randomIndex(1000)}`;
     }
     case 'random_characters':
     default:
