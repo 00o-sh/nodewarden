@@ -1,4 +1,4 @@
-const { localeFiles, readLocale, isIntentionallyEnglishKey } = require('./i18n-utils.cjs');
+const { localeFiles, readLocale } = require('./i18n-utils.cjs');
 
 // CONTRACT:
 // This is the authoritative locale consistency gate. It checks key parity,
@@ -11,6 +11,28 @@ const base = locales.en;
 const baseKeys = Object.keys(base).sort();
 const placeholderRe = /\{\w+\}/g;
 const errors = [];
+const intentionallyEnglishKeys = new Set([
+  'txt_backup_destination_detail_note',
+  'txt_backup_protocol_webdav',
+  'txt_backup_protocol_s3',
+  'txt_backup_recommend_group_webdav',
+  'txt_backup_recommend_group_s3',
+  'txt_backup_destination_name_default_webdav',
+  'txt_backup_destination_name_default_s3',
+  'txt_dash',
+  'txt_text_3',
+]);
+const intentionallyEnglishPrefixes = [
+  'txt_log_action_',
+  'txt_log_meta_',
+  'txt_log_reason_',
+  'txt_log_target_type_',
+  'txt_log_trigger_',
+];
+
+function isIntentionallyEnglishKey(key) {
+  return intentionallyEnglishKeys.has(key) || intentionallyEnglishPrefixes.some((prefix) => key.startsWith(prefix));
+}
 
 for (const [locale, table] of Object.entries(locales)) {
   const keys = Object.keys(table).sort();

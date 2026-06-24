@@ -123,8 +123,17 @@ function getBackupDestinationSummary(destination: BackupDestinationRecord | null
   };
 }
 
+// Linear leading/trailing-slash trim. A `/^\/+|\/+$/g` regex on an
+// attacker-supplied blob name is flagged by CodeQL as a polynomial ReDoS risk.
+function stripSurroundingSlashes(value: string): string {
+  let next = String(value || '');
+  while (next.startsWith('/')) next = next.slice(1);
+  while (next.endsWith('/')) next = next.slice(0, -1);
+  return next;
+}
+
 function ensureBackupBlobName(value: string): string {
-  const normalized = String(value || '').trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  const normalized = stripSurroundingSlashes(String(value || '').trim().replace(/\\/g, '/'));
   if (!normalized) {
     throw new Error('Backup attachment blob is required');
   }

@@ -169,6 +169,7 @@ export default function AppAuthenticatedShell(props: AppAuthenticatedShellProps)
     },
   ];
 
+  const navLayoutLabel = navLayoutOptions.find((option) => option.mode === navLayoutMode)?.label || t('txt_nav_layout_flat');
   const flatNav = (
     <>
       {renderSideLink('/vault', props.location === '/vault', <KeyRound size={16} />, t('nav_vault_items'))}
@@ -236,7 +237,7 @@ export default function AppAuthenticatedShell(props: AppAuthenticatedShellProps)
       <div className="app-shell">
         <header className="topbar">
           <div className="brand">
-            <img src="/nodewarden-logo.svg" alt={t('txt_nodewarden_logo_alt')} className="brand-logo" />
+            <img src="/nodewarden-logo.svg" alt="NodeWarden logo" className="brand-logo" />
             <span className="brand-wordmark" role="img" aria-label="NodeWarden" />
             <span className="mobile-page-title">{props.currentPageTitle}</span>
           </div>

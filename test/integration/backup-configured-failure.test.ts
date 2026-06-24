@@ -26,6 +26,7 @@ beforeAll(async () => {
   session = await authenticate('cfgbackupfail');
   adminId = ((await (await api('GET', '/api/accounts/profile', session.accessToken)).json()) as any).id;
   const settings = await api('PUT', '/api/admin/backup/settings', session.accessToken, {
+    masterPasswordHash: session.account.masterPasswordHash,
     destinations: [{
       type: 'webdav', includeAttachments: false,
       destination: { baseUrl: 'https://dav.test', username: 'u', password: 'p', remotePath: 'nodewarden' },

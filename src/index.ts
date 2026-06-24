@@ -10,9 +10,17 @@ let dbInitialized = false;
 let dbInitError: string | null = null;
 let dbInitPromise: Promise<void> | null = null;
 
+// Linear trailing-slash trim — avoids a `/\/+$/` regex on the (attacker-supplied)
+// request path, which CodeQL flags as a polynomial ReDoS risk.
+function stripTrailingSlashes(value: string): string {
+  let next = value;
+  while (next.length > 1 && next.endsWith('/')) next = next.slice(0, -1);
+  return next;
+}
+
 export function normalizeRequestUrl(request: Request): Request {
   const url = new URL(request.url);
-  const normalizedPathname = url.pathname.length <= 1 ? url.pathname : url.pathname.replace(/\/+$/, '');
+  const normalizedPathname = url.pathname.length <= 1 ? url.pathname : stripTrailingSlashes(url.pathname);
   if (normalizedPathname === url.pathname) return request;
 
   url.pathname = normalizedPathname;

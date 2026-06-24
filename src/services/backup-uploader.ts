@@ -56,6 +56,14 @@ function trimSlashes(value: string): string {
   return next;
 }
 
+// Linear trailing-slash trim. Avoids a `/\/+$/` regex, whose backtracking on
+// attacker-influenced URLs/paths CodeQL flags as polynomial (ReDoS).
+function stripTrailingSlashes(value: string): string {
+  let next = String(value || '');
+  while (next.endsWith('/')) next = next.slice(0, -1);
+  return next;
+}
+
 function buildJoinedPath(...segments: string[]): string {
   return segments.map(trimSlashes).filter(Boolean).join('/');
 }
@@ -224,7 +232,7 @@ function ensureDestinationConfigReady(destination: BackupDestinationRecord): voi
 }
 
 function buildWebDavUrl(baseUrl: string, relativePath: string): string {
-  const trimmedBase = baseUrl.replace(/\/+$/, '');
+  const trimmedBase = stripTrailingSlashes(baseUrl);
   const normalized = normalizeRelativePath(relativePath);
   return normalized ? `${trimmedBase}/${encodePathSegments(normalized)}` : trimmedBase;
 }
@@ -455,7 +463,7 @@ function isBucketHostedS3Endpoint(endpoint: URL, bucket: string): boolean {
 }
 
 function s3BucketBaseUrl(config: S3BackupDestination): URL {
-  const endpoint = new URL(config.endpoint.replace(/\/+$/, ''));
+  const endpoint = new URL(stripTrailingSlashes(config.endpoint));
   const bucket = config.bucket.trim();
 
   if (config.addressingStyle === 'virtual-hosted-style') {
@@ -464,11 +472,11 @@ function s3BucketBaseUrl(config: S3BackupDestination): URL {
     return endpoint;
   }
 
-  return new URL(`${endpoint.toString().replace(/\/+$/, '')}/${encodeURIComponent(bucket)}`);
+  return new URL(`${stripTrailingSlashes(endpoint.toString())}/${encodeURIComponent(bucket)}`);
 }
 
 function s3ObjectUrl(config: S3BackupDestination, objectKey: string): URL {
-  return new URL(`${s3BucketBaseUrl(config).toString().replace(/\/+$/, '')}/${encodePathSegments(objectKey)}`);
+  return new URL(`${stripTrailingSlashes(s3BucketBaseUrl(config).toString())}/${encodePathSegments(objectKey)}`);
 }
 
 function normalizeS3ObjectKey(config: S3BackupDestination, relativePath: string): string {
@@ -566,7 +574,7 @@ async function listS3Entries(config: S3BackupDestination, relativePath: string):
       : fullPrefix;
     const normalizedRelative = trimSlashes(relative);
     if (!normalizedRelative) continue;
-    const itemPath = normalizedRelative.replace(/\/+$/, '');
+    const itemPath = stripTrailingSlashes(normalizedRelative);
     if ((parentPath(itemPath) || '') !== currentPath) continue;
     items.push({
       path: itemPath,

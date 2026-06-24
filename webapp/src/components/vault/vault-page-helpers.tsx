@@ -1,3 +1,4 @@
+import { useMemo } from 'preact/hooks';
 import {
   CreditCard,
   FileKey2,
