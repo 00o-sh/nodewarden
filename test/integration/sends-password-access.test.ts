@@ -1,6 +1,6 @@
 import { SELF } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { ENC_STRING, Session, api, authenticate, baseHeaders, url } from './helpers';
+import { ENC_STRING, Session, api, authenticate, url } from './helpers';
 
 // The send_access OAuth grant for a password-protected send: a wrong plaintext
 // password and a wrong password hash are both rejected, and repeated failures
