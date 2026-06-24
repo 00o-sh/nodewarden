@@ -568,10 +568,10 @@ export default function ImportPage({ onImport, onImportEncryptedRaw, accountKeys
       return;
     }
     await runExportWithMasterPassword(masterPassword);
-    if (!isExporting) {
-      setExportAuthPassword('');
-      setExportAuthDialogOpen(false);
-    }
+    // Reached only when an export was not already in flight (guarded above), so
+    // always reset the auth dialog after the export attempt completes.
+    setExportAuthPassword('');
+    setExportAuthDialogOpen(false);
   }
 
   function handleExport() {
