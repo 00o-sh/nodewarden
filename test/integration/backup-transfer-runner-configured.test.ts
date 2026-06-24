@@ -43,6 +43,7 @@ beforeAll(async () => {
   adminId = ((await (await api('GET', '/api/accounts/profile', token)).json()) as any).id;
 
   const settings = await api('PUT', '/api/admin/backup/settings', token, {
+    masterPasswordHash: session.account.masterPasswordHash,
     destinations: [{
       type: 'webdav',
       destination: { baseUrl: 'https://dav.test', username: 'u', password: 'p', remotePath: 'nodewarden' },

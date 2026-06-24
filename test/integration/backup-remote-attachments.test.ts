@@ -56,6 +56,7 @@ async function uploadAttachment(): Promise<void> {
 // re-established before each test that needs a usable destination.
 async function reconfigure(): Promise<void> {
   await api('PUT', '/api/admin/backup/settings', token, {
+    masterPasswordHash: session.account.masterPasswordHash,
     destinations: [{
       type: 'webdav',
       label: 'attach',
@@ -70,7 +71,7 @@ async function runBackup(): Promise<Response> {
   return SELF.fetch(url('/api/admin/backup/run'), {
     method: 'POST',
     headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-    body: JSON.stringify({}),
+    body: JSON.stringify({ masterPasswordHash: session.account.masterPasswordHash }),
   });
 }
 
@@ -163,7 +164,7 @@ describe('remote backup with attachments', () => {
     const restore = await SELF.fetch(url('/api/admin/backup/remote/restore'), {
       method: 'POST',
       headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ path, replaceExisting: true }),
+      body: JSON.stringify({ path, replaceExisting: true, masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(restore.status).toBe(200);
 
@@ -184,8 +185,10 @@ describe('remote backup with attachments', () => {
     const integrityBody = (await integrity.json()) as any;
     expect(integrityBody.integrity.matches).toBe(true);
 
-    const download = await SELF.fetch(url(`/api/admin/backup/remote/download?path=${encodeURIComponent(path)}`), {
-      headers: baseHeaders({ Authorization: `Bearer ${token}` }),
+    const download = await SELF.fetch(url('/api/admin/backup/remote/download'), {
+      method: 'POST',
+      headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ path, masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(download.status).toBe(200);
     const zipBytes = new Uint8Array(await download.arrayBuffer());
@@ -202,7 +205,7 @@ describe('remote backup with attachments', () => {
     const restore = await SELF.fetch(url('/api/admin/backup/remote/restore'), {
       method: 'POST',
       headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ path, replaceExisting: true }),
+      body: JSON.stringify({ path, replaceExisting: true, masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(restore.status).toBe(200);
 

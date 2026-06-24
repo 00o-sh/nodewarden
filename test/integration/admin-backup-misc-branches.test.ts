@@ -47,7 +47,11 @@ describe('admin backup settings repair when persisted settings cannot be decrypt
     await saveBackupSettings(storage, otherSecretEnv as any, getDefaultBackupSettings('UTC'));
     await expect(loadBackupSettings(storage, env as any, 'UTC')).rejects.toThrow();
 
-    const res = await handleRepairAdminBackupSettings(jsonReq({ destinations: [] }), env as any, admin);
+    const res = await handleRepairAdminBackupSettings(
+      jsonReq({ masterPasswordHash: session.account.masterPasswordHash, destinations: [] }),
+      env as any,
+      admin
+    );
     expect(res.status).toBe(200);
     const repaired = (await res.json()) as any;
     expect(Array.isArray(repaired.destinations)).toBe(true);
@@ -59,7 +63,11 @@ describe('admin backup settings repair when persisted settings cannot be decrypt
 describe('admin backup export when the database binding is unavailable', () => {
   it('reports the failure as a 500', async () => {
     const brokenEnv = { ...(env as any), DB: undefined };
-    const res = await handleAdminExportBackup(jsonReq({ includeAttachments: false }), brokenEnv as any, admin);
+    const res = await handleAdminExportBackup(
+      jsonReq({ masterPasswordHash: session.account.masterPasswordHash, includeAttachments: false }),
+      brokenEnv as any,
+      admin
+    );
     expect(res.status).toBe(500);
   });
 });

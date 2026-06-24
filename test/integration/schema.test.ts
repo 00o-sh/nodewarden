@@ -47,6 +47,6 @@ describe('database bootstrap', () => {
       .first<{ value: string }>();
     // Pinning the version makes an upstream schema bump a deliberate, visible
     // change rather than a silent one.
-    expect(row?.value).toBe('2026-06-12-auth-requests');
+    expect(row?.value).toBe('2026-06-23-totp-login-replay');
   });
 });

@@ -12,6 +12,8 @@ For many self-hosted projects, the web frontend is often a "nice to have." But N
 
 The project explicitly supports the official Bitwarden clients' sync flow, particularly `/api/sync` compatibility. This means you don't have to re-learn your habits, nor settle for a feature-incomplete third-party client.
 
+On top of full sync, NodeWarden delivers **real-time sync**: changes propagate to the web vault, browser extension, desktop, and mobile clients as they happen, over the official Bitwarden notifications channel.
+
 This compatibility is the foundation that makes NodeWarden genuinely usable in practice.
 
 ## 3. Attachment Upload and Download

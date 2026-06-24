@@ -13,6 +13,7 @@ beforeAll(async () => {
 
 function webdavSettings(overrides: Record<string, unknown> = {}) {
   return {
+    masterPasswordHash: session.account.masterPasswordHash,
     destinations: [
       {
         type: 'webdav',
@@ -44,6 +45,7 @@ describe('backup destination settings', () => {
 
   it('saves an S3 destination', async () => {
     const put = await api('PUT', '/api/admin/backup/settings', token, {
+      masterPasswordHash: session.account.masterPasswordHash,
       destinations: [
         {
           type: 's3',
@@ -74,13 +76,14 @@ describe('backup destination settings', () => {
 
   it('rejects an invalid destination type (400)', async () => {
     const res = await api('PUT', '/api/admin/backup/settings', token, {
+      masterPasswordHash: session.account.masterPasswordHash,
       destinations: [{ type: 'ftp', destination: {}, schedule: { enabled: false } }],
     });
     expect(res.status).toBe(400);
   });
 
   it('rejects a non-array destinations payload (400)', async () => {
-    const res = await api('PUT', '/api/admin/backup/settings', token, { destinations: 'nope' });
+    const res = await api('PUT', '/api/admin/backup/settings', token, { masterPasswordHash: session.account.masterPasswordHash, destinations: 'nope' });
     expect(res.status).toBe(400);
   });
 

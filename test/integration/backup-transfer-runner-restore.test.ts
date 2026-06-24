@@ -43,6 +43,7 @@ beforeAll(async () => {
   token = session.accessToken;
   adminId = ((await (await api('GET', '/api/accounts/profile', token)).json()) as any).id;
   const settings = await api('PUT', '/api/admin/backup/settings', token, {
+    masterPasswordHash: session.account.masterPasswordHash,
     destinations: [{
       type: 'webdav',
       destination: { baseUrl: 'https://dav.test', username: 'u', password: 'p', remotePath: 'nodewarden' },
@@ -59,7 +60,7 @@ describe('backup transfer runner remote restore', () => {
     const exp = await SELF.fetch(url('/api/admin/backup/export'), {
       method: 'POST',
       headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ includeAttachments: false }),
+      body: JSON.stringify({ includeAttachments: false, masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(exp.status).toBe(200);
     const fileName = /filename="([^"]+)"/.exec(exp.headers.get('Content-Disposition') || '')?.[1] || 'backup.zip';
