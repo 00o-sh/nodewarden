@@ -26,6 +26,7 @@ const s3Destination = {
 describe('admin backup settings update', () => {
   it('persists normalized WebDAV + S3 destinations', async () => {
     const res = await api('PUT', '/api/admin/backup/settings', token, {
+      masterPasswordHash: session.account.masterPasswordHash,
       destinations: [webdavDestination, s3Destination],
     });
     expect(res.status).toBe(200);
@@ -44,13 +45,14 @@ describe('admin backup settings update', () => {
 
   it('rejects an invalid destination type (400)', async () => {
     const res = await api('PUT', '/api/admin/backup/settings', token, {
+      masterPasswordHash: session.account.masterPasswordHash,
       destinations: [{ ...webdavDestination, type: 'ftp' }],
     });
     expect(res.status).toBe(400);
   });
 
   it('clears destinations on an empty update', async () => {
-    const res = await api('PUT', '/api/admin/backup/settings', token, { destinations: [] });
+    const res = await api('PUT', '/api/admin/backup/settings', token, { masterPasswordHash: session.account.masterPasswordHash, destinations: [] });
     expect(res.status).toBe(200);
     expect(((await res.json()) as any).destinations).toHaveLength(0);
   });

@@ -7,7 +7,7 @@ import { downloadBytesAsFile, readResponseBytesWithProgress } from '@/lib/downlo
 import NotFoundPage from '@/components/NotFoundPage';
 import StandalonePageFrame from '@/components/StandalonePageFrame';
 import { getDemoPublicSend, IS_DEMO_MODE } from '@/lib/demo';
-import { t, translateError } from '@/lib/i18n';
+import { t } from '@/lib/i18n';
 
 interface PublicSendPageProps {
   accessId: string;
@@ -150,7 +150,7 @@ export default function PublicSendPage(props: PublicSendPageProps) {
         setNotFound(true);
         setError('');
       } else {
-        setError(translateError(err, t('txt_failed_to_open_send')));
+        setError(err.message || t('txt_failed_to_open_send'));
       }
       setSendData(null);
     } finally {
@@ -194,7 +194,7 @@ export default function PublicSendPage(props: PublicSendPageProps) {
       );
     } catch (e) {
       const err = e as Error;
-      setError(translateError(err, t('txt_download_failed')));
+      setError(err.message || t('txt_download_failed'));
     } finally {
       setBusy(false);
       setDownloadPercent(null);

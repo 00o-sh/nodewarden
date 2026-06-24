@@ -27,11 +27,27 @@ describe('admin remote backup browse/download guards', () => {
   });
 
   it('409s downloading a zip from an unknown destination', async () => {
-    expect((await api('GET', '/api/admin/backup/remote/download?destinationId=nope&path=backup.zip', token)).status).toBe(409);
+    expect(
+      (
+        await api('POST', '/api/admin/backup/remote/download', token, {
+          destinationId: 'nope',
+          path: 'backup.zip',
+          masterPasswordHash: session.account.masterPasswordHash,
+        })
+      ).status
+    ).toBe(409);
   });
 
   it('409s downloading a non-zip path', async () => {
-    expect((await api('GET', '/api/admin/backup/remote/download?destinationId=nope&path=notazip', token)).status).toBe(409);
+    expect(
+      (
+        await api('POST', '/api/admin/backup/remote/download', token, {
+          destinationId: 'nope',
+          path: 'notazip',
+          masterPasswordHash: session.account.masterPasswordHash,
+        })
+      ).status
+    ).toBe(409);
   });
 
   it('409s an integrity check with an unknown destination', async () => {
@@ -49,7 +65,11 @@ describe('admin remote backup restore guards', () => {
   });
 
   it('rejects a restore with a non-zip path', async () => {
-    const res = await api('POST', '/api/admin/backup/remote/restore', token, { destinationId: 'nope', path: 'notazip' });
+    const res = await api('POST', '/api/admin/backup/remote/restore', token, {
+      destinationId: 'nope',
+      path: 'notazip',
+      masterPasswordHash: session.account.masterPasswordHash,
+    });
     expect(res.status).toBeGreaterThanOrEqual(400);
   });
 });

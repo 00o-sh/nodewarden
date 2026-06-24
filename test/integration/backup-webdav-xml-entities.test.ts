@@ -36,6 +36,7 @@ beforeAll(async () => {
   }) as typeof fetch;
 
   await api('PUT', '/api/admin/backup/settings', token, {
+    masterPasswordHash: session.account.masterPasswordHash,
     destinations: [{
       type: 'webdav', includeAttachments: false,
       destination: { baseUrl: 'https://dav.test', username: 'u', password: 'p', remotePath: 'nodewarden' },

@@ -48,6 +48,7 @@ beforeAll(async () => {
   }) as typeof fetch;
 
   await api('PUT', '/api/admin/backup/settings', token, {
+    masterPasswordHash: session.account.masterPasswordHash,
     destinations: [{
       type: 'webdav',
       label: 'e2e',
@@ -73,7 +74,7 @@ describe('remote backup run/list/restore', () => {
     const run = await SELF.fetch(url('/api/admin/backup/run'), {
       method: 'POST',
       headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-      body: JSON.stringify({}),
+      body: JSON.stringify({ masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(run.status).toBe(200);
 
@@ -90,7 +91,7 @@ describe('remote backup run/list/restore', () => {
     const restore = await SELF.fetch(url('/api/admin/backup/remote/restore'), {
       method: 'POST',
       headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ path: remotePath.replace('nodewarden/', ''), replaceExisting: true }),
+      body: JSON.stringify({ path: remotePath.replace('nodewarden/', ''), replaceExisting: true, masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(restore.status).toBe(200);
 

@@ -5,10 +5,12 @@ import { Session, api, authenticate, baseHeaders, url } from './helpers';
 // Admin backup settings/repair/run validation branches, exercised as an admin
 // with malformed and well-formed bodies. Real D1, no mocks.
 let token: string;
+let masterPasswordHash: string;
 
 beforeAll(async () => {
   const session: Session = await authenticate('adminbackuprepair');
   token = session.accessToken;
+  masterPasswordHash = session.account.masterPasswordHash;
 });
 
 function raw(method: string, path: string, body: string): Promise<Response> {
@@ -33,7 +35,7 @@ describe('admin backup settings / repair / run validation', () => {
   });
 
   it('repairs settings from a well-formed body', async () => {
-    const res = await api('POST', '/api/admin/backup/settings/repair', token, { destinations: [] });
+    const res = await api('POST', '/api/admin/backup/settings/repair', token, { masterPasswordHash, destinations: [] });
     expect(res.status).toBe(200);
     expect(Array.isArray(((await res.json()) as any).destinations)).toBe(true);
   });

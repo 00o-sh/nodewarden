@@ -16,7 +16,7 @@ async function exportBackup(): Promise<{ bytes: Uint8Array; fileName: string }> 
   const res = await SELF.fetch(url('/api/admin/backup/export'), {
     method: 'POST',
     headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ includeAttachments: false }),
+    body: JSON.stringify({ includeAttachments: false, masterPasswordHash: session.account.masterPasswordHash }),
   });
   expect(res.status).toBe(200);
   const fileName = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '')?.[1] || 'nodewarden_backup.zip';
@@ -28,6 +28,7 @@ function importFile(bytes: Uint8Array, fileName: string, replaceExisting: boolea
   fd.set('file', new File([bytes], fileName, { type: 'application/zip' }));
   if (replaceExisting) fd.set('replaceExisting', '1');
   fd.set('allowChecksumMismatch', '1');
+  fd.set('masterPasswordHash', session.account.masterPasswordHash);
   return SELF.fetch(url('/api/admin/backup/import'), {
     method: 'POST',
     headers: baseHeaders({ Authorization: `Bearer ${token}` }),

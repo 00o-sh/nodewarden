@@ -19,7 +19,7 @@ async function exportArchive(): Promise<{ bytes: Uint8Array; fileName: string }>
   const res = await SELF.fetch(url('/api/admin/backup/export'), {
     method: 'POST',
     headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ includeAttachments: false }),
+    body: JSON.stringify({ includeAttachments: false, masterPasswordHash: session.account.masterPasswordHash }),
   });
   expect(res.status).toBe(200);
   expect(res.headers.get('Content-Type')).toContain('application/zip');
@@ -32,6 +32,7 @@ async function importArchive(bytes: Uint8Array, fileName: string): Promise<Respo
   const fd = new FormData();
   fd.append('file', new File([bytes], fileName, { type: 'application/zip' }));
   fd.append('replaceExisting', '1');
+  fd.append('masterPasswordHash', session.account.masterPasswordHash);
   // Note: no explicit Content-Type — fetch sets the multipart boundary.
   return SELF.fetch(url('/api/admin/backup/import'), {
     method: 'POST',

@@ -18,6 +18,7 @@ describe('TOTP enable/disable via accounts/totp', () => {
       enabled: true,
       secret,
       token: await totpToken(secret),
+      masterPasswordHash: session.account.masterPasswordHash,
     });
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;
@@ -48,7 +49,7 @@ describe('TOTP enable/disable via accounts/totp', () => {
   it('rejects disabling with a wrong password (400)', async () => {
     // Re-enable first so there is something to disable.
     const secret = randomBase32();
-    await api('PUT', '/api/accounts/totp', token, { enabled: true, secret, token: await totpToken(secret) });
+    await api('PUT', '/api/accounts/totp', token, { enabled: true, secret, token: await totpToken(secret), masterPasswordHash: session.account.masterPasswordHash });
 
     const res = await api('PUT', '/api/accounts/totp', token, { enabled: false, masterPasswordHash: 'wrong' });
     expect(res.status).toBe(400);
