@@ -1,6 +1,6 @@
 import { SELF } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { ENC_STRING, Session, api, authenticate, baseHeaders, url } from './helpers';
+import { ENC_STRING, Session, api, authenticate, url } from './helpers';
 
 // Additional public send-access branches: malformed JSON bodies are tolerated
 // (treated as empty) on text and file access, and a password-protected send
