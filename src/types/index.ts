@@ -14,6 +14,11 @@ export interface Env {
   WEBAUTHN_RP_ID?: string;
   WEBAUTHN_RP_NAME?: string;
   WEBAUTHN_ALLOWED_ORIGINS?: string;
+  // Opt-in (set to 'true') to relay mobile push notifications through
+  // Bitwarden's public push service. Disabled by default so a deployment never
+  // registers an installation with / sends device tokens to a third party
+  // unless the operator explicitly enables it.
+  PUSH_RELAY_ENABLED?: string;
 }
 
 export type UserRole = 'admin' | 'user';
@@ -21,8 +26,6 @@ export type UserStatus = 'active' | 'banned';
 
 // Sample JWT secret used by `.dev.vars.example`.
 // If runtime JWT_SECRET equals this value, treat it as unsafe.
-// Snyk flags this as a hardcoded secret; it is a sentinel, not a credential.
-// Suppressed as a false positive via .snyk (Consistent Ignores).
 export const DEFAULT_DEV_SECRET = 'Enter-your-JWT-key-here-at-least-32-characters';
 
 // Attachment model
@@ -233,6 +236,8 @@ export interface Device {
   encryptedUserKey: string | null;
   encryptedPublicKey: string | null;
   encryptedPrivateKey: string | null;
+  pushUuid: string | null;
+  pushToken: string | null;
   devicePendingAuthRequest?: DevicePendingAuthRequest | null;
   lastSeenAt: string | null;
   createdAt: string;
@@ -466,8 +471,18 @@ export interface TokenResponse {
   ResetMasterPassword: boolean;
   scope: string;
   unofficialServer: boolean;
+  UserVerificationToken?: string;
+  userVerificationToken?: string;
   MasterPasswordPolicy?: {
+    minComplexity: number;
+    minLength: number;
+    requireUpper: boolean;
+    requireLower: boolean;
+    requireNumbers: boolean;
+    requireSpecial: boolean;
+    enforceOnLogin: boolean;
     Object: string;
+    object?: string;
   } | null;
   ApiUseKeyConnector?: boolean;
   AccountKeys?: any | null;
@@ -496,12 +511,13 @@ export interface ProfileResponse {
   accountKeys: any | null;
   securityStamp: string;
   organizations: any[];
+  organizationsNew?: any[];
   providers: any[];
   providerOrganizations: any[];
   forcePasswordReset: boolean;
   avatarColor: string | null;
   creationDate: string;
-  verifyDevices?: boolean;
+  verifyDevices: boolean;
   role?: UserRole;
   status?: UserStatus;
   object: string;
@@ -560,6 +576,7 @@ export interface SyncResponse {
   ciphers: CipherResponse[];
   domains: any;
   policies: any[];
+  policiesNew?: any[];
   sends: SendResponse[];
   UserDecryption?: {
     MasterPasswordUnlock: MasterPasswordUnlock | null;
@@ -567,6 +584,10 @@ export interface SyncResponse {
     KeyConnectorOption?: null;
     WebAuthnPrfOption?: WebAuthnPrfDecryptionOption | null;
     WebAuthnPrfOptions?: WebAuthnPrfDecryptionOption[];
+    V2UpgradeToken?: {
+      WrappedUserKey1: string;
+      WrappedUserKey2: string;
+    } | null;
     Object?: string;
   } | null;
   // PascalCase for desktop/browser clients

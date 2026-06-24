@@ -42,7 +42,7 @@ describe('two-factor read endpoints', () => {
 
   it('lists the authenticator provider once TOTP is enabled', async () => {
     const secret = randomBase32();
-    expect((await api('POST', '/api/accounts/totp', token, { enabled: true, secret, token: await totpToken(secret) })).status).toBe(200);
+    expect((await api('POST', '/api/accounts/totp', token, { enabled: true, secret, token: await totpToken(secret), masterPasswordHash: mph })).status).toBe(200);
     const res = await api('GET', '/api/two-factor', token);
     expect(res.status).toBe(200);
     const data = ((await res.json()) as any).Data;

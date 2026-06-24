@@ -18,7 +18,7 @@ async function exportBackup(): Promise<{ bytes: Uint8Array; fileName: string }> 
   const res = await SELF.fetch(url('/api/admin/backup/export'), {
     method: 'POST',
     headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ includeAttachments: true }),
+    body: JSON.stringify({ includeAttachments: true, masterPasswordHash: session.account.masterPasswordHash }),
   });
   expect(res.status).toBe(200);
   const fileName = /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') || '')?.[1] || 'backup.zip';
@@ -30,6 +30,7 @@ function importFile(bytes: Uint8Array, fileName: string): Promise<Response> {
   fd.set('file', new File([bytes], fileName, { type: 'application/zip' }));
   fd.set('replaceExisting', '1');
   fd.set('allowChecksumMismatch', '1');
+  fd.set('masterPasswordHash', session.account.masterPasswordHash);
   return SELF.fetch(url('/api/admin/backup/import'), {
     method: 'POST', headers: baseHeaders({ Authorization: `Bearer ${token}` }), body: fd,
   });

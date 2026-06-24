@@ -65,7 +65,7 @@ describe('password grant — login branches', () => {
     // Enable TOTP; the response hands back the recovery code.
     const secret = randomBase32();
     const enable = await api('POST', '/api/accounts/totp', token, {
-      enabled: true, secret, token: await totpToken(secret),
+      enabled: true, secret, token: await totpToken(secret), masterPasswordHash: account.masterPasswordHash,
     });
     expect(enable.status).toBe(200);
     const recoveryCode = ((await enable.json()) as any).recoveryCode as string;

@@ -21,7 +21,7 @@ async function runBackup(): Promise<Response> {
   return SELF.fetch(url('/api/admin/backup/run'), {
     method: 'POST',
     headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-    body: JSON.stringify({}),
+    body: JSON.stringify({ masterPasswordHash: session.account.masterPasswordHash }),
   });
 }
 
@@ -58,6 +58,7 @@ beforeAll(async () => {
   }) as typeof fetch;
 
   await api('PUT', '/api/admin/backup/settings', token, {
+    masterPasswordHash: session.account.masterPasswordHash,
     destinations: [{
       type: 'webdav',
       label: 'orch',
@@ -97,7 +98,7 @@ describe('local export with attachments', () => {
     const res = await SELF.fetch(url('/api/admin/backup/export'), {
       method: 'POST',
       headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ includeAttachments: true }),
+      body: JSON.stringify({ includeAttachments: true, masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(res.status).toBe(200);
     expect((res.headers.get('Content-Type') || '')).toContain('zip');
@@ -108,6 +109,7 @@ describe('local export with attachments', () => {
 describe('settings repair', () => {
   it('repairs settings with a valid destination payload', async () => {
     const res = await api('POST', '/api/admin/backup/settings/repair', token, {
+      masterPasswordHash: session.account.masterPasswordHash,
       destinations: [{
         type: 'webdav',
         label: 'repaired',

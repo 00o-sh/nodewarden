@@ -22,7 +22,7 @@ beforeAll(async () => {
 const endpoints: Array<{ method: string; path: string; body?: unknown }> = [
   { method: 'POST', path: '/api/admin/backup/run', body: {} },
   { method: 'GET', path: '/api/admin/backup/remote' },
-  { method: 'GET', path: '/api/admin/backup/remote/download?path=x.zip' },
+  { method: 'POST', path: '/api/admin/backup/remote/download', body: { path: 'x.zip' } },
   { method: 'GET', path: '/api/admin/backup/remote/integrity?path=x.zip' },
   { method: 'DELETE', path: '/api/admin/backup/remote/file?path=x.zip' },
   { method: 'POST', path: '/api/admin/backup/remote/restore', body: { path: 'x.zip' } },
@@ -60,8 +60,8 @@ describe('admin backup validation', () => {
   });
 
   it('rejects invalid settings and repair payloads (400)', async () => {
-    expect((await api('PUT', '/api/admin/backup/settings', adminToken, { destinations: 'nope' })).status).toBe(400);
-    expect((await api('POST', '/api/admin/backup/settings/repair', adminToken, { destinations: 'nope' })).status).toBe(400);
+    expect((await api('PUT', '/api/admin/backup/settings', adminToken, { destinations: 'nope', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(400);
+    expect((await api('POST', '/api/admin/backup/settings/repair', adminToken, { destinations: 'nope', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(400);
   });
 });
 
@@ -69,19 +69,19 @@ describe('admin backup missing-destination and bad-path branches', () => {
   it('409s remote ops that reference an unknown destination', async () => {
     const ghost = crypto.randomUUID();
     expect((await api('GET', `/api/admin/backup/remote?destinationId=${ghost}`, adminToken)).status).toBe(409);
-    expect((await api('GET', `/api/admin/backup/remote/download?path=a.zip&destinationId=${ghost}`, adminToken)).status).toBe(409);
+    expect((await api('POST', '/api/admin/backup/remote/download', adminToken, { path: 'a.zip', destinationId: ghost, masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(409);
     expect((await api('GET', `/api/admin/backup/remote/integrity?path=a.zip&destinationId=${ghost}`, adminToken)).status).toBe(409);
     expect((await api('DELETE', `/api/admin/backup/remote/file?path=a.zip&destinationId=${ghost}`, adminToken)).status).toBe(409);
   });
 
   it('409s download/integrity/delete for a non-zip path before touching the remote', async () => {
-    expect((await api('GET', '/api/admin/backup/remote/download?path=notes.txt', adminToken)).status).toBe(409);
+    expect((await api('POST', '/api/admin/backup/remote/download', adminToken, { path: 'notes.txt', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(409);
     expect((await api('GET', '/api/admin/backup/remote/integrity?path=notes.txt', adminToken)).status).toBe(409);
     expect((await api('DELETE', '/api/admin/backup/remote/file?path=notes.txt', adminToken)).status).toBe(409);
   });
 
   it('fails a configured run against an unknown destination (500)', async () => {
-    const res = await api('POST', '/api/admin/backup/run', adminToken, { destinationId: crypto.randomUUID() });
+    const res = await api('POST', '/api/admin/backup/run', adminToken, { destinationId: crypto.randomUUID(), masterPasswordHash: admin.account.masterPasswordHash });
     expect(res.status).toBe(500);
   });
 });

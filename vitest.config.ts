@@ -23,7 +23,8 @@ export default defineConfig({
       // Ratcheting floor: CI fails if coverage drops below these. Raise them as
       // new tests land so coverage can only move up. Coverage now includes the
       // backup subsystem (local export/import plus the remote WebDAV/S3 flows,
-      // exercised end-to-end with real in-memory servers rather than mocks).
+      // exercised end-to-end with real in-memory servers rather than mocks),
+      // plus the upstream realtime-notifications and mobile push-relay paths.
       thresholds: {
         lines: 93,
         statements: 90,
