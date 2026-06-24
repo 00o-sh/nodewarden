@@ -27,6 +27,7 @@ import {
   handleNotificationsNegotiate,
 } from './handlers/notifications';
 import { handlePublicUploadSendFile } from './handlers/sends';
+import { handleCreateAliasShim } from './handlers/email-aliases';
 import { jsonResponse } from './utils/response';
 import { StorageService } from './services/storage';
 import type { Env } from './types';
@@ -410,6 +411,15 @@ export async function handlePublicRoute(
 
   if (path === '/identity/connect/token' && method === 'POST') {
     return handleToken(request, env);
+  }
+
+  // addy.io-compatible alias generator shim. Official Bitwarden clients call this
+  // via their "self-hosted addy.io server URL" field, authenticating with a
+  // per-user alias API token (Bearer) rather than a NodeWarden session.
+  if (path === '/api/v1/aliases' && method === 'POST') {
+    const blocked = await enforcePublicRateLimit('public-sensitive', LIMITS.rateLimit.sensitivePublicRequestsPerMinute);
+    if (blocked) return blocked;
+    return handleCreateAliasShim(request, env);
   }
 
   if (path === '/api/devices/knowndevice' && method === 'GET') {

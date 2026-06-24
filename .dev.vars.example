@@ -3,3 +3,11 @@
 # Generate one with: openssl rand -hex 32
 # (Example only, 64 hex chars = 32 bytes)
 JWT_SECRET=Enter-your-JWT-key-here-at-least-32-characters
+
+# Email alias generator (optional).
+# Only required for the "advanced" alias paths that create explicit Cloudflare
+# Email Routing rules (custom forwarding destination, or disabling a catch-all
+# alias). Default catch-all alias generation works without these.
+# Token needs Zone -> Email Routing: Edit on the target zone.
+# CF_API_TOKEN=your-cloudflare-api-token
+# CF_ZONE_ID=your-cloudflare-zone-id

@@ -48,6 +48,7 @@
 | Import / Export | ✅ | ✅ | Supports Bitwarden JSON / CSV / **ZIP import with attachments** |
 | **Cloud Backup Center** | ❌ | ✅ | **WebDAV / S3 scheduled backup (OneDrive/Google Drive etc.)** |
 | Password hint (web) | ⚠️ Limited | ✅ | **No email required** |
+| **Forwarded email alias generator** | ⚠️ Third-party only | ✅ | **Self-hosted via Cloudflare Email Routing; addy.io-compatible so official clients work; aliases stored & managed server-side** |
 | TOTP / Steam TOTP | ✅ | ✅ | Includes `steam://` support |
 | Multi-user | ✅ | ✅ | Invite-based registration |
 | Organizations / Collections / Member roles | ✅ | ❌ | Not implemented |
@@ -119,6 +120,22 @@ npm run dev:kv
 - ✅ **PRF key unlock** - Passkey can unlock vault directly
 - ✅ **Official client compatibility** - Chromium browser extension supports Passkey login
 - ✅ **Multi-device sync** - Supports iCloud, Google Password Manager, etc.
+
+### Forwarded Email Alias Generator
+
+Generate per-site forwarding aliases on your own domain, backed by **Cloudflare Email Routing** — no third-party alias provider required.
+
+- ✅ **Works with official Bitwarden clients** — NodeWarden exposes an **addy.io-compatible** API. In the client's *Forwarded email alias* generator, choose **addy.io**, set the **self-hosted server URL** to your NodeWarden instance, paste an **API access token** generated in NodeWarden, and set your **domain**.
+- ✅ **Server-side storage** — unlike Bitwarden (which delegates to a third party and keeps nothing), every alias — including ones created from official clients — is stored in NodeWarden so you can list, disable, and delete them centrally.
+- ✅ **Catch-all by default** — with a Cloudflare catch-all configured, generating an alias needs zero API calls; aliases just forward to your default address.
+- ✅ **Advanced overrides** — pick a non-default destination or disable an alias; NodeWarden creates the matching Email Routing rule (forward/drop) automatically.
+
+Setup:
+
+1. In Cloudflare, enable **Email Routing** for your zone and verify a destination address (your real inbox); optionally enable **catch-all** to that address.
+2. Create a scoped **API token** (Zone → Email Routing: Edit) and set the Worker secrets `CF_API_TOKEN` and `CF_ZONE_ID`. *(Only required for advanced per-alias rules; default catch-all aliases work without it.)*
+3. Open the **Email Aliases** page in the web vault and (as an admin) enable the generator, then configure the alias domains and default destination.
+4. From the same page, generate and copy aliases directly, or create an **API access token** and paste it (with your NodeWarden URL + domain) into an official client's addy.io forwarder.
 
 ### Cloud Backup Notes
 

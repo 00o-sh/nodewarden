@@ -17,6 +17,7 @@ describe('database bootstrap', () => {
     const tables = new Set(results.map((r) => r.name));
 
     const expected = [
+      'alias_api_tokens',
       'attachments',
       'audit_logs',
       'auth_requests',
@@ -24,6 +25,7 @@ describe('database bootstrap', () => {
       'config',
       'devices',
       'domain_settings',
+      'email_aliases',
       'folders',
       'invites',
       'login_attempts_ip',
@@ -47,6 +49,6 @@ describe('database bootstrap', () => {
       .first<{ value: string }>();
     // Pinning the version makes an upstream schema bump a deliberate, visible
     // change rather than a silent one.
-    expect(row?.value).toBe('2026-06-12-auth-requests');
+    expect(row?.value).toBe('2026-06-22-email-aliases');
   });
 });

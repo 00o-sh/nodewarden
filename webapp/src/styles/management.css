@@ -1832,3 +1832,101 @@
     padding-top: 0;
   }
 }
+
+/* Email alias generator */
+.card-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.alias-list {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.alias-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.alias-row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.alias-row-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.alias-address {
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+  word-break: break-all;
+}
+.alias-desc {
+  font-size: var(--font-sm);
+}
+.badge {
+  font-size: var(--font-xs);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-soft);
+}
+.badge-success {
+  color: var(--success);
+  border-color: var(--success);
+}
+.badge-muted {
+  color: var(--text-muted);
+}
+.btn-danger {
+  color: #fff;
+  background: var(--danger);
+  border-color: var(--danger);
+}
+.alias-secret-notice {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px dashed var(--warning);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.alias-secret {
+  font-family: var(--font-mono);
+  font-size: var(--font-sm);
+  word-break: break-all;
+}
+.alias-setup {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-soft);
+}
+.alias-setup-steps {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-sm);
+}
+.alias-toggle-field {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}

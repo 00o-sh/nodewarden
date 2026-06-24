@@ -45,6 +45,7 @@
 | 导入 / 导出 | ✅ | ✅ | 支持 Bitwarden JSON / CSV / **ZIP 导入（包括附件）** |
 | **云端备份中心** | ❌ | ✅ | **支持 WebDAV / S3 定时备份（OneDrive/Google Drive等）** |
 | 密码提示（网页端） | ⚠️ 有限 | ✅ | **无需发送邮件** |
+| **邮箱别名（转发地址）生成器** | ⚠️ 仅依赖第三方 | ✅ | **基于 Cloudflare Email Routing 自托管；兼容 addy.io，官方客户端可直接使用；别名在服务端存储与管理** |
 | TOTP / Steam TOTP | ✅ | ✅ | 含 `steam://` 支持 |
 | 多用户 | ✅ | ✅ | 支持邀请码注册 |
 | 组织 / 集合 / 成员权限 | ✅ | ❌ | 未实现 |
@@ -130,6 +131,22 @@ npm run dev:kv
 - ✅ **PRF 密钥解锁** - Passkey 可直接解锁保险库
 - ✅ **官方客户端兼容** - Chromium系浏览器扩展可用Passkey登录
 - ✅ **多设备同步** - 支持iCloud、Google Password Manager等
+
+### 邮箱别名（转发地址）生成器
+
+在你自己的域名上生成按站点区分的转发别名，底层由 **Cloudflare Email Routing** 提供，无需依赖第三方别名服务。
+
+- ✅ **兼容官方 Bitwarden 客户端**：NodeWarden 提供 **addy.io 兼容** 接口。在客户端的“转发邮箱别名”生成器中选择 **addy.io**，将 **自托管服务器地址** 填为你的 NodeWarden 实例，粘贴在 NodeWarden 中生成的 **API 访问令牌**，并填写 **域名**。
+- ✅ **服务端存储**：与 Bitwarden（仅委托第三方、自身不保存）不同，所有别名（包括从官方客户端创建的）都会保存在 NodeWarden，可集中查看、停用与删除。
+- ✅ **默认走 Catch-all**：配置 Cloudflare catch-all 后，生成别名无需任何 API 调用，别名直接转发到默认地址。
+- ✅ **高级覆盖**：可选择非默认的转发目标或停用某个别名，NodeWarden 会自动创建对应的 Email Routing 规则（转发/丢弃）。
+
+配置步骤：
+
+1. 在 Cloudflare 为你的域名启用 **Email Routing** 并验证一个目标地址（你的真实收件箱）；可选开启到该地址的 **catch-all**。
+2. 创建一个受限 **API Token**（Zone → Email Routing：Edit），并设置 Worker 机密 `CF_API_TOKEN` 与 `CF_ZONE_ID`。*（仅高级别名规则需要；默认 catch-all 别名无需此项。）*
+3. 在网页端打开 **邮箱别名** 页面，以管理员身份启用生成器，并配置别名域名与默认目标地址。
+4. 在同一页面可直接生成并复制别名；或生成 **API 访问令牌**，连同 NodeWarden 地址与域名一起填入官方客户端的 addy.io 转发器。
 
 ### 云端备份说明
 
