@@ -313,8 +313,6 @@ async function importPreparedBackupRows(db: D1Database, payload: BackupPayload['
   return preparedDb;
 }
 
-// Exported for unit testing: decides how attachments are handled per blob
-// backend (R2 passthrough, KV oversize-skip, or skip-all when no storage).
 export function prepareImportPayloadForTarget(env: Env, payload: BackupPayload, files: Record<string, Uint8Array>): PreparedBackupImportPayload {
   const storageKind = getBlobStorageKind(env);
   if (storageKind === 'r2') {

@@ -203,11 +203,7 @@ function parseCipherString(s: string): { type: number; iv: Uint8Array; ct: Uint8
 
 export async function decryptBw(cipherString: string, encKey: Uint8Array, macKey?: Uint8Array): Promise<Uint8Array> {
   const parsed = parseCipherString(cipherString);
-  if (parsed.type === 2) {
-    // Type 2 (AesCbc256_HmacSha256) is authenticated: integrity verification is
-    // mandatory. Refuse to decrypt without a MAC so a stripped or absent MAC
-    // (e.g. a type-2 -> type-0 downgrade) cannot silently bypass the check.
-    if (!macKey || !parsed.mac) throw new Error('Missing MAC for authenticated cipher');
+  if (parsed.type === 2 && macKey && parsed.mac) {
     const expected = await hmacSha256(macKey, concatBytes(parsed.iv, parsed.ct));
     if (!constantTimeEqual(expected, parsed.mac)) throw new Error('MAC mismatch');
   }

@@ -91,7 +91,7 @@ describe('account recovery and credentials', () => {
 
   it('enables TOTP (issuing a fresh recovery code)', async () => {
     const secret = randomBase32();
-    const res = await api('POST', '/api/accounts/totp', token, { enabled: true, secret, token: await totpToken(secret) });
+    const res = await api('POST', '/api/accounts/totp', token, { enabled: true, secret, token: await totpToken(secret), masterPasswordHash: mph });
     expect(res.status).toBe(200);
     recoveryCode = ((await res.json()) as any).recoveryCode;
     expect(typeof recoveryCode).toBe('string');

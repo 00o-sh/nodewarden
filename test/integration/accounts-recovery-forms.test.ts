@@ -15,7 +15,7 @@ beforeAll(async () => {
   token = session.accessToken;
   mph = session.account.masterPasswordHash;
   const secret = randomBase32();
-  const enable = await api('POST', '/api/accounts/totp', token, { enabled: true, secret, token: await totpToken(secret) });
+  const enable = await api('POST', '/api/accounts/totp', token, { enabled: true, secret, token: await totpToken(secret), masterPasswordHash: mph });
   expect(enable.status).toBe(200);
   recoveryCode = ((await enable.json()) as any).recoveryCode;
 });

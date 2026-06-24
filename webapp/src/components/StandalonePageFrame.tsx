@@ -1,6 +1,5 @@
 import type { ComponentChildren } from 'preact';
 import { APP_VERSION } from '@shared/app-version';
-import { t } from '@/lib/i18n';
 
 interface StandalonePageFrameProps {
   title: string;
@@ -13,7 +12,7 @@ export default function StandalonePageFrame(props: StandalonePageFrameProps) {
   return (
     <div className="standalone-shell">
       <div className="standalone-brand standalone-brand-outside">
-        <img src="/nodewarden-logo.svg" alt={t('txt_nodewarden_logo_alt')} className="standalone-brand-logo" />
+        <img src="/nodewarden-logo.svg" alt="NodeWarden logo" className="standalone-brand-logo" />
         <div>
           <span className="standalone-brand-wordmark" role="img" aria-label="NodeWarden" />
         </div>

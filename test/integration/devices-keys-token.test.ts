@@ -34,7 +34,7 @@ describe('device keys and token sub-routes', () => {
   });
 
   it('accepts a push-token update (no-op)', async () => {
-    expect((await api('PUT', `/api/devices/identifier/${crypto.randomUUID()}/token`, token, { pushToken: 'x' })).status).toBe(200);
+    expect((await api('PUT', `/api/devices/identifier/${session.account.deviceIdentifier}/token`, token, { pushToken: 'x' })).status).toBe(200);
   });
 
   it('accepts a web-push-auth update (no-op)', async () => {

@@ -62,8 +62,23 @@ function asTrimmedString(value: unknown): string {
   return String(value ?? '').trim();
 }
 
+// Linear slash trims (no `/\/+$/`-style backtracking, which CodeQL flags as a
+// polynomial ReDoS risk on attacker-supplied URLs/paths).
+function stripTrailingSlashes(value: string): string {
+  let next = String(value || '');
+  while (next.endsWith('/')) next = next.slice(0, -1);
+  return next;
+}
+
+function stripSurroundingSlashes(value: string): string {
+  let next = String(value || '');
+  while (next.startsWith('/')) next = next.slice(1);
+  while (next.endsWith('/')) next = next.slice(0, -1);
+  return next;
+}
+
 function normalizePath(value: unknown): string {
-  return asTrimmedString(value).replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  return stripSurroundingSlashes(asTrimmedString(value).replace(/\\/g, '/'));
 }
 
 function assertValidTimeZone(timezone: string): string {
@@ -134,7 +149,7 @@ function normalizeS3Destination(value: unknown, allowIncomplete = false): S3Back
   }
 
   return {
-    endpoint: endpoint ? endpoint.replace(/\/+$/, '') : '',
+    endpoint: endpoint ? stripTrailingSlashes(endpoint) : '',
     bucket,
     addressingStyle,
     region,
@@ -163,7 +178,7 @@ function normalizeWebDavDestination(value: unknown, allowIncomplete = false): We
   }
 
   return {
-    baseUrl: baseUrl ? baseUrl.replace(/\/+$/, '') : '',
+    baseUrl: baseUrl ? stripTrailingSlashes(baseUrl) : '',
     username,
     password,
     remotePath,

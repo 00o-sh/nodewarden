@@ -56,10 +56,10 @@ function trimSlashes(value: string): string {
   return next;
 }
 
-// Loop-based trailing-slash trim. Avoids the polynomial backtracking of
-// /\/+$/ on attacker-influenced input (e.g. ".../////x").
+// Linear trailing-slash trim. Avoids a `/\/+$/` regex, whose backtracking on
+// attacker-influenced URLs/paths CodeQL flags as polynomial (ReDoS).
 function stripTrailingSlashes(value: string): string {
-  let next = String(value ?? '');
+  let next = String(value || '');
   while (next.endsWith('/')) next = next.slice(0, -1);
   return next;
 }

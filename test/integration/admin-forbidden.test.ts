@@ -37,7 +37,7 @@ describe('admin endpoints reject non-admin callers (403)', () => {
     ['POST', '/api/admin/backup/run'],
     ['POST', '/api/admin/backup/export'],
     ['GET', '/api/admin/backup/remote'],
-    ['GET', '/api/admin/backup/remote/download?path=x.zip'],
+    ['POST', '/api/admin/backup/remote/download?path=x.zip'],
     ['GET', '/api/admin/backup/remote/integrity?path=x.zip'],
     ['DELETE', '/api/admin/backup/remote/file?path=x.zip'],
     ['POST', '/api/admin/backup/remote/restore'],
