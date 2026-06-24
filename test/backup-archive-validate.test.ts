@@ -73,6 +73,44 @@ describe('validateBackupPayloadContents', () => {
       ciphers: [{ id: 'c1', user_id: 'u1' }, { id: 'c1', user_id: 'u1' }],
     }), {})).toThrow(/duplicate cipher id/i);
   });
+
+  it('rejects an invalid account passkey row', () => {
+    expect(() => validateBackupPayloadContents(payload({
+      users: [user],
+      webauthn_credentials: [{ id: 'p1', user_id: 'u1', credential_id: '', public_key: 'pk' }],
+    }), {})).toThrow(/invalid account passkey row/i);
+  });
+
+  it('rejects duplicate account passkey id and credential id', () => {
+    expect(() => validateBackupPayloadContents(payload({
+      users: [user],
+      webauthn_credentials: [
+        { id: 'p1', user_id: 'u1', credential_id: 'c1', public_key: 'pk' },
+        { id: 'p1', user_id: 'u1', credential_id: 'c2', public_key: 'pk' },
+      ],
+    }), {})).toThrow(/duplicate account passkey id/i);
+    expect(() => validateBackupPayloadContents(payload({
+      users: [user],
+      webauthn_credentials: [
+        { id: 'p1', user_id: 'u1', credential_id: 'c1', public_key: 'pk' },
+        { id: 'p2', user_id: 'u1', credential_id: 'c1', public_key: 'pk' },
+      ],
+    }), {})).toThrow(/duplicate account passkey credential id/i);
+  });
+
+  it('rejects an invalid and a duplicate trusted two-factor device token', () => {
+    expect(() => validateBackupPayloadContents(payload({
+      users: [user],
+      trusted_two_factor_device_tokens: [{ token: 't1', user_id: 'u1', device_identifier: 'd1', expires_at: 0 }],
+    }), {})).toThrow(/invalid trusted two-factor device token row/i);
+    expect(() => validateBackupPayloadContents(payload({
+      users: [user],
+      trusted_two_factor_device_tokens: [
+        { token: 't1', user_id: 'u1', device_identifier: 'd1', expires_at: 9_999_999_999_999 },
+        { token: 't1', user_id: 'u1', device_identifier: 'd2', expires_at: 9_999_999_999_999 },
+      ],
+    }), {})).toThrow(/duplicate trusted two-factor device token/i);
+  });
 });
 
 describe('parseBackupArchive', () => {
@@ -98,6 +136,12 @@ describe('parseBackupArchive', () => {
 
   it('rejects an unsupported format version', () => {
     expect(() => parseBackupArchive(archive({ formatVersion: 2 }, db()))).toThrow(/Unsupported backup format version/i);
+  });
+
+  it('rejects an archive with too many entries', () => {
+    const entries: Record<string, Uint8Array> = {};
+    for (let i = 0; i <= 10_000; i++) entries[`f${i}.txt`] = new Uint8Array([1]);
+    expect(() => parseBackupArchive(zipSync(entries))).toThrow(/too many files/i);
   });
 
   it('rejects an archive missing a required attachment file', () => {
