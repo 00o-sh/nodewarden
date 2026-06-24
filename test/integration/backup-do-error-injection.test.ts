@@ -29,7 +29,7 @@ const jsonReq = () =>
   new Request('https://vault.test/api/admin/backup/run', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ masterPasswordHash: session.account.masterPasswordHash }),
   });
 
 beforeAll(async () => {
@@ -78,7 +78,7 @@ const restoreReq = () =>
   new Request('https://vault.test/api/admin/backup/remote/restore', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ path: 'nodewarden_backup.zip', replaceExisting: true }),
+    body: JSON.stringify({ path: 'nodewarden_backup.zip', replaceExisting: true, masterPasswordHash: session.account.masterPasswordHash }),
   });
 
 describe('remote backup restore surfaces Durable Object outcomes', () => {
