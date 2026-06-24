@@ -26,10 +26,10 @@ export default defineConfig({
       // exercised end-to-end with real in-memory servers rather than mocks),
       // plus the upstream realtime-notifications and mobile push-relay paths.
       thresholds: {
-        lines: 93,
-        statements: 90,
+        lines: 94,
+        statements: 91,
         functions: 95,
-        branches: 77,
+        branches: 78,
       },
     },
   },
