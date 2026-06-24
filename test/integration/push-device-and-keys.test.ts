@@ -46,6 +46,36 @@ describe('device push-token storage lifecycle', () => {
     // Clearing a device that does not exist resolves to null.
     expect(await storage().clearDevicePushToken(userId, crypto.randomUUID())).toBeNull();
   });
+
+  it('upserts, re-keys, renames, touches and deletes a device', async () => {
+    const s = storage();
+    const deviceId = crypto.randomUUID();
+
+    // Insert with session stamp + encrypted keys (exercises the keyed-insert branch).
+    await s.upsertDevice(userId, deviceId, 'Laptop', 9, 'stamp-1', {
+      encryptedUserKey: 'euk',
+      encryptedPublicKey: 'epk',
+      encryptedPrivateKey: 'eprk',
+    });
+    let device = await s.getDevice(userId, deviceId);
+    expect(device?.name).toBe('Laptop');
+
+    // Upsert again (update path) without keys, then patch keys separately.
+    await s.upsertDevice(userId, deviceId, 'Laptop Renamed', 9, 'stamp-2');
+    expect(await s.updateDeviceKeys(userId, deviceId, { encryptedUserKey: 'euk2' })).toBe(true);
+    expect(await s.updateDeviceName(userId, deviceId, 'Final Name')).toBe(true);
+    expect(await s.touchDeviceLastSeen(userId, deviceId)).toBe(true);
+
+    const devices = await s.getDevicesByUserId(userId);
+    expect(devices.some((d) => d.deviceIdentifier === deviceId)).toBe(true);
+
+    // Updates against a non-existent device return false.
+    expect(await s.updateDeviceName(userId, crypto.randomUUID(), 'x')).toBe(false);
+    expect(await s.updateDeviceKeys(userId, crypto.randomUUID(), { encryptedUserKey: 'x' })).toBe(false);
+
+    expect(await s.deleteDevice(userId, deviceId)).toBe(true);
+    expect(await s.deleteDevice(userId, deviceId)).toBe(false);
+  });
 });
 
 describe('standalone storage / settings helpers', () => {
