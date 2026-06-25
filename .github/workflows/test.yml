@@ -69,6 +69,12 @@ jobs:
         if: steps.changes.outputs.run == 'true'
         run: npm ci
 
+      - name: Type check (API)
+        if: steps.changes.outputs.run == 'true'
+        # Vitest transpiles via esbuild (types are stripped, not checked), so the
+        # strict backend type check runs separately. Fails fast before the suite.
+        run: npm run typecheck
+
       - name: Run tests with coverage
         if: steps.changes.outputs.run == 'true'
         # Runs the full suite and enforces the coverage thresholds in
