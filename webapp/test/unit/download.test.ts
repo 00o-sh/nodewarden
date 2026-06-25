@@ -47,22 +47,16 @@ describe('downloadBytesAsFile', () => {
   });
 
   it('sets the download filename and href on the anchor before clicking', () => {
-    let captured: HTMLAnchorElement | null = null;
-    clickSpy.mockImplementation(function (this: HTMLAnchorElement) {
-      captured = this;
-    });
     downloadBytesAsFile(new Uint8Array([9]), 'report.csv', 'text/csv');
-    expect(captured).not.toBeNull();
-    expect(captured!.download).toBe('report.csv');
-    expect(captured!.href).toContain('blob:mock-url');
+    const captured = clickSpy.mock.contexts.at(-1) as HTMLAnchorElement;
+    expect(captured).toBeTruthy();
+    expect(captured.download).toBe('report.csv');
+    expect(captured.href).toContain('blob:mock-url');
   });
 
   it('defaults mime type and filename when blank', () => {
-    let captured: HTMLAnchorElement | null = null;
-    clickSpy.mockImplementation(function (this: HTMLAnchorElement) {
-      captured = this;
-    });
     downloadBytesAsFile(new Uint8Array([0]), '', '');
+    const captured = clickSpy.mock.contexts.at(-1) as HTMLAnchorElement;
     const blob = createObjectURL.mock.calls[0][0] as Blob;
     expect(blob.type).toBe('application/octet-stream');
     expect(captured!.download).toBe('download.bin');

@@ -15,7 +15,7 @@ import {
   parseLastPassCsv,
 } from '@/lib/import-formats-csv-misc';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 
 describe('parseArcCsv', () => {
   it('maps url/username/password/note onto login ciphers and derives name from url', () => {

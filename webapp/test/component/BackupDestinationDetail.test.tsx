@@ -84,7 +84,7 @@ function setup(overrides: Record<string, unknown> = {}) {
     ...callbacks,
     ...overrides,
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   render(<BackupDestinationDetail {...(props as any)} />);
   return callbacks;
 }

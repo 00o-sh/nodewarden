@@ -44,7 +44,7 @@ function renderPage(overrides: Record<string, unknown> = {}) {
     onNotify: vi.fn(),
     ...overrides,
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   render(<BackupCenterPage {...(props as any)} />);
   return props;
 }

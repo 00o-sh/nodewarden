@@ -51,7 +51,7 @@ function renderPage(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   render(<BackupCenterPage {...(props as any)} />);
   return props;
 }
