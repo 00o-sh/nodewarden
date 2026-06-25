@@ -12,7 +12,7 @@ import {
   parseZohoVaultCsv,
 } from '@/lib/import-formats-advanced';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 const c = (p: { ciphers: unknown[] }, i = 0) => p.ciphers[i] as any;
 
 describe('parseMSecureCsv', () => {

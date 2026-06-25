@@ -27,7 +27,7 @@ function setup(overrides: Record<string, unknown> = {}) {
     onAddDestination,
     ...overrides,
   };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   render(<BackupDestinationSidebar {...(props as any)} />);
   return { onSelectDestination, onToggleAddChooser, onAddDestination };
 }
