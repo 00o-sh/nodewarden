@@ -1,5 +1,5 @@
 import { env } from 'cloudflare:test';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createBackupDestinationRecord } from '../../shared/backup-schema';
 
 // The BACKUP_TRANSFER_RUNNER Durable Object validates every internal request
