@@ -55,17 +55,16 @@ export default defineConfig({
       reporter: ['text-summary', 'json-summary', 'html'],
       reportsDirectory: 'coverage/webapp',
       // Ratcheting floor: CI fails if frontend coverage drops below these.
-      // Raise them as new tests land so coverage can only move up. Seeded just
-      // below the first batch of unit + component tests (lib + a few
-      // components); grow toward parity with the backend (95/92/95/80) as the
-      // pyramid fills in. NOTE: the floor is intentionally low today because the
-      // suite covers a slice of webapp/src — the gate prevents regression, not
-      // a claim of broad coverage.
+      // Raise them as new tests land so coverage can only move up. The pure-logic
+      // surface of webapp/src/lib (crypto, importers, exporters, vault/backup
+      // helpers, network/offline) is now broadly covered; the remaining gap is
+      // the large page components, hooks, and api/ clients. Grow toward parity
+      // with the backend (95/92/95/80) as those fill in.
       thresholds: {
-        lines: 5,
-        statements: 5,
-        functions: 4,
-        branches: 3,
+        lines: 25,
+        statements: 24,
+        functions: 14,
+        branches: 20,
       },
     },
   },
