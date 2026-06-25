@@ -113,12 +113,9 @@ jobs:
         run: npm run lint
 
       - name: Typecheck (frontend)
-        # NON-BLOCKING for now: turning tsc on for webapp/ surfaces pre-existing
-        # type errors that predate this suite (including a real latent bug at
-        # BackupCenterPage.tsx onSaveSettings). Make this blocking once those are
-        # fixed in a follow-up — mirrors this repo's "visible but not gating"
-        # convention for not-yet-clean scans.
-        continue-on-error: true
+        # Blocking: tsc --noEmit over webapp/. The pre-existing errors this gate
+        # originally surfaced (a real onSaveSettings arity bug plus two TS
+        # strictness issues) are now fixed, so a type regression fails CI.
         run: npm run typecheck:webapp
 
       - name: Unit + component tests with coverage (frontend)

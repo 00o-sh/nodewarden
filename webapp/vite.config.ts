@@ -2,7 +2,9 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import preact from '@preact/preset-vite';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, type BuildOptions, type Plugin } from 'vite';
+
+type RollupTreeshake = NonNullable<NonNullable<BuildOptions['rollupOptions']>['treeshake']>;
 
 const rootDir = fileURLToPath(new URL('.', import.meta.url));
 
@@ -283,9 +285,10 @@ export default defineConfig(({ mode }) => {
       target: 'esnext',
       chunkSizeWarningLimit: 800,
       rollupOptions: {
-        treeshake: {
-          preset: 'smallest',
-        },
+        // Vite bundles its own Rollup types, which can skew from the resolved
+        // Rollup types and reject this otherwise-valid treeshake preset object.
+        // Cast to bypass the version mismatch without changing build behavior.
+        treeshake: { preset: 'smallest' } as RollupTreeshake,
         output: {
           manualChunks(id) {
             const normalized = id.replace(/\\/g, '/');

@@ -25,10 +25,10 @@ Preact + wouter + @tanstack/react-query, built with Vite.
 - **ESLint** (`npm run lint`) — typescript-eslint recommended, scoped to
   `webapp/`. Blocking.
 - **Typecheck** (`npm run typecheck:webapp`) — `tsc --noEmit` over the webapp.
-  Currently **non-blocking** in CI: enabling it surfaced pre-existing type
-  errors that predate this suite (notably a real latent bug where
-  `BackupCenterPage`'s delete-destination path calls `onSaveSettings` with the
-  wrong arguments). Fix those in a follow-up, then flip the CI step to blocking.
+  **Blocking.** Enabling it originally surfaced pre-existing errors (a real
+  latent bug where `BackupCenterPage`'s delete-destination path called
+  `onSaveSettings` without the master password, plus two TS-strictness issues);
+  those are now fixed, so the gate guards against type regressions.
 
 ### Unit tests — `webapp/test/unit/`
 
@@ -98,5 +98,4 @@ functions 95 / branches 80).
 2. Add these as **required status checks** in branch protection for `main` so a
    PR physically cannot merge unless they pass:
    - `test` (backend), `frontend` (this job), and the security workflow as desired.
-3. Keep raising the coverage floor and flip typecheck to blocking once the
-   pre-existing errors are resolved.
+3. Keep raising the coverage floor as the suite grows.
