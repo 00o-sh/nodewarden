@@ -517,7 +517,9 @@ async function signedS3Request(
       'X-Amz-Date': headers['x-amz-date'],
       ...(method === 'PUT' ? { 'Content-Type': headers['content-type'] } : {}),
     },
-    body,
+    // GET/HEAD requests carry no body; only attach one when present so the
+    // fetch options stay valid (a body on GET is rejected by the runtime).
+    ...(body === undefined ? {} : { body }),
   });
 }
 

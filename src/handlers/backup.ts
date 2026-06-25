@@ -102,7 +102,7 @@ async function writeAuditLog(
     category: 'data',
     level: action.endsWith('.failed') ? 'error' : 'info',
     metadata: {
-      ...(metadata || {}),
+      ...metadata,
       ...(request ? auditRequestMetadata(request) : {}),
     },
   });
@@ -437,7 +437,7 @@ export async function executeConfiguredBackup(
       uploadVerificationAttempts: maxArchiveUploadAttempts,
       prunedFileCount,
       pruneError: pruneErrorMessage,
-      ...(auditMetadata || {}),
+      ...auditMetadata,
     });
 
     await progress?.({
@@ -466,7 +466,7 @@ export async function executeConfiguredBackup(
     await writeAuditLog(storage, actorUserId, `admin.backup.remote.${trigger}.failed`, 'backup', null, {
       ...getBackupDestinationSummary(destination),
       error: destination.runtime.lastErrorMessage,
-      ...(auditMetadata || {}),
+      ...auditMetadata,
     });
     await progress?.({
       operation: 'backup-remote-run',
@@ -727,7 +727,7 @@ export async function importAndAuditRemoteBackupFile(
     bytes: remoteFile.bytes.byteLength,
     trigger: 'remote',
     checksumMismatchAccepted,
-    ...(auditMetadata || {}),
+    ...auditMetadata,
   });
   return result;
 }

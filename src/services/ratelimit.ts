@@ -265,7 +265,7 @@ function parseIpv6Hextets(input: string): number[] | null {
     const missing = 8 - (headNums.length + tailNums.length);
     if (missing < 1) return null;
 
-    return [...headNums, ...new Array<number>(missing).fill(0), ...tailNums];
+    return [...headNums, ...Array.from({ length: missing }, () => 0), ...tailNums];
   }
 
   const all = parseParts(value.split(':'));

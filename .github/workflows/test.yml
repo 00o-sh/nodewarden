@@ -75,6 +75,13 @@ jobs:
         # strict backend type check runs separately. Fails fast before the suite.
         run: npm run typecheck
 
+      - name: Lint (API)
+        if: steps.changes.outputs.run == 'true'
+        # oxlint over the backend sources. --deny-warnings (in the script) makes any
+        # finding fail CI, so the lint stays clean as new code lands. Named lint:api
+        # to stay distinct from the frontend `lint` (eslint over webapp/).
+        run: npm run lint:api
+
       - name: Run tests with coverage
         if: steps.changes.outputs.run == 'true'
         # Runs the full suite and enforces the coverage thresholds in

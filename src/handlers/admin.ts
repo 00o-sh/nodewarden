@@ -36,7 +36,7 @@ async function writeAuditLog(
     category: action.startsWith('admin.user.') ? 'security' : 'system',
     level: action.startsWith('admin.user.') ? 'security' : 'info',
     metadata: {
-      ...(metadata || {}),
+      ...metadata,
       ...(request ? auditRequestMetadata(request) : {}),
     },
   });

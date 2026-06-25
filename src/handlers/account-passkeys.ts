@@ -263,7 +263,7 @@ export async function handleGetAccountPasskeyAttestationOptions(request: Request
       },
     });
     (options as any).extensions = {
-      ...((options as any).extensions || {}),
+      ...(options as any).extensions,
       prf: {},
     };
     stage = 'save_challenge';
