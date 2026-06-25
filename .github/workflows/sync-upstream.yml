@@ -1,38 +1,58 @@
 name: Sync upstream
 
-# DISABLED: automatic upstream sync is turned off.
+# Opens (or updates) a pull request that merges upstream
+# (shuaiplus/NodeWarden) into `main` for review. This workflow NEVER pushes to
+# `main` and NEVER force-pushes `main` — its only write is to the dedicated
+# `automation/upstream-sync` branch that backs a single auto-updated PR.
+# Cloudflare only deploys `main`, so no upstream code goes live until a human
+# reviews the PR (diff + CI) and merges it.
 #
-# This workflow pulls commits from the upstream repository
-# (shuaiplus/NodeWarden) and pushes them straight to `main`, which
-# Cloudflare auto-deploys. Running it automatically means unreviewed
-# upstream code goes live on a server that holds password-vault data.
-# The scheduled trigger has been removed so this never runs on its own.
+# Behaviour:
+#   - Runs nightly (03:00 UTC) and on demand (workflow_dispatch).
+#   - Resolves a target: the latest upstream *release* on the schedule, or the
+#     dispatch input (commit/tag), or the latest upstream/main commit when the
+#     input is blank.
+#   - A clean merge pushes the sync branch and opens/updates the PR.
+#   - A merge with conflicts fails the run loudly (no partial state is pushed) so
+#     it can be resolved by hand.
 #
-# It can still be started manually from the Actions tab (workflow_dispatch)
-# if you deliberately want to sync after reviewing the upstream changes.
-# Delete this file entirely if you never want to sync from upstream.
+# CI note: PRs opened with the default GITHUB_TOKEN do not themselves trigger
+# other workflows. Set a repo secret `SYNC_UPSTREAM_PAT` (a fine-grained PAT with
+# contents:write + pull-requests:write) and CI will run on the sync PR
+# automatically. Without it the PR still opens; nudge CI by closing/reopening it.
 
 on:
+  schedule:
+    - cron: '0 3 * * *'
   workflow_dispatch:
     inputs:
       target_commit:
-        description: 'Commit hash (leave blank to use latest commit)'
+        description: 'Commit hash or tag (blank = latest upstream/main commit)'
         required: false
         type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: true
+
 jobs:
   sync:
     runs-on: ubuntu-latest
-    # contents: write is needed to push the synced commits to main.
     permissions:
       contents: write
+      pull-requests: write
+    env:
+      SYNC_BRANCH: automation/upstream-sync
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
+          # Prefer a PAT so the resulting PR triggers CI; fall back to the
+          # default token (PR still opens, CI may need a manual nudge).
+          token: ${{ secrets.SYNC_UPSTREAM_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Configure git
         run: |
@@ -51,109 +71,96 @@ jobs:
           # script, so its contents can't be interpreted as shell code.
           MANUAL_INPUT: ${{ github.event.inputs.target_commit }}
         run: |
-          TRIGGER="${{ github.event_name }}"
-
-          if [ "$TRIGGER" = "schedule" ]; then
-            # Auto mode: resolve latest upstream release tag
-            LATEST_TAG=$(curl -s https://api.github.com/repos/shuaiplus/NodeWarden/releases/latest | jq -r .tag_name)
-            if [ "$LATEST_TAG" = "null" ] || [ -z "$LATEST_TAG" ]; then
-              echo "No release found in upstream."
-              exit 1
+          if [ -n "$MANUAL_INPUT" ]; then
+            TARGET_SHA=$(git rev-parse "${MANUAL_INPUT}^{commit}" 2>/dev/null) \
+              || { echo "::error::Cannot resolve '$MANUAL_INPUT' to a commit."; exit 1; }
+            LABEL="$MANUAL_INPUT"
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            LATEST_TAG=$(curl -fsSL https://api.github.com/repos/shuaiplus/NodeWarden/releases/latest | jq -r .tag_name)
+            if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "null" ]; then
+              echo "::error::No upstream release found."; exit 1
             fi
-            TARGET_SHA=$(git rev-list -n 1 "$LATEST_TAG" 2>/dev/null)
-            if [ -z "$TARGET_SHA" ]; then
-              echo "Tag '$LATEST_TAG' not found after fetch."
-              exit 1
-            fi
-            echo "mode=auto" >> $GITHUB_OUTPUT
-            echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-            echo "target_sha=$TARGET_SHA" >> $GITHUB_OUTPUT
-            echo "Auto mode — latest release: $LATEST_TAG ($TARGET_SHA)"
-
-          elif [ -n "$MANUAL_INPUT" ]; then
-            # Manual mode: use provided commit hash or tag
-            TARGET_SHA=$(git rev-parse "$MANUAL_INPUT" 2>/dev/null)
-            if [ -z "$TARGET_SHA" ]; then
-              echo "Cannot resolve '$MANUAL_INPUT' to a commit."
-              exit 1
-            fi
-            echo "mode=manual" >> $GITHUB_OUTPUT
-            echo "target_sha=$TARGET_SHA" >> $GITHUB_OUTPUT
-            echo "Manual mode — target: $MANUAL_INPUT ($TARGET_SHA)"
-
+            TARGET_SHA=$(git rev-list -n 1 "$LATEST_TAG" 2>/dev/null) \
+              || { echo "::error::Tag '$LATEST_TAG' not found after fetch."; exit 1; }
+            LABEL="$LATEST_TAG"
           else
-            # Manual mode, blank input: use latest commit on upstream/main
             TARGET_SHA=$(git rev-parse upstream/main)
-            echo "mode=manual" >> $GITHUB_OUTPUT
-            echo "target_sha=$TARGET_SHA" >> $GITHUB_OUTPUT
-            echo "Manual mode — latest commit: $TARGET_SHA"
+            LABEL="upstream/main@${TARGET_SHA:0:12}"
           fi
+          echo "target_sha=$TARGET_SHA" >> "$GITHUB_OUTPUT"
+          echo "label=$LABEL" >> "$GITHUB_OUTPUT"
+          echo "Target: $LABEL ($TARGET_SHA)"
 
       - name: Check if update is needed
         id: check
         run: |
           TARGET_SHA="${{ steps.resolve.outputs.target_sha }}"
-          MODE="${{ steps.resolve.outputs.mode }}"
-
-          if [ "$MODE" = "manual" ]; then
-            # Manual: skip only if HEAD is exactly this commit
-            CURRENT_SHA=$(git rev-parse HEAD)
-            if [ "$CURRENT_SHA" = "$TARGET_SHA" ]; then
-              echo "Already at $TARGET_SHA — skipping."
-              echo "needs_update=false" >> $GITHUB_OUTPUT
-            else
-              echo "Switching to $TARGET_SHA"
-              echo "needs_update=true" >> $GITHUB_OUTPUT
-            fi
+          if git merge-base --is-ancestor "$TARGET_SHA" origin/main 2>/dev/null; then
+            echo "main already contains $TARGET_SHA — nothing to sync."
+            echo "needs_update=false" >> "$GITHUB_OUTPUT"
           else
-            # Auto: skip if target is already in ancestry
-            if git merge-base --is-ancestor "$TARGET_SHA" HEAD 2>/dev/null; then
-              echo "Already up to date with $TARGET_SHA — skipping."
-              echo "needs_update=false" >> $GITHUB_OUTPUT
-            else
-              echo "Update needed — target: $TARGET_SHA"
-              echo "needs_update=true" >> $GITHUB_OUTPUT
-            fi
+            echo "needs_update=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Apply update
+      - name: Merge upstream into the sync branch
+        id: merge
         if: steps.check.outputs.needs_update == 'true'
         run: |
           TARGET_SHA="${{ steps.resolve.outputs.target_sha }}"
-          MODE="${{ steps.resolve.outputs.mode }}"
-          git checkout main
-          if [ "$MODE" = "manual" ]; then
-            # Hard reset allows both upgrade and rollback
-            git reset --hard "$TARGET_SHA"
+          git checkout -B "$SYNC_BRANCH" origin/main
+          if git merge --no-edit "$TARGET_SHA"; then
+            # Never let an upstream merge rewrite this workflow file.
+            git checkout origin/main -- .github/workflows/sync-upstream.yml
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: keep our sync-upstream workflow"
+            fi
+            echo "conflicts=false" >> "$GITHUB_OUTPUT"
           else
-            git merge "$TARGET_SHA" --no-edit
+            git merge --abort
+            echo "conflicts=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Restore workflow file
-        if: steps.check.outputs.needs_update == 'true'
+      - name: Push sync branch
+        if: steps.check.outputs.needs_update == 'true' && steps.merge.outputs.conflicts == 'false'
+        run: git push --force origin "$SYNC_BRANCH"
+
+      - name: Open or update the sync PR
+        if: steps.check.outputs.needs_update == 'true' && steps.merge.outputs.conflicts == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.SYNC_UPSTREAM_PAT || secrets.GITHUB_TOKEN }}
+          LABEL: ${{ steps.resolve.outputs.label }}
+          TARGET_SHA: ${{ steps.resolve.outputs.target_sha }}
         run: |
-          # Always keep our own workflow file, never let upstream overwrite it
-          git checkout HEAD@{1} -- .github/workflows/sync-upstream.yml 2>/dev/null || true
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: restore sync-upstream workflow after sync"
+          EXISTING=$(gh pr list --head "$SYNC_BRANCH" --base main --state open --json number --jq '.[0].number // empty')
+          BODY=$(printf '%s\n' \
+            "Automated merge of upstream \`shuaiplus/NodeWarden\` (\`$LABEL\`, \`$TARGET_SHA\`) into \`main\`." \
+            "" \
+            "Review the diff and wait for CI before merging — nothing deploys until this PR is merged." \
+            "The branch is force-updated by each nightly run, so this PR always reflects the latest upstream target.")
+          if [ -n "$EXISTING" ]; then
+            echo "PR #$EXISTING already open for $SYNC_BRANCH; the push updated it."
+            gh pr edit "$EXISTING" --title "chore: sync upstream ($LABEL)" --body "$BODY"
+          else
+            gh pr create --base main --head "$SYNC_BRANCH" \
+              --title "chore: sync upstream ($LABEL)" --body "$BODY"
           fi
 
-      - name: Push
-        if: steps.check.outputs.needs_update == 'true'
+      - name: Fail on merge conflicts
+        if: steps.check.outputs.needs_update == 'true' && steps.merge.outputs.conflicts == 'true'
         run: |
-          if [ "${{ steps.resolve.outputs.mode }}" = "manual" ]; then
-            git push origin main --force
-          else
-            git push origin main
-          fi
+          echo "::error::Upstream merge into '$SYNC_BRANCH' has conflicts (target ${{ steps.resolve.outputs.label }}). Resolve locally and open the PR by hand; nothing was pushed."
+          exit 1
 
       - name: Summary
+        if: always()
         run: |
-          if [ "${{ steps.check.outputs.needs_update }}" = "true" ]; then
-            echo "### Synced successfully" >> $GITHUB_STEP_SUMMARY
-            echo "- **Mode:** ${{ steps.resolve.outputs.mode }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Tag:** ${{ steps.resolve.outputs.latest_tag || 'N/A (manual)' }}" >> $GITHUB_STEP_SUMMARY
-            echo "- **Commit:** \`${{ steps.resolve.outputs.target_sha }}\`" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check.outputs.needs_update }}" != "true" ]; then
+            echo "### Nothing to sync" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "${{ steps.merge.outputs.conflicts }}" = "true" ]; then
+            echo "### Upstream merge has conflicts — manual resolution needed" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Target:** ${{ steps.resolve.outputs.label }}" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "### Nothing to update" >> $GITHUB_STEP_SUMMARY
+            echo "### Sync PR opened/updated" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Target:** ${{ steps.resolve.outputs.label }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Branch:** \`${{ env.SYNC_BRANCH }}\`" >> "$GITHUB_STEP_SUMMARY"
           fi
