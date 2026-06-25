@@ -81,8 +81,15 @@ jobs:
         # vitest.config.ts (the ratcheting floor).
         run: npm run coverage
 
+      - name: Frontend coverage (for badge)
+        # Produces coverage/webapp/coverage-summary.json so publish-badges.sh can
+        # emit the separate "Web coverage" badge. The frontend job is what gates
+        # the webapp ratchet on PRs; here we only need the number, on main.
+        if: steps.changes.outputs.run == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: npm run coverage:webapp
+
       - name: Publish badges
-        # Self-contained auto-updating badges (coverage + i18n): only on pushes to main.
+        # Self-contained auto-updating badges (API + web coverage + i18n): only on pushes to main.
         if: steps.changes.outputs.run == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

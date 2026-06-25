@@ -92,7 +92,10 @@ slice of the webapp — the gate prevents regression, it is not a claim of broad
 coverage. Target: parity with the backend (lines 95 / statements 92 /
 functions 95 / branches 80).
 
-## Making "green ⇒ mergeable" real
+The two suites also publish **separate coverage badges** — "API coverage"
+(backend) and "Web coverage" (frontend) — so the frontend number is tracked on
+its own and never drags the backend's down (they were never the same number).
+
 
 1. The `frontend` job in `.github/workflows/test.yml` runs every blocking layer.
 2. Add these as **required status checks** in branch protection for `main` so a
