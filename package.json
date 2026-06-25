@@ -29,7 +29,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "test:webapp": "vitest run --config vitest.webapp.config.ts",
+    "test:webapp": "vitest run --config vitest.webapp-jsdom.config.ts",
     "coverage:webapp": "vitest run --config vitest.webapp.config.ts --coverage",
     "test:contract": "vitest run --config vitest.contract.config.ts",
     "test:e2e": "playwright test --config playwright.config.ts",
