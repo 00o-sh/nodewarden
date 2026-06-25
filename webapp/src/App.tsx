@@ -227,7 +227,9 @@ export default function App() {
   const [inviteCodeFromUrl, setInviteCodeFromUrl] = useState(initialInviteCode);
   const [unlockPassword, setUnlockPassword] = useState('');
   const [pendingTotp, setPendingTotp] = useState<PendingTotp | null>(null);
-  const [pendingTotpMode, setPendingTotpMode] = useState<'login' | 'unlock' | null>(null);
+  // Only the setter is used (the mode is tracked for side effects, never read),
+  // so we keep the setter and drop the unused state binding.
+  const setPendingTotpMode = useState<'login' | 'unlock' | null>(null)[1];
   const [pendingPasskeyPassword, setPendingPasskeyPassword] = useState<PendingPasskeyPassword | null>(null);
   const [passkeyPassword, setPasskeyPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
