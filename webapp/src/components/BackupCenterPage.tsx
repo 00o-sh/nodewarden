@@ -26,7 +26,7 @@ import {
   persistRemoteBrowserState,
 } from '@/lib/backup-center';
 import { BACKUP_PROGRESS_EVENT, type BackupProgressDetail, type BackupProgressOperation } from '@/lib/backup-restore-progress';
-import { RECOMMENDED_PROVIDERS, type RecommendedProvider } from '@/lib/backup-recommendations';
+import { RECOMMENDED_PROVIDERS } from '@/lib/backup-recommendations';
 import { t } from '@/lib/i18n';
 import { BackupDestinationDetail } from './backup-center/BackupDestinationDetail';
 import { BackupDestinationSidebar } from './backup-center/BackupDestinationSidebar';
@@ -56,6 +56,7 @@ type PendingRestoreIntegrity =
 type PendingBackupVerification =
   | { action: 'export' }
   | { action: 'saveSettings' }
+  | { action: 'deleteDestination'; destinationId: string }
   | { action: 'import'; replaceExisting: boolean; allowChecksumMismatch: boolean; knownIntegrity?: BackupFileIntegrityCheckResult }
   | { action: 'runRemoteBackup' }
   | { action: 'downloadRemote'; path: string }
@@ -242,6 +243,8 @@ export default function BackupCenterPage(props: BackupCenterPageProps) {
       ? t('txt_backup_export')
       : pendingBackupVerification?.action === 'saveSettings'
         ? t('txt_backup_save_settings')
+        : pendingBackupVerification?.action === 'deleteDestination'
+          ? t('txt_backup_save_settings')
         : pendingBackupVerification?.action === 'runRemoteBackup'
           ? t('txt_backup_run_manual')
       : pendingBackupVerification?.action === 'downloadRemote'
@@ -496,7 +499,16 @@ export default function BackupCenterPage(props: BackupCenterPageProps) {
 
   async function handleDeleteDestination() {
     if (!selectedDestinationId || savingSettings) return;
+    // Deleting a destination persists a mutated settings payload, so it must go
+    // through the same master-password verification gate as saving settings.
     const destinationIdToDelete = selectedDestinationId;
+    setConfirmDeleteDestinationOpen(false);
+    setPendingBackupVerification({ action: 'deleteDestination', destinationId: destinationIdToDelete });
+    setBackupPasswordValue('');
+  }
+
+  async function executeDeleteDestination(masterPassword: string, destinationIdToDelete: string) {
+    if (savingSettings) return;
     const nextSettings: AdminBackupSettings = {
       destinations: (savedSettings?.destinations || []).filter((destination) => destination.id !== destinationIdToDelete),
     };
@@ -504,7 +516,7 @@ export default function BackupCenterPage(props: BackupCenterPageProps) {
     setSavingSettings(true);
     setLocalError('');
     try {
-      const saved = await props.onSaveSettings(nextSettings);
+      const saved = await props.onSaveSettings(masterPassword, nextSettings);
       const nextDraftDestinations = settings.destinations.filter((destination) => destination.id !== destinationIdToDelete);
       const nextSelected = getFirstVisibleDestinationId({ destinations: nextDraftDestinations }) || getFirstVisibleDestinationId(saved);
       setSavedSettings(saved);
@@ -865,6 +877,8 @@ export default function BackupCenterPage(props: BackupCenterPageProps) {
         await executeExport(masterPassword);
       } else if (request.action === 'saveSettings') {
         await executeSaveSettings(masterPassword);
+      } else if (request.action === 'deleteDestination') {
+        await executeDeleteDestination(masterPassword, request.destinationId);
       } else if (request.action === 'import') {
         await executeLocalRestore(masterPassword, request.replaceExisting, request.allowChecksumMismatch, request.knownIntegrity);
       } else if (request.action === 'runRemoteBackup') {

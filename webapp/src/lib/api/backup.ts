@@ -197,7 +197,7 @@ export async function exportAdminBackup(
 export async function downloadAdminBackupAttachmentBlob(
   authedFetch: AuthedFetch,
   blobName: string
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   const params = new URLSearchParams();
   params.set('blobName', blobName);
   const resp = await authedFetch(`/api/admin/backup/blob?${params.toString()}`, { method: 'GET' });

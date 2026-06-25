@@ -1,0 +1,104 @@
+# Frontend testing strategy
+
+Goal: **when a PR's checks are green, we are confident the frontend can merge.**
+No suite makes that literally 100% — the practical bar is that every layer the
+frontend can break is gated as a required check, and the seam between the
+frontend and the *real* backend is tested rather than mocked.
+
+The backend (`src/`) already has its own unit + integration suite with a 95%
+coverage ratchet (`vitest.config.ts`, the `test` job in
+`.github/workflows/test.yml`). This document covers the **frontend** (`webapp/`):
+Preact + wouter + @tanstack/react-query, built with Vite.
+
+## The layers
+
+| Layer | Runs in | Config | What it proves |
+|-------|---------|--------|----------------|
+| **Static** | — | `eslint.config.js`, `tsc` | Lint + types are sound before anything runs |
+| **Unit** | jsdom/Node | `vitest.webapp.config.ts` | Pure logic: crypto, importers, utils, api helpers |
+| **Component** | jsdom | `vitest.webapp.config.ts` | Components/hooks render and behave correctly |
+| **Contract** | real Workers runtime | `vitest.contract.config.ts` | The webapp api client agrees with the real backend |
+| **E2E** | real browser (Chromium) | `playwright.config.ts` | Critical journeys work in the fully built app |
+
+### Static gates
+
+- **ESLint** (`npm run lint`) — typescript-eslint recommended, scoped to
+  `webapp/`. Blocking.
+- **Typecheck** (`npm run typecheck:webapp`) — `tsc --noEmit` over the webapp.
+  **Blocking.** Enabling it originally surfaced pre-existing errors (a real
+  latent bug where `BackupCenterPage`'s delete-destination path called
+  `onSaveSettings` without the master password, plus two TS-strictness issues);
+  those are now fixed, so the gate guards against type regressions.
+
+### Unit tests — `webapp/test/unit/`
+
+The highest-stakes, cheapest-to-test surface. Includes:
+
+- **Crypto** (`crypto.test.ts`) — real WebCrypto round-trips for the Bitwarden
+  AES-CBC-HMAC format, PBKDF2/HKDF derivation, MAC-tamper rejection, and the
+  RFC 6238 TOTP test vector. For a password manager this is the surface that
+  most needs to be correct.
+- **Importers** (`import-formats.test.ts`) — the CSV parser plus format parsers
+  (Bitwarden, Chrome, …) over fixture data.
+- **Utilities** (`website-utils.test.ts`, `api-shared.test.ts`).
+
+### Component tests — `webapp/test/component/`
+
+`@testing-library/preact` in jsdom: render a component/hook, drive it, assert
+the DOM and callbacks. Start with high-traffic, high-risk components and grow.
+
+### Contract tests — `webapp/test/contract/` (the key layer)
+
+These run the webapp's **own** `lib/api/*` client against the **real worker**
+(workerd via Miniflare — the same runtime the backend integration suite uses).
+The client's global `fetch` is routed to the live worker
+(`webapp/test/contract/setup.ts`), so real frontend crypto and request shaping
+are verified against real backend handlers.
+
+`auth-flow.test.ts` runs a full account lifecycle — register → prelogin →
+password login → authenticated profile read → vault-key unlock — entirely
+through the frontend client. **This is what turns "the backend's API tests pass
+*and* the frontend's component tests pass" into "the two halves actually
+agree."** Request/response shape drift between frontend and backend fails here,
+where neither the unit nor component suite would catch it.
+
+### E2E smoke — `webapp/e2e/`
+
+Playwright against the **demo build** (`npm run build:demo` / `dev:demo`), which
+stubs the backend so journeys are deterministic and network-free while still
+exercising the fully wired app in a real browser. Keep these few and critical
+(boot, log in, see the vault). Chromium is provided by the environment /
+`npx playwright install chromium` in CI.
+
+## Running locally
+
+```bash
+npm run lint                 # ESLint (webapp)
+npm run typecheck:webapp     # tsc --noEmit (webapp)
+npm run test:webapp          # unit + component
+npm run coverage:webapp      # the above + coverage ratchet
+npm run test:contract        # frontend client vs real worker
+npm run build && npm run build:demo
+npm run test:e2e             # Playwright (set PLAYWRIGHT_CHROMIUM_PATH to reuse a
+                             # pre-installed Chromium, e.g. in a managed sandbox)
+```
+
+## The coverage ratchet
+
+`vitest.webapp.config.ts` enforces minimum coverage over `webapp/src`. The floor
+is seeded **just below** what today's tests achieve, so it can only move up.
+Raise it as tests land; it is intentionally low now because the suite covers a
+slice of the webapp — the gate prevents regression, it is not a claim of broad
+coverage. Target: parity with the backend (lines 95 / statements 92 /
+functions 95 / branches 80).
+
+The two suites also publish **separate coverage badges** — "API coverage"
+(backend) and "Web coverage" (frontend) — so the frontend number is tracked on
+its own and never drags the backend's down (they were never the same number).
+
+
+1. The `frontend` job in `.github/workflows/test.yml` runs every blocking layer.
+2. Add these as **required status checks** in branch protection for `main` so a
+   PR physically cannot merge unless they pass:
+   - `test` (backend), `frontend` (this job), and the security workflow as desired.
+3. Keep raising the coverage floor as the suite grows.
