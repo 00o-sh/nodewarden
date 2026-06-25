@@ -290,7 +290,7 @@ export function normalizeCipherLoginForCompatibility(
 
 function normalizeCipherLoginUrisForCompatibility(
   uris: any,
-  options: { requiresUriChecksum?: boolean; preserveRepairableUris?: boolean } = {}
+  _options: { requiresUriChecksum?: boolean; preserveRepairableUris?: boolean } = {}
 ): any[] | null {
   if (!Array.isArray(uris) || uris.length === 0) return null;
   const out: any[] = [];
@@ -681,7 +681,7 @@ export function cipherToResponse(
   options: CipherResponseOptions = {}
 ): CipherResponse {
   // Strip internal-only fields that must not appear in the API response
-  const { userId, createdAt, updatedAt, archivedAt, deletedAt, ...passthrough } = cipher;
+  const { userId: _userId, createdAt, updatedAt, archivedAt, deletedAt, ...passthrough } = cipher;
   const responseCipherKey = optionalEncString(cipher.key);
   const normalizedLogin = normalizeCipherLoginForCompatibility(
     (passthrough as any).login ?? null,

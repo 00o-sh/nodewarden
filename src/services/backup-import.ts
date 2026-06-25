@@ -94,13 +94,13 @@ async function getTableCreateSql(db: D1Database, table: BackupTableName): Promis
 }
 
 function buildShadowTableCreateSql(createSql: string, table: BackupTableName): string {
-  const tablePattern = new RegExp(`^CREATE TABLE(?:\\s+IF NOT EXISTS)?\\s+(?:\"${table}\"|${table})(?=\\s*\\()`, 'i');
+  const tablePattern = new RegExp(`^CREATE TABLE(?:\\s+IF NOT EXISTS)?\\s+(?:"${table}"|${table})(?=\\s*\\()`, 'i');
   let next = createSql.replace(tablePattern, `CREATE TABLE "${shadowTableName(table)}"`);
   if (next === createSql) {
     throw new Error(`Restore shadow schema could not rewrite CREATE TABLE statement for ${table}`);
   }
   for (const currentTable of BACKUP_TABLES) {
-    const referencePattern = new RegExp(`\\bREFERENCES\\s+(?:\"${currentTable}\"|${currentTable})(?=\\s*\\()`, 'gi');
+    const referencePattern = new RegExp(`\\bREFERENCES\\s+(?:"${currentTable}"|${currentTable})(?=\\s*\\()`, 'gi');
     next = next.replace(
       referencePattern,
       `REFERENCES "${shadowTableName(currentTable)}"`
@@ -470,7 +470,7 @@ async function prepareRemoteAttachmentPayload(
   env: Env,
   payload: BackupPayload,
   files: Record<string, Uint8Array>,
-  source: RemoteAttachmentSource
+  _source: RemoteAttachmentSource
 ): Promise<PreparedBackupImportPayload> {
   const manifestLookup = buildAttachmentBlobLookup(payload.manifest);
   const storageKind = getBlobStorageKind(env);
