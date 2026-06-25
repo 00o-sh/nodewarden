@@ -1,43 +1,22 @@
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
 import { defineConfig } from 'vitest/config';
-import preact from '@preact/preset-vite';
 
-// Frontend tests (webapp/). Two layers run here in the jsdom environment:
-//   - unit:      pure-logic tests for lib/ helpers (crypto, importers, utils).
-//   - component: rendered-DOM tests for components/hooks via @testing-library.
+// Frontend coverage orchestrator. Runs BOTH frontend test projects under one
+// istanbul coverage report:
+//   - vitest.webapp.jsdom.config.ts : unit + component tests (jsdom)
+//   - vitest.contract.config.ts     : api-client contract tests against the
+//                                     real worker (workerd/Miniflare)
+// Combining them means the api/ modules — which are only exercised end-to-end
+// against the real worker — count toward the webapp coverage number, the same
+// way the backend merges its node + workerd projects in vitest.config.ts.
 //
-// This is intentionally a SEPARATE vitest invocation from the backend suite
-// (vitest.config.ts) so the backend's 95% coverage ratchet stays independent of
-// the frontend's (the two move at different speeds). Full-stack contract tests
-// that need the real Workers runtime live in vitest.contract.config.ts.
-const rootDir = fileURLToPath(new URL('.', import.meta.url));
-const webappSrc = path.resolve(rootDir, 'webapp/src');
-
+// This is a SEPARATE invocation from the backend suite so the backend's 95%
+// ratchet stays independent of the frontend's (they move at different speeds).
 export default defineConfig({
-  plugins: [preact()],
-  // Mirror the build-time define so production (non-demo) code paths are what
-  // the tests exercise.
-  define: {
-    __NODEWARDEN_DEMO__: 'false',
-  },
-  resolve: {
-    alias: {
-      // Mirror webapp/vite.config.ts: the non-demo build swaps the demo modules
-      // for empty stubs, so tests exercise the real (production) wiring.
-      '@/lib/demo': path.resolve(webappSrc, 'lib/demo.empty.ts'),
-      '@/lib/demo-brand-icons': path.resolve(webappSrc, 'lib/demo.empty.ts'),
-      '@': webappSrc,
-      '@shared': path.resolve(rootDir, 'shared'),
-    },
-  },
   test: {
-    name: 'webapp',
-    environment: 'jsdom',
-    globals: true,
-    include: ['webapp/test/unit/**/*.test.{ts,tsx}', 'webapp/test/component/**/*.test.{ts,tsx}'],
-    setupFiles: ['webapp/test/setup.ts'],
+    projects: ['vitest.webapp-jsdom.config.ts', 'vitest.contract.config.ts'],
     coverage: {
+      // v8 coverage cannot run inside the workerd isolate, so use istanbul,
+      // which works across both the jsdom and workers projects.
       provider: 'istanbul',
       include: ['webapp/src/**/*.{ts,tsx}'],
       // Generated/entry/asset-only modules carry no testable logic; excluding
@@ -54,17 +33,16 @@ export default defineConfig({
       ],
       reporter: ['text-summary', 'json-summary', 'html'],
       reportsDirectory: 'coverage/webapp',
-      // Ratcheting floor: CI fails if frontend coverage drops below these.
-      // Raise them as new tests land so coverage can only move up. The pure-logic
-      // surface of webapp/src/lib (crypto, importers, exporters, vault/backup
-      // helpers, network/offline) is now broadly covered; the remaining gap is
-      // the large page components, hooks, and api/ clients. Grow toward parity
+      // Ratcheting floor: CI fails if frontend coverage drops below these. Raise
+      // them as new tests land so coverage can only move up. The lib pure-logic
+      // surface and the api/ clients (via contract tests) are now covered; the
+      // remaining gap is the large page components and hooks. Grow toward parity
       // with the backend (95/92/95/80) as those fill in.
       thresholds: {
-        lines: 25,
-        statements: 24,
-        functions: 14,
-        branches: 20,
+        lines: 31,
+        statements: 30,
+        functions: 19,
+        branches: 25,
       },
     },
   },

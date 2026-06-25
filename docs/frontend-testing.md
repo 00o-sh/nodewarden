@@ -15,10 +15,16 @@ Preact + wouter + @tanstack/react-query, built with Vite.
 | Layer | Runs in | Config | What it proves |
 |-------|---------|--------|----------------|
 | **Static** | — | `eslint.config.js`, `tsc` | Lint + types are sound before anything runs |
-| **Unit** | jsdom/Node | `vitest.webapp.config.ts` | Pure logic: crypto, importers, utils, api helpers |
-| **Component** | jsdom | `vitest.webapp.config.ts` | Components/hooks render and behave correctly |
+| **Unit** | jsdom/Node | `vitest.webapp-jsdom.config.ts` | Pure logic: crypto, importers, utils, api helpers |
+| **Component** | jsdom | `vitest.webapp-jsdom.config.ts` | Components/hooks render and behave correctly |
 | **Contract** | real Workers runtime | `vitest.contract.config.ts` | The webapp api client agrees with the real backend |
 | **E2E** | real browser (Chromium) | `playwright.config.ts` | Critical journeys work in the fully built app |
+
+`vitest.webapp.config.ts` is the **coverage orchestrator**: it runs the jsdom
+project *and* the contract project under one istanbul report, so coverage of the
+`api/` clients — which are only exercised end-to-end against the real worker —
+counts toward the webapp coverage floor (the same way the backend merges its
+node + workerd projects).
 
 ### Static gates
 

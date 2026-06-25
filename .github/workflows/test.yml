@@ -132,16 +132,14 @@ jobs:
         # strictness issues) are now fixed, so a type regression fails CI.
         run: npm run typecheck:webapp
 
-      - name: Unit + component tests with coverage (frontend)
+      - name: Frontend tests with coverage (unit + component + contract)
         # Blocking: enforces the ratcheting coverage floor in
-        # vitest.webapp.config.ts.
+        # vitest.webapp.config.ts. This orchestrator runs BOTH the jsdom project
+        # (unit + component) AND the contract project — the webapp api client
+        # driven against the real Workers runtime (Miniflare), catching
+        # request/response shape drift between frontend and backend — under one
+        # istanbul report, so api/ coverage counts toward the floor.
         run: npm run coverage:webapp
-
-      - name: Contract tests (frontend api client vs real worker)
-        # Blocking: runs the webapp api client against the real Workers runtime
-        # (Miniflare), catching request/response shape drift between the
-        # frontend and backend.
-        run: npm run test:contract
 
       - name: Build (production + demo)
         # Blocking: a green build is the only thing that exercises the generated
