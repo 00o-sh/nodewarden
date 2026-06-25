@@ -6,8 +6,9 @@
 # Both badges are written in a single orphan commit, so this is the only writer
 # of the `badges` branch — keep all badge files here to avoid clobbering.
 #
-#   - coverage.json : line coverage from coverage/coverage-summary.json
-#                     (produced by `npm run coverage`).
+#   - coverage.json : API (backend) line coverage from coverage/coverage-summary.json
+#                     (produced by `npm run coverage`). The frontend tracks its
+#                     own coverage separately, hence the "API coverage" label.
 #   - i18n.json     : weakest-locale translation coverage from i18n-report.cjs.
 #
 # Requires GH_TOKEN (a token with contents:write) and GITHUB_REPOSITORY.
@@ -23,7 +24,7 @@ else                         COLOR=orange
 fi
 
 WORKDIR="$(mktemp -d)"
-printf '{"schemaVersion":1,"label":"coverage","message":"%s%%","color":"%s"}\n' "$PCT" "$COLOR" \
+printf '{"schemaVersion":1,"label":"API coverage","message":"%s%%","color":"%s"}\n' "$PCT" "$COLOR" \
   > "$WORKDIR/coverage.json"
 
 # i18n badge: the script computes the weakest-locale percentage itself.
