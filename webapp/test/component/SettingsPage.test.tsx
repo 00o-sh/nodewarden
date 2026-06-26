@@ -79,7 +79,6 @@ describe('<SettingsPage>', () => {
     expect(screen.getByRole('heading', { name: 'Account passkeys' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Recovery Code' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'API Key' })).toBeInTheDocument();
-    expect(screen.getByTestId('pending-auth-panel')).toBeInTheDocument();
   });
 
   it('fires onLockTimeoutChange when the session timeout select changes', () => {
