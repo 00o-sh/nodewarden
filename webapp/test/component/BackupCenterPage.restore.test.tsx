@@ -41,7 +41,30 @@ const ZIP_ITEM: RemoteBackupItem = {
   modifiedAt: '2026-01-02T00:00:00.000Z',
 };
 
+// The remote browser only renders its toolbar (refresh) and item list once a
+// cached listing exists for the selected destination. Seed the persisted cache
+// so the browser is present on first render and the refresh button is reachable.
+function seedRemoteBrowserCache() {
+  window.localStorage.setItem('nodewarden.backup.remote-browser.v1:user-1', JSON.stringify({
+    cache: {
+      [`${DESTINATION_ID}:`]: {
+        object: 'backup-remote-browser',
+        destinationId: DESTINATION_ID,
+        destinationName: 'Primary WebDAV',
+        provider: 'webdav',
+        currentPath: '',
+        parentPath: null,
+        items: [],
+      },
+    },
+    pathByDestination: {},
+    pageByKey: {},
+    selectedDestinationId: DESTINATION_ID,
+  }));
+}
+
 function renderPage(overrides: Record<string, unknown> = {}) {
+  seedRemoteBrowserCache();
   const onLoadSettings = vi.fn().mockResolvedValue(buildSettings());
   const onSaveSettings = vi.fn().mockImplementation(
     (_password: string, settings: AdminBackupSettings) => Promise.resolve(settings)

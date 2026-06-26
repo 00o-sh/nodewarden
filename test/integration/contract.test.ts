@@ -36,6 +36,7 @@ describe('unauthenticated contract', () => {
         'email-verification',
         'pm-19051-send-email-verification',
         'pm-19148-innovation-archive',
+        'pm-30529-webauthn-related-origins',
         'unauth-ui-refresh',
         'web-push',
       ].sort()

@@ -198,7 +198,7 @@ describe('createAccountPasskeyCredential', () => {
     const result = await createAccountPasskeyCredential({
       options: makeCreationOptions(),
       token: 'attest-token',
-    });
+    }, true);
 
     // The native options passed to navigator.credentials.create were decoded
     // from base64url into ArrayBuffers and a prf extension was attached.
@@ -215,7 +215,11 @@ describe('createAccountPasskeyCredential', () => {
     expect(result.token).toBe('attest-token');
     expect(result.supportsPrf).toBe(true);
     expect(result.deviceResponse).toBe(credential);
-    expect(result.createOptions).toBe(passed);
+    // The prf extension is attached only to the clone handed to
+    // navigator.credentials.create; the returned createOptions stay prf-free so
+    // they can drive the follow-up PRF assertion. They share the decoded buffers.
+    expect((result.createOptions as any).extensions?.prf).toBeUndefined();
+    expect(result.createOptions.challenge).toBe(passed.challenge);
 
     const req = result.request as any;
     expect(req.id).toBe('new-cred');
