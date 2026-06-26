@@ -108,3 +108,34 @@ its own and never drags the backend's down (they were never the same number).
    PR physically cannot merge unless they pass:
    - `test` (backend), `frontend` (this job), and the security workflow as desired.
 3. Keep raising the coverage floor as the suite grows.
+
+## Fail-closed gating — making "green = safe"
+
+The bar this suite is held to: **if the `frontend` job is green, the change is
+safe to merge.** We bias fail-closed — it is better to block a safe change than
+to let an unsafe one through. Concretely:
+
+- **Real-backend E2E** (`playwright.realbackend.config.ts`,
+  `webapp/e2e-real/`) drives the *production stack* — the real worker serving the
+  built webapp + API on one origin, backed by a real local D1/R2 — through
+  register → login → vault CRUD with genuine client-side crypto, and asserts
+  **persistence across a full reload (with unlock) and a fresh login session**.
+  Demo-mode E2E (stubbed backend) cannot prove this; this is the strongest
+  green-means-safe signal. (`scripts/e2e-real-server.sh` boots a fresh-state
+  worker per run.)
+- **Changed-line coverage gate** (`scripts/check-diff-coverage.cjs`,
+  `npm run coverage:diff`): the ratchet only blocks coverage *regressions*; this
+  blocks **new untested code** — every executable line a PR adds/changes under
+  `webapp/src` must be exercised, or CI fails. Fail-closed: a changed source
+  file with no coverage data at all is treated as a violation.
+- **No flake-pass**: Playwright `retries: 0` in CI, so a flake turns the gate
+  red instead of passing on a retry.
+
+### What green still does NOT guarantee
+
+Green means "no known regression in the tested surface + the core real-stack
+journeys work." It is **not** a substitute for human review of
+security-sensitive diffs. Crypto, authentication, key handling, and access
+control changes should get human eyes **regardless of green** — do not wire up
+auto-merge-on-green for those. Coverage % measures execution, not assertion
+quality; a line can be covered without being meaningfully checked.

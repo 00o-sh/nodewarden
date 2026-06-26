@@ -33,6 +33,8 @@
     "coverage:webapp": "vitest run --config vitest.webapp.config.ts --coverage",
     "test:contract": "vitest run --config vitest.contract.config.ts",
     "test:e2e": "playwright test --config playwright.config.ts",
+    "test:e2e:real": "playwright test --config playwright.realbackend.config.ts",
+    "coverage:diff": "node scripts/check-diff-coverage.cjs",
     "typecheck:webapp": "tsc -p webapp/tsconfig.json --noEmit",
     "lint": "eslint ."
   },
