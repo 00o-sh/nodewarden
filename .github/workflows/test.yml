@@ -112,6 +112,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # Full history so the changed-line coverage gate can diff against the
+          # PR base (origin/main).
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
@@ -141,6 +145,12 @@ jobs:
         # istanbul report, so api/ coverage counts toward the floor.
         run: npm run coverage:webapp
 
+      - name: Changed-line coverage gate (frontend)
+        # Fail-closed: every executable line this PR adds/changes under webapp/src
+        # must be covered by the run above. The ratchet only blocks regressions;
+        # this blocks NEW untested code. See scripts/check-diff-coverage.cjs.
+        run: npm run coverage:diff
+
       - name: Build (production + demo)
         # Blocking: a green build is the only thing that exercises the generated
         # service worker and the full Vite/Rollup pipeline.
@@ -155,6 +165,14 @@ jobs:
         # Blocking: drives critical user journeys in a real browser against the
         # demo build (network-free, deterministic).
         run: npm run test:e2e
+
+      - name: E2E real-backend lifecycle (real worker + D1/R2)
+        # Blocking and highest-confidence: drives the production stack — the real
+        # worker serving the built webapp + API on one origin, backed by a real
+        # local D1/R2 — through register/login/CRUD with genuine client-side
+        # crypto, asserting PERSISTENCE across reloads and a fresh login session.
+        # This is what demo-mode E2E cannot prove. See playwright.realbackend.config.ts.
+        run: npm run test:e2e:real
 
       - name: Upload Playwright report
         if: always()

@@ -31,7 +31,9 @@ export default defineConfig({
         'webapp/src/lib/demo-brand-icons.ts',
         'webapp/src/lib/i18n/locales/**',
       ],
-      reporter: ['text-summary', 'json-summary', 'html'],
+      // 'json' emits coverage-final.json (per-line data) used by the
+      // changed-line (diff) coverage gate in scripts/check-diff-coverage.cjs.
+      reporter: ['text-summary', 'json-summary', 'json', 'html'],
       reportsDirectory: 'coverage/webapp',
       // Ratcheting floor: CI fails if frontend coverage drops below these. Raise
       // them as new tests land so coverage can only move up. The lib pure-logic

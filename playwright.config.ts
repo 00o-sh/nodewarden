@@ -16,7 +16,8 @@ export default defineConfig({
   testDir: './webapp/e2e',
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: isCI ? 1 : 0,
+  // Fail-closed: a flake must turn the gate red, never pass on retry.
+  retries: 0,
   reporter: isCI ? [['list'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: BASE_URL,
