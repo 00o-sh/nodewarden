@@ -15,7 +15,14 @@
  *
  * Usage: node scripts/check-diff-coverage.cjs
  */
-const { execSync } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
+
+// Run git with an argv array (never a shell string) so values like the
+// DIFF_COVERAGE_BASE env var can't be interpreted as shell — no command
+// injection surface.
+function git(args, opts = {}) {
+  return execFileSync('git', args, { encoding: 'utf8', ...opts });
+}
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -35,7 +42,7 @@ if (!fs.existsSync(COVERAGE_FILE)) {
 // Resolve a merge-base so we only look at lines this branch actually introduced.
 let base = BASE;
 try {
-  base = execSync(`git merge-base ${BASE} HEAD`, { encoding: 'utf8' }).trim() || BASE;
+  base = git(['merge-base', BASE, 'HEAD']).trim() || BASE;
 } catch {
   // Fall back to the raw ref (e.g. shallow CI checkout without history).
 }
@@ -44,7 +51,7 @@ try {
 function changedLines() {
   let diff = '';
   try {
-    diff = execSync(`git diff --unified=0 --no-color ${base}...HEAD`, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
+    diff = git(['diff', '--unified=0', '--no-color', `${base}...HEAD`], { maxBuffer: 64 * 1024 * 1024 });
   } catch (err) {
     fail(`could not compute git diff against ${base}: ${err.message}`);
   }
