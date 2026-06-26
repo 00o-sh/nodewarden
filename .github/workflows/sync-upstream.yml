@@ -16,10 +16,13 @@ name: Sync upstream
 #   - A merge with conflicts fails the run loudly (no partial state is pushed) so
 #     it can be resolved by hand.
 #
-# CI note: PRs opened with the default GITHUB_TOKEN do not themselves trigger
-# other workflows. Set a repo secret `SYNC_UPSTREAM_PAT` (a fine-grained PAT with
-# contents:write + pull-requests:write) and CI will run on the sync PR
-# automatically. Without it the PR still opens; nudge CI by closing/reopening it.
+# Token note: opening a PR from a workflow needs either a PAT or the repo setting
+# "Allow GitHub Actions to create and approve pull requests" (and even then it's
+# unreliable on forks). So the run NEVER hard-fails on PR creation: it always
+# pushes the sync branch, opens/updates the PR when it can, and otherwise stays
+# green with a one-click compare link in the run summary. Set a repo secret
+# `SYNC_UPSTREAM_PAT` (fine-grained PAT, contents:write + pull-requests:write) for
+# fully-automatic PRs that also trigger CI on the sync PR.
 
 on:
   schedule:
@@ -128,22 +131,57 @@ jobs:
         if: steps.check.outputs.needs_update == 'true' && steps.merge.outputs.conflicts == 'false'
         env:
           GH_TOKEN: ${{ secrets.SYNC_UPSTREAM_PAT || secrets.GITHUB_TOKEN }}
+          USING_PAT: ${{ secrets.SYNC_UPSTREAM_PAT != '' }}
           LABEL: ${{ steps.resolve.outputs.label }}
           TARGET_SHA: ${{ steps.resolve.outputs.target_sha }}
+          COMPARE_URL: ${{ github.server_url }}/${{ github.repository }}/compare/main...automation/upstream-sync?expand=1
         run: |
-          EXISTING=$(gh pr list --head "$SYNC_BRANCH" --base main --state open --json number --jq '.[0].number // empty')
+          # The sync branch is already pushed, so the useful work is done. PR
+          # creation can still be blocked when running on the default GITHUB_TOKEN
+          # (GitHub restricts token-created PRs unless "Allow GitHub Actions to
+          # create and approve pull requests" is on, and it's unreliable on forks).
+          # So we try to open/update the PR, but on failure we stay green and hand
+          # back a one-click compare link instead of erroring out.
           BODY=$(printf '%s\n' \
             "Automated merge of upstream \`shuaiplus/NodeWarden\` (\`$LABEL\`, \`$TARGET_SHA\`) into \`main\`." \
             "" \
             "Review the diff and wait for CI before merging — nothing deploys until this PR is merged." \
             "The branch is force-updated by each nightly run, so this PR always reflects the latest upstream target.")
+
+          EXISTING=$(gh pr list --head "$SYNC_BRANCH" --base main --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
           if [ -n "$EXISTING" ]; then
-            echo "PR #$EXISTING already open for $SYNC_BRANCH; the push updated it."
-            gh pr edit "$EXISTING" --title "chore: sync upstream ($LABEL)" --body "$BODY"
-          else
-            gh pr create --base main --head "$SYNC_BRANCH" \
-              --title "chore: sync upstream ($LABEL)" --body "$BODY"
+            echo "PR #$EXISTING is already open for $SYNC_BRANCH; the branch push updated it."
+            gh pr edit "$EXISTING" --title "chore: sync upstream ($LABEL)" --body "$BODY" \
+              || echo "::warning::Could not update PR #$EXISTING metadata (non-fatal)."
+            echo "### Sync PR #$EXISTING updated" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Target:** $LABEL" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
+
+          if gh pr create --base main --head "$SYNC_BRANCH" --title "chore: sync upstream ($LABEL)" --body "$BODY"; then
+            echo "Opened the sync PR."
+            echo "### Sync PR opened" >> "$GITHUB_STEP_SUMMARY"
+            echo "- **Target:** $LABEL" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Could not create the PR with the available token — do not fail; the
+          # branch is ready and a human can open the PR with one click.
+          echo "::warning::Could not open the PR automatically (the token can't create PRs here). The sync branch is pushed and ready."
+          {
+            echo "### Upstream synced — open the PR manually"
+            echo ""
+            echo "The \`$SYNC_BRANCH\` branch is updated to **$LABEL** and ready."
+            echo ""
+            echo "👉 [**Open the upstream-sync PR**]($COMPARE_URL)"
+            echo ""
+            if [ "$USING_PAT" != "true" ]; then
+              echo "For fully-automatic PR opening (and CI on the sync PR), add a repo secret"
+              echo "\`SYNC_UPSTREAM_PAT\` (a fine-grained PAT with contents:write + pull-requests:write),"
+              echo "or verify **Settings → Actions → General → Workflow permissions →"
+              echo "\"Allow GitHub Actions to create and approve pull requests\"** is enabled."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Fail on merge conflicts
         if: steps.check.outputs.needs_update == 'true' && steps.merge.outputs.conflicts == 'true'
