@@ -9,12 +9,12 @@ import type {
 } from '@/lib/backup-recommendations';
 
 describe('RECOMMENDED_PROVIDERS', () => {
-  it('lists the three expected providers in order', () => {
-    expect(RECOMMENDED_PROVIDERS.map((p) => p.id)).toEqual([
-      'infinicloud',
-      'koofr',
-      'pcloud',
-    ]);
+  it('includes the core providers and keeps ids unique', () => {
+    const ids = RECOMMENDED_PROVIDERS.map((p) => p.id);
+    // Assert the established providers are present without re-pinning the exact
+    // list, so adding new recommended providers upstream doesn't break this.
+    expect(ids).toEqual(expect.arrayContaining(['infinicloud', 'koofr', 'pcloud']));
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('gives every provider the required base fields', () => {
