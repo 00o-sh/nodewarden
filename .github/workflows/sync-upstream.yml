@@ -13,8 +13,11 @@ name: Sync upstream
 #     dispatch input (commit/tag), or the latest upstream/main commit when the
 #     input is blank.
 #   - A clean merge pushes the sync branch and opens/updates the PR.
-#   - A merge with conflicts fails the run loudly (no partial state is pushed) so
-#     it can be resolved by hand.
+#   - A merge with conflicts is NOT thrown away: the conflicted tree (with the
+#     <<<<<<< / ======= / >>>>>>> markers committed as file content) is pushed
+#     and a PR is opened/updated, loudly flagged so it is resolved before merge.
+#     Such a branch looks cleanly mergeable to GitHub (the markers are just
+#     text), so the PR title/body shout "DO NOT MERGE" until a human resolves it.
 #
 # Token note: opening a PR from a workflow needs either a PAT or the repo setting
 # "Allow GitHub Actions to create and approve pull requests" (and even then it's
@@ -119,17 +122,34 @@ jobs:
             fi
             echo "conflicts=false" >> "$GITHUB_OUTPUT"
           else
-            git merge --abort
+            # Don't throw the work away. Record the conflicted paths, keep our own
+            # copy of this workflow file, then commit the conflicted tree as-is so
+            # the markers travel to a PR for manual resolution.
+            CONFLICTED=$(git diff --name-only --diff-filter=U | sort)
+            echo "Conflicted files:"; echo "$CONFLICTED"
+            {
+              echo 'conflicted_files<<EOF'
+              echo "$CONFLICTED"
+              echo 'EOF'
+            } >> "$GITHUB_OUTPUT"
+            git checkout origin/main -- .github/workflows/sync-upstream.yml
+            git add -A
+            git commit --no-verify -m "chore: sync upstream ($LABEL) — UNRESOLVED CONFLICTS, do not merge as-is" \
+              -m "Conflict markers are committed as file content. Resolve them on this branch (git checkout $SYNC_BRANCH; fix the <<<<<<< / ======= / >>>>>>> markers; commit; push) before merging."
             echo "conflicts=true" >> "$GITHUB_OUTPUT"
           fi
+        env:
+          LABEL: ${{ steps.resolve.outputs.label }}
 
       - name: Push sync branch
-        if: steps.check.outputs.needs_update == 'true' && steps.merge.outputs.conflicts == 'false'
+        if: steps.check.outputs.needs_update == 'true'
         run: git push --force origin "$SYNC_BRANCH"
 
       - name: Open or update the sync PR
-        if: steps.check.outputs.needs_update == 'true' && steps.merge.outputs.conflicts == 'false'
+        if: steps.check.outputs.needs_update == 'true'
         env:
+          CONFLICTS: ${{ steps.merge.outputs.conflicts }}
+          CONFLICTED_FILES: ${{ steps.merge.outputs.conflicted_files }}
           GH_TOKEN: ${{ secrets.SYNC_UPSTREAM_PAT || secrets.GITHUB_TOKEN }}
           USING_PAT: ${{ secrets.SYNC_UPSTREAM_PAT != '' }}
           REPO: ${{ github.repository }}
@@ -144,12 +164,34 @@ jobs:
           # fine-grained PATs cannot call even with Pull requests: write — REST
           # works where that GraphQL path 403s. On any failure we still stay green
           # and hand back a one-click compare link instead of erroring out.
-          TITLE="chore: sync upstream ($LABEL)"
-          BODY=$(printf '%s\n' \
-            "Automated merge of upstream \`shuaiplus/NodeWarden\` (\`$LABEL\`, \`$TARGET_SHA\`) into \`main\`." \
-            "" \
-            "Review the diff and wait for CI before merging — nothing deploys until this PR is merged." \
-            "The branch is force-updated by each nightly run, so this PR always reflects the latest upstream target.")
+          if [ "$CONFLICTS" = "true" ]; then
+            TITLE="🚨 DO NOT MERGE: sync upstream ($LABEL) has conflicts"
+            FILE_LIST=$(printf '%s\n' "$CONFLICTED_FILES" | sed '/^$/d' | sed 's/^/- `/; s/$/`/')
+            BODY=$(printf '%s\n' \
+              "⚠️ **This branch contains UNRESOLVED merge conflicts committed as file content.**" \
+              "GitHub sees it as cleanly mergeable because the \`<<<<<<<\` / \`=======\` / \`>>>>>>>\` markers are just text — **do not click merge** until they are resolved." \
+              "" \
+              "Automated merge of upstream \`shuaiplus/NodeWarden\` (\`$LABEL\`, \`$TARGET_SHA\`) into \`main\`." \
+              "" \
+              "**Conflicted files:**" \
+              "$FILE_LIST" \
+              "" \
+              "**To resolve:**" \
+              "\`\`\`" \
+              "git fetch origin && git checkout $SYNC_BRANCH" \
+              "# edit each file above, removing the conflict markers" \
+              "git add -A && git commit && git push" \
+              "\`\`\`" \
+              "" \
+              "The branch is force-updated by each nightly run, so any manual fixes here are overwritten on the next run unless the conflict is resolved upstream/in \`main\`.")
+          else
+            TITLE="chore: sync upstream ($LABEL)"
+            BODY=$(printf '%s\n' \
+              "Automated merge of upstream \`shuaiplus/NodeWarden\` (\`$LABEL\`, \`$TARGET_SHA\`) into \`main\`." \
+              "" \
+              "Review the diff and wait for CI before merging — nothing deploys until this PR is merged." \
+              "The branch is force-updated by each nightly run, so this PR always reflects the latest upstream target.")
+          fi
 
           EXISTING=$(gh api "/repos/$REPO/pulls?head=$OWNER:$SYNC_BRANCH&base=main&state=open" --jq '.[0].number // empty' 2>/dev/null || true)
           if [ -n "$EXISTING" ]; then
@@ -187,11 +229,10 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Fail on merge conflicts
+      - name: Warn on merge conflicts
         if: steps.check.outputs.needs_update == 'true' && steps.merge.outputs.conflicts == 'true'
         run: |
-          echo "::error::Upstream merge into '$SYNC_BRANCH' has conflicts (target ${{ steps.resolve.outputs.label }}). Resolve locally and open the PR by hand; nothing was pushed."
-          exit 1
+          echo "::warning::Upstream merge into '$SYNC_BRANCH' had conflicts (target ${{ steps.resolve.outputs.label }}). The conflicted tree was pushed and a 'DO NOT MERGE' PR opened/updated — resolve the markers on the branch before merging."
 
       - name: Summary
         if: always()
@@ -199,8 +240,9 @@ jobs:
           if [ "${{ steps.check.outputs.needs_update }}" != "true" ]; then
             echo "### Nothing to sync" >> "$GITHUB_STEP_SUMMARY"
           elif [ "${{ steps.merge.outputs.conflicts }}" = "true" ]; then
-            echo "### Upstream merge has conflicts — manual resolution needed" >> "$GITHUB_STEP_SUMMARY"
+            echo "### ⚠️ Upstream merge has conflicts — PR opened, resolve before merging" >> "$GITHUB_STEP_SUMMARY"
             echo "- **Target:** ${{ steps.resolve.outputs.label }}" >> "$GITHUB_STEP_SUMMARY"
+            echo "- The \`${{ env.SYNC_BRANCH }}\` branch holds the conflicted tree (markers committed); the PR is flagged **DO NOT MERGE** until resolved." >> "$GITHUB_STEP_SUMMARY"
           else
             echo "### Sync PR opened/updated" >> "$GITHUB_STEP_SUMMARY"
             echo "- **Target:** ${{ steps.resolve.outputs.label }}" >> "$GITHUB_STEP_SUMMARY"
