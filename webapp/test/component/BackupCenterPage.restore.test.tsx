@@ -281,7 +281,7 @@ describe('<BackupCenterPage> restore flows', () => {
     const onRestoreRemoteBackup = vi.fn()
       .mockRejectedValueOnce(new Error('This requires a fresh instance'))
       .mockResolvedValueOnce({});
-    const { } = renderPage({ onRestoreRemoteBackup });
+    renderPage({ onRestoreRemoteBackup });
     await screen.findByText(t('txt_backup_destination_detail_title'));
     await loadRemoteBrowser();
 
