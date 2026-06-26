@@ -183,6 +183,8 @@ jobs:
               "git add -A && git commit && git push" \
               "\`\`\`" \
               "" \
+              "**Merge with a real merge commit — NOT \"Squash and merge\".** Squashing drops upstream's commit ancestry, so the next sync run still sees \`main\` as behind and re-opens this same diff." \
+              "" \
               "The branch is force-updated by each nightly run, so any manual fixes here are overwritten on the next run unless the conflict is resolved upstream/in \`main\`.")
           else
             TITLE="chore: sync upstream ($LABEL)"
@@ -190,6 +192,9 @@ jobs:
               "Automated merge of upstream \`shuaiplus/NodeWarden\` (\`$LABEL\`, \`$TARGET_SHA\`) into \`main\`." \
               "" \
               "Review the diff and wait for CI before merging — nothing deploys until this PR is merged." \
+              "" \
+              "**Merge with a real merge commit — NOT \"Squash and merge\".** Squashing drops upstream's commit ancestry, so the next sync run still sees \`main\` as behind and re-opens this same diff." \
+              "" \
               "The branch is force-updated by each nightly run, so this PR always reflects the latest upstream target.")
           fi
 
