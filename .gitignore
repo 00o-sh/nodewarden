@@ -72,3 +72,7 @@ playwright-report/
 test-results/
 /blob-report/
 .playwright/
+
+# Mutation testing (Stryker) artifacts
+reports/
+.stryker-tmp/
