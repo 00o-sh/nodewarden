@@ -19,9 +19,8 @@ runs).
 | `Import-and-Export.md` | Import and Export | `导入与导出.md` |
 | `Backup-and-Restore.md` | Backup and Restore | `备份与恢复.md` |
 | `FAQ.md` | FAQ | `常见问题.md` |
-| `_Sidebar.md` | (sidebar navigation) | `_Sidebar.md` |
 
-Source: upstream wiki commit `000076b` (`Add initial Chinese wiki`).
+Source: upstream wiki commit `1f26892`.
 
 ## Staying in sync with upstream
 
@@ -38,8 +37,7 @@ git clone https://github.com/shuaiplus/NodeWarden.wiki.git
 ```
 
 1. Translate each changed `*.md` page into English, keeping the English
-   filenames above so the page URLs and the cross-links in `Home.md` /
-   `_Sidebar.md` stay valid.
+   filenames above so the page URLs and any cross-links stay valid.
 2. Refresh the snapshot in `.upstream/` (copy the new upstream pages there and
    update `.upstream/UPSTREAM_COMMIT`) in the same PR.
 
