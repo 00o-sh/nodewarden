@@ -40,6 +40,22 @@ describe('admin backup settings / repair / run validation', () => {
     expect(Array.isArray(((await res.json()) as any).destinations)).toBe(true);
   });
 
+  it('400s a repair with neither a master-password hash nor a verification token', async () => {
+    // requireBackupRepairVerification: with no masterPasswordHash it falls back to
+    // the userVerificationToken, and rejects when that is absent too.
+    const res = await api('POST', '/api/admin/backup/settings/repair', token, { destinations: [] });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error?: string }).error).toContain('masterPasswordHash or userVerificationToken is required');
+  });
+
+  it('400s a repair with an invalid passkey verification token', async () => {
+    // A structurally-bogus token fails verifyPasskeyUserVerificationToken (which
+    // returns false rather than throwing), so the gate reports it as invalid.
+    const res = await api('POST', '/api/admin/backup/settings/repair', token, { userVerificationToken: 'not-a-valid-token', destinations: [] });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error?: string }).error).toContain('Invalid user verification token');
+  });
+
   it('400s a malformed run body', async () => {
     expect((await raw('POST', '/api/admin/backup/run', '{bad')).status).toBe(400);
   });
