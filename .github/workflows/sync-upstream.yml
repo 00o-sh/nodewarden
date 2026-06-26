@@ -132,35 +132,39 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.SYNC_UPSTREAM_PAT || secrets.GITHUB_TOKEN }}
           USING_PAT: ${{ secrets.SYNC_UPSTREAM_PAT != '' }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ github.repository_owner }}
           LABEL: ${{ steps.resolve.outputs.label }}
           TARGET_SHA: ${{ steps.resolve.outputs.target_sha }}
           COMPARE_URL: ${{ github.server_url }}/${{ github.repository }}/compare/main...automation/upstream-sync?expand=1
         run: |
-          # The sync branch is already pushed, so the useful work is done. PR
-          # creation can still be blocked when running on the default GITHUB_TOKEN
-          # (GitHub restricts token-created PRs unless "Allow GitHub Actions to
-          # create and approve pull requests" is on, and it's unreliable on forks).
-          # So we try to open/update the PR, but on failure we stay green and hand
-          # back a one-click compare link instead of erroring out.
+          # The sync branch is already pushed, so the useful work is done. We talk
+          # to the REST API directly (gh api) rather than `gh pr create`/`gh pr list`,
+          # which go through the GraphQL `createPullRequest` mutation that
+          # fine-grained PATs cannot call even with Pull requests: write — REST
+          # works where that GraphQL path 403s. On any failure we still stay green
+          # and hand back a one-click compare link instead of erroring out.
+          TITLE="chore: sync upstream ($LABEL)"
           BODY=$(printf '%s\n' \
             "Automated merge of upstream \`shuaiplus/NodeWarden\` (\`$LABEL\`, \`$TARGET_SHA\`) into \`main\`." \
             "" \
             "Review the diff and wait for CI before merging — nothing deploys until this PR is merged." \
             "The branch is force-updated by each nightly run, so this PR always reflects the latest upstream target.")
 
-          EXISTING=$(gh pr list --head "$SYNC_BRANCH" --base main --state open --json number --jq '.[0].number // empty' 2>/dev/null || true)
+          EXISTING=$(gh api "/repos/$REPO/pulls?head=$OWNER:$SYNC_BRANCH&base=main&state=open" --jq '.[0].number // empty' 2>/dev/null || true)
           if [ -n "$EXISTING" ]; then
             echo "PR #$EXISTING is already open for $SYNC_BRANCH; the branch push updated it."
-            gh pr edit "$EXISTING" --title "chore: sync upstream ($LABEL)" --body "$BODY" \
+            gh api --method PATCH "/repos/$REPO/pulls/$EXISTING" -f title="$TITLE" -f body="$BODY" >/dev/null 2>&1 \
+              && echo "Updated PR #$EXISTING metadata." \
               || echo "::warning::Could not update PR #$EXISTING metadata (non-fatal)."
             echo "### Sync PR #$EXISTING updated" >> "$GITHUB_STEP_SUMMARY"
             echo "- **Target:** $LABEL" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
-          if gh pr create --base main --head "$SYNC_BRANCH" --title "chore: sync upstream ($LABEL)" --body "$BODY"; then
-            echo "Opened the sync PR."
-            echo "### Sync PR opened" >> "$GITHUB_STEP_SUMMARY"
+          if NEW=$(gh api --method POST "/repos/$REPO/pulls" -f title="$TITLE" -f head="$SYNC_BRANCH" -f base=main -f body="$BODY" --jq '.number' 2>/dev/null); then
+            echo "Opened the sync PR #$NEW."
+            echo "### Sync PR #$NEW opened" >> "$GITHUB_STEP_SUMMARY"
             echo "- **Target:** $LABEL" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
