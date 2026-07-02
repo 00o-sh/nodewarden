@@ -8,6 +8,7 @@ import {
   createAccountPasskeyCredential,
   shouldRetryCreateWithoutPrf,
   unlockVaultKeyWithAccountPasskeyPrf,
+  withoutCreatePrfExtension,
 } from '@/lib/account-passkeys';
 import { base64ToBytes, bytesToBase64 } from '@/lib/crypto';
 import { t } from '@/lib/i18n';
@@ -655,6 +656,23 @@ describe('shouldRetryCreateWithoutPrf', () => {
     expect(shouldRetryCreateWithoutPrf(named('NotAllowedError'))).toBe(false);
     expect(shouldRetryCreateWithoutPrf('not-an-error')).toBe(false);
     expect(shouldRetryCreateWithoutPrf(null)).toBe(false);
+  });
+});
+
+describe('withoutCreatePrfExtension', () => {
+  it('drops the extensions object entirely when prf was its only key', () => {
+    const result = withoutCreatePrfExtension({ extensions: { prf: {} } } as any);
+    expect('extensions' in (result as any)).toBe(false);
+  });
+
+  it('keeps the other extensions when prf is removed alongside them', () => {
+    const result = withoutCreatePrfExtension({ extensions: { prf: {}, credProps: true } } as any);
+    expect((result as any).extensions).toEqual({ credProps: true });
+  });
+
+  it('is a no-op when there is no prf extension', () => {
+    const result = withoutCreatePrfExtension({ challenge: new ArrayBuffer(1) } as any);
+    expect((result as any).extensions).toBeUndefined();
   });
 });
 

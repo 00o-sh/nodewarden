@@ -142,6 +142,19 @@ describe('i18n', () => {
       const out = mod.translateServerError('  Some novel error  ', 'fb');
       expect(out).toBe('Some novel error');
     });
+
+    it('maps the parameterised backup error patterns', async () => {
+      const mod = await freshModule();
+      // Each of these carries a numeric/paramised capture the localizer fills in.
+      expect(mod.translateServerError('You can save up to 5 backup destinations', 'fb')).not.toBe('fb');
+      expect(
+        mod.translateServerError('Backup archive upload verification failed after 3 attempts: disk full', 'fb')
+      ).not.toBe('fb');
+      expect(mod.translateServerError('Remote attachment download failed: 404', 'fb')).not.toBe('fb');
+      expect(mod.translateServerError('Remote attachment batch download failed: 500', 'fb')).not.toBe('fb');
+      expect(mod.translateServerError('WebDAV upload failed: 507', 'fb')).not.toBe('fb');
+      expect(mod.translateServerError('S3 listing failed: 403', 'fb')).not.toBe('fb');
+    });
   });
 
   describe('initI18n', () => {

@@ -34,9 +34,11 @@ describe('unauthenticated contract', () => {
         'cipher-key-encryption',
         'duo-redirect',
         'email-verification',
+        'fill-assist-targeting-rules',
         'pm-19051-send-email-verification',
         'pm-19148-innovation-archive',
         'pm-30529-webauthn-related-origins',
+        'pm-4516-devices-add-last-activity-date',
         'unauth-ui-refresh',
         'web-push',
       ].sort()
