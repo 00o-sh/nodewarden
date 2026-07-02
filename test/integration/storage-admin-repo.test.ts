@@ -105,9 +105,9 @@ describe('invite repo', () => {
     // A used invite can't be marked used again.
     expect(await storage.markInviteUsed(invite.code, usedById)).toBe(false);
 
-    const revokable = makeInvite();
-    await storage.createInvite(revokable);
-    expect(await storage.revokeInvite(revokable.code)).toBe(true);
+    const deletable = makeInvite();
+    await storage.createInvite(deletable);
+    expect(await storage.deleteInvite(deletable.code)).toBe(true);
   });
 
   it('lists active invites', async () => {

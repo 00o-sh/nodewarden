@@ -3,12 +3,12 @@ import {
   clearAuditLogs,
   createInvite,
   deleteAllInvites,
+  deleteInvite,
   deleteUser,
   getAuditLogSettings,
   listAdminInvites,
   listAdminUsers,
   listAuditLogs,
-  revokeInvite,
   saveAuditLogSettings,
   setUserStatus,
 } from '@/lib/api/admin';
@@ -107,7 +107,7 @@ describe('admin users contract', () => {
 });
 
 describe('admin invites contract', () => {
-  it('creates an invite that appears in the listing, then revokes it', async () => {
+  it('creates an invite that appears in the listing, then deletes it', async () => {
     const before = await listAdminInvites(admin.authedFetch);
     const beforeActive = before.filter((i) => i.status === 'active').length;
 
@@ -121,10 +121,10 @@ describe('admin invites contract', () => {
     expect(created.code).toBeTruthy();
     expect(created.inviteLink).toContain(created.code);
 
-    await revokeInvite(admin.authedFetch, created.code);
+    await deleteInvite(admin.authedFetch, created.code);
 
-    const afterRevoke = await listAdminInvites(admin.authedFetch);
-    const stillActive = afterRevoke.find((i) => i.code === created.code && i.status === 'active');
+    const afterDelete = await listAdminInvites(admin.authedFetch);
+    const stillActive = afterDelete.find((i) => i.code === created.code && i.status === 'active');
     expect(stillActive).toBeUndefined();
   });
 

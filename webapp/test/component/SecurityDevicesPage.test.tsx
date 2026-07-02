@@ -39,6 +39,7 @@ function buildProps(overrides: Partial<Parameters<typeof SecurityDevicesPage>[0]
     onRevokeTrust: vi.fn(),
     onTrustPermanently: vi.fn(),
     onRemoveDevice: vi.fn(),
+    onRemoveSelectedDevices: vi.fn(),
     onRevokeAll: vi.fn(),
     onRemoveAll: vi.fn(),
   };
@@ -61,6 +62,58 @@ afterEach(() => {
 });
 
 describe('<SecurityDevicesPage>', () => {
+  it('selects all selectable devices and removes them in bulk', () => {
+    const onRemoveSelectedDevices = vi.fn();
+    const devices = [
+      makeDevice({ id: 'd1', identifier: 'a', name: 'A' }),
+      makeDevice({ id: 'd2', identifier: 'b', name: 'B' }),
+    ];
+    buildProps({ devices, currentDeviceIdentifier: 'current', onRemoveSelectedDevices });
+    fireEvent.click(screen.getByRole('button', { name: /Select All/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Remove selected/i }));
+    expect(onRemoveSelectedDevices).toHaveBeenCalledTimes(1);
+    expect(onRemoveSelectedDevices.mock.calls[0][0].map((d: AuthorizedDevice) => d.identifier).sort())
+      .toEqual(['a', 'b']);
+  });
+
+  it('toggles selection on/off, clears a full selection, guards the current device, and labels unnamed devices', () => {
+    const devices = [
+      makeDevice({ id: 'd1', identifier: 'a', name: 'A' }),
+      makeDevice({ id: 'd2', identifier: 'b', name: '' }), // unnamed -> aria-label fallback
+      makeDevice({ id: 'cur', identifier: 'current', name: 'This device' }),
+    ];
+    buildProps({ devices, currentDeviceIdentifier: 'current' });
+
+    // Select all selectable devices, then clear them again (the "all selected" branch).
+    fireEvent.click(screen.getByRole('button', { name: /Select All/i }));
+    expect(screen.getByRole('button', { name: /Remove selected \(2\)/i })).not.toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: /Clear selection/i }));
+    expect(screen.getByRole('button', { name: /Remove selected \(0\)/i })).toBeDisabled();
+
+    // Toggle device A on, then off (the include ? filter : add branch).
+    const boxA = screen.getByLabelText(/Select A\b/i) as HTMLInputElement;
+    fireEvent.click(boxA);
+    expect(screen.getByRole('button', { name: /Remove selected \(1\)/i })).not.toBeDisabled();
+    fireEvent.click(boxA);
+    expect(screen.getByRole('button', { name: /Remove selected \(0\)/i })).toBeDisabled();
+
+    // The current device's checkbox is disabled in the UI. Force-enable it and
+    // click to prove the toggle handler itself refuses to select the current
+    // device (the identity guard), leaving the selection empty.
+    const boxCurrent = screen.getByLabelText(/Select This device/i) as HTMLInputElement;
+    expect(boxCurrent).toBeDisabled();
+    boxCurrent.disabled = false;
+    fireEvent.click(boxCurrent);
+    expect(screen.getByRole('button', { name: /Remove selected \(0\)/i })).toBeDisabled();
+  });
+
+  it('shows a loading skeleton while devices load with an empty list', () => {
+    buildProps({ devices: [], loading: true });
+    // LoadingState renders a `.loading-state` skeleton inside the devices table.
+    expect(document.querySelector('.loading-state')).toBeTruthy();
+    expect(screen.queryByText('My Laptop')).not.toBeInTheDocument();
+  });
+
   it('renders the authorized devices section and a device row', () => {
     buildProps();
     expect(screen.getByRole('heading', { name: 'Authorized Devices' })).toBeInTheDocument();

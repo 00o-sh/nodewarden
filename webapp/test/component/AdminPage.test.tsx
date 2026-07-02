@@ -21,7 +21,8 @@ function setup(overrides: Partial<Parameters<typeof AdminPage>[0]> = {}) {
     onDeleteAllInvites: vi.fn().mockResolvedValue(undefined),
     onToggleUserStatus: vi.fn().mockResolvedValue(undefined),
     onDeleteUser: vi.fn().mockResolvedValue(undefined),
-    onRevokeInvite: vi.fn().mockResolvedValue(undefined),
+    onDeleteInvite: vi.fn().mockResolvedValue(undefined),
+    onDeleteInvalidInvites: vi.fn().mockResolvedValue(undefined),
   };
   render(
     <AdminPage
@@ -74,13 +75,19 @@ describe('<AdminPage>', () => {
     expect(handlers.onDeleteAllInvites).toHaveBeenCalledTimes(1);
   });
 
-  it('fires onRevokeInvite only for active invites', () => {
+  it('fires onDeleteInvite with the code of the clicked invite row', () => {
     const handlers = setup();
-    // Only the active invite row exposes a Revoke button
-    const revokeButtons = screen.getAllByRole('button', { name: /Revoke/i });
-    expect(revokeButtons).toHaveLength(1);
-    fireEvent.click(revokeButtons[0]);
-    expect(handlers.onRevokeInvite).toHaveBeenCalledWith('CODE-ACTIVE');
+    // Each invite row exposes a per-row Delete button (exact name, so it does
+    // not match the "Delete All" / "Delete Invalid" header actions).
+    const row = screen.getByText('CODE-ACTIVE').closest('tr')!;
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
+    expect(handlers.onDeleteInvite).toHaveBeenCalledWith('CODE-ACTIVE');
+  });
+
+  it('fires onDeleteInvalidInvites when the delete-invalid button is clicked', () => {
+    const handlers = setup();
+    fireEvent.click(screen.getByRole('button', { name: /Delete Invalid/i }));
+    expect(handlers.onDeleteInvalidInvites).toHaveBeenCalledTimes(1);
   });
 
   it('fires onToggleUserStatus with the toggleable status for a non-current user', () => {
