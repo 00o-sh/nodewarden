@@ -139,3 +139,23 @@ security-sensitive diffs. Crypto, authentication, key handling, and access
 control changes should get human eyes **regardless of green** — do not wire up
 auto-merge-on-green for those. Coverage % measures execution, not assertion
 quality; a line can be covered without being meaningfully checked.
+
+## Mutation testing the crypto (assertion quality)
+
+Coverage proves a line *ran*; it does not prove a test would *catch a bug* in it.
+For the security-critical crypto we check that directly with mutation testing
+(Stryker): `npm run mutation:crypto` deliberately mutates
+`webapp/src/lib/{crypto,decrypt-cipher,vault-decrypt}.ts` and confirms a test
+fails for each change. Surviving mutants are assertions too loose to notice the
+bug.
+
+This is a **local / periodic QA tool, not a CI gate** (too slow to run per PR).
+The crypto suite has been hardened against it with known-answer vectors
+(PBKDF2-HMAC-SHA256, HKDF multi-block, RFC 6238 TOTP at multiple times) plus
+explicit MAC-enforcement, malformed-input, and boundary tests — so an output- or
+guard-changing mutation in the core encrypt/decrypt/derive paths fails a test.
+(The score reported by `stryker.crypto.config.json`'s minimal runner is a *lower
+bound*: it runs only the crypto unit tests for speed, so mutants the full suite
+would also kill show as uncovered. Remaining survivors are equivalent mutants —
+e.g. the constant-time length pre-check — and legacy cipher-string types the app
+never emits.)

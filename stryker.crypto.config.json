@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Mutation testing for the security-critical crypto modules. Validates that the tests would CATCH a bug, not just execute the line. Run locally: npm run mutation:crypto. Too slow to gate CI; used to find and fix weak assertions.",
+  "testRunner": "vitest",
+  "vitest": { "configFile": "vitest.mutation.config.ts" },
+  "mutate": [
+    "webapp/src/lib/crypto.ts",
+    "webapp/src/lib/decrypt-cipher.ts",
+    "webapp/src/lib/vault-decrypt.ts"
+  ],
+  "coverageAnalysis": "perTest",
+  "reporters": ["clear-text", "progress", "html"],
+  "htmlReporter": { "fileName": "reports/mutation/crypto.html" },
+  "concurrency": 4,
+  "timeoutMS": 30000,
+  "thresholds": { "high": 90, "low": 75, "break": null }
+}
