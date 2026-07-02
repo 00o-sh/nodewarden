@@ -150,7 +150,7 @@ function shouldRetryWithLegacyPrf(error: unknown): boolean {
   return name === 'NotSupportedError' || name === 'SyntaxError' || name === 'TypeError';
 }
 
-function shouldRetryCreateWithoutPrf(error: unknown): boolean {
+export function shouldRetryCreateWithoutPrf(error: unknown): boolean {
   const name = error instanceof DOMException || error instanceof Error ? error.name : '';
   const message = error instanceof DOMException || error instanceof Error ? error.message : '';
   return (
@@ -161,7 +161,7 @@ function shouldRetryCreateWithoutPrf(error: unknown): boolean {
   );
 }
 
-async function canRequestPrfExtension(): Promise<boolean> {
+export async function canRequestPrfExtension(): Promise<boolean> {
   if (/\bFirefox\//i.test(navigator.userAgent)) return false;
   return true;
 }
