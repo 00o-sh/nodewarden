@@ -1,22 +1,25 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/preact';
 import type { AppConfirmState } from '@/components/AppGlobalOverlays';
+import { t } from '@/lib/i18n';
 
 vi.mock('@/lib/api/admin', () => ({
   createInvite: vi.fn(),
   deleteAllInvites: vi.fn(),
+  deleteInvalidInvites: vi.fn(),
+  deleteInvite: vi.fn(),
   deleteUser: vi.fn(),
-  revokeInvite: vi.fn(),
   setUserStatus: vi.fn(),
 }));
 
 import useAdminActions from '@/hooks/useAdminActions';
-import { createInvite, deleteAllInvites, deleteUser, revokeInvite, setUserStatus } from '@/lib/api/admin';
+import { createInvite, deleteAllInvites, deleteInvalidInvites, deleteInvite, deleteUser, setUserStatus } from '@/lib/api/admin';
 
 const mockedCreateInvite = vi.mocked(createInvite);
 const mockedDeleteAllInvites = vi.mocked(deleteAllInvites);
+const mockedDeleteInvalidInvites = vi.mocked(deleteInvalidInvites);
+const mockedDeleteInvite = vi.mocked(deleteInvite);
 const mockedDeleteUser = vi.mocked(deleteUser);
-const mockedRevokeInvite = vi.mocked(revokeInvite);
 const mockedSetUserStatus = vi.mocked(setUserStatus);
 
 function setup() {
@@ -42,8 +45,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockedCreateInvite.mockResolvedValue(undefined);
   mockedDeleteAllInvites.mockResolvedValue(undefined);
+  mockedDeleteInvalidInvites.mockResolvedValue(undefined);
+  mockedDeleteInvite.mockResolvedValue(undefined);
   mockedDeleteUser.mockResolvedValue(undefined);
-  mockedRevokeInvite.mockResolvedValue(undefined);
   mockedSetUserStatus.mockResolvedValue(undefined);
 });
 
@@ -134,24 +138,111 @@ describe('useAdminActions', () => {
     });
   });
 
-  describe('revokeInvite', () => {
-    it('revokes, refetches, and notifies success', async () => {
-      const { actions, authedFetch, refetchInvites, onNotify } = setup();
+  describe('deleteInvite (confirm-gated)', () => {
+    it('opens a danger confirm and does not call the api until confirmed', async () => {
+      const { actions, onSetConfirm } = setup();
       await act(async () => {
-        await actions.revokeInvite('CODE1');
+        await actions.deleteInvite('CODE1');
       });
-      expect(mockedRevokeInvite).toHaveBeenCalledWith(authedFetch, 'CODE1');
+      expect(onSetConfirm).toHaveBeenCalledTimes(1);
+      const confirm = capturedConfirm(onSetConfirm);
+      expect(confirm.danger).toBe(true);
+      expect(typeof confirm.onConfirm).toBe('function');
+      expect(mockedDeleteInvite).not.toHaveBeenCalled();
+    });
+
+    it('deletes, dismisses the confirm, refetches, and notifies success on confirm', async () => {
+      const { actions, authedFetch, onSetConfirm, refetchInvites, onNotify } = setup();
+      await act(async () => {
+        await actions.deleteInvite('CODE1');
+      });
+      const confirm = capturedConfirm(onSetConfirm);
+      await act(async () => {
+        confirm.onConfirm();
+        await Promise.resolve();
+      });
+      expect(onSetConfirm).toHaveBeenLastCalledWith(null);
+      expect(mockedDeleteInvite).toHaveBeenCalledWith(authedFetch, 'CODE1');
       expect(refetchInvites).toHaveBeenCalledTimes(1);
       expect(onNotify).toHaveBeenCalledWith('success', expect.any(String));
     });
 
-    it('notifies error when the api rejects', async () => {
-      mockedRevokeInvite.mockRejectedValue(new Error('revoke fail'));
-      const { actions, onNotify } = setup();
+    it('notifies error when delete rejects after confirm', async () => {
+      mockedDeleteInvite.mockRejectedValue(new Error('delete fail'));
+      const { actions, onSetConfirm, refetchInvites, onNotify } = setup();
       await act(async () => {
-        await actions.revokeInvite('CODE1');
+        await actions.deleteInvite('CODE1');
       });
-      expect(onNotify).toHaveBeenCalledWith('error', 'revoke fail');
+      const confirm = capturedConfirm(onSetConfirm);
+      await act(async () => {
+        confirm.onConfirm();
+        await Promise.resolve();
+      });
+      expect(refetchInvites).not.toHaveBeenCalled();
+      expect(onNotify).toHaveBeenCalledWith('error', 'delete fail');
+    });
+
+    it('falls back to a generic message when a non-Error is thrown', async () => {
+      mockedDeleteInvite.mockRejectedValue('boom');
+      const { actions, onSetConfirm, onNotify } = setup();
+      await act(async () => {
+        await actions.deleteInvite('CODE1');
+      });
+      const confirm = capturedConfirm(onSetConfirm);
+      await act(async () => {
+        confirm.onConfirm();
+        await Promise.resolve();
+      });
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_delete_invite_failed'));
+    });
+  });
+
+  describe('deleteInvalidInvites (confirm-gated)', () => {
+    it('deletes invalid invites, refetches, and notifies success on confirm', async () => {
+      const { actions, authedFetch, onSetConfirm, refetchInvites, onNotify } = setup();
+      await act(async () => {
+        await actions.deleteInvalidInvites();
+      });
+      const confirm = capturedConfirm(onSetConfirm);
+      expect(confirm.danger).toBe(true);
+      expect(mockedDeleteInvalidInvites).not.toHaveBeenCalled();
+      await act(async () => {
+        confirm.onConfirm();
+        await Promise.resolve();
+      });
+      expect(onSetConfirm).toHaveBeenLastCalledWith(null);
+      expect(mockedDeleteInvalidInvites).toHaveBeenCalledWith(authedFetch);
+      expect(refetchInvites).toHaveBeenCalledTimes(1);
+      expect(onNotify).toHaveBeenCalledWith('success', expect.any(String));
+    });
+
+    it('notifies error when the api rejects after confirm', async () => {
+      mockedDeleteInvalidInvites.mockRejectedValue(new Error('del invalid fail'));
+      const { actions, onSetConfirm, refetchInvites, onNotify } = setup();
+      await act(async () => {
+        await actions.deleteInvalidInvites();
+      });
+      const confirm = capturedConfirm(onSetConfirm);
+      await act(async () => {
+        confirm.onConfirm();
+        await Promise.resolve();
+      });
+      expect(refetchInvites).not.toHaveBeenCalled();
+      expect(onNotify).toHaveBeenCalledWith('error', 'del invalid fail');
+    });
+
+    it('falls back to a generic message when a non-Error is thrown', async () => {
+      mockedDeleteInvalidInvites.mockRejectedValue('boom');
+      const { actions, onSetConfirm, onNotify } = setup();
+      await act(async () => {
+        await actions.deleteInvalidInvites();
+      });
+      const confirm = capturedConfirm(onSetConfirm);
+      await act(async () => {
+        confirm.onConfirm();
+        await Promise.resolve();
+      });
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_delete_invalid_invites_failed'));
     });
   });
 

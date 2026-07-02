@@ -60,7 +60,7 @@ test('the change-master-password form renders its fields', async ({ page }) => {
   await expect(module.getByRole('button', { name: 'Change Password' })).toBeVisible();
 });
 
-test('admin can create then revoke an invite', async ({ page }) => {
+test('admin can create then delete an invite', async ({ page }) => {
   await page.getByRole('link', { name: 'Admin Panel' }).click();
   await expect(page).toHaveURL(/\/admin/);
   await expect(page.getByRole('heading', { name: 'Invites' })).toBeVisible();
@@ -71,11 +71,13 @@ test('admin can create then revoke an invite', async ({ page }) => {
   await expect.poll(async () => page.locator('.invite-table tbody tr').count())
     .toBeGreaterThan(inviteRowsBefore);
 
-  // Revoke the seeded active invite.
+  // Delete the seeded invite. In demo mode the delete is applied directly
+  // (the master-password confirm gate only runs against the real backend).
   const seededRow = page.locator('.invite-table tbody tr', { hasText: 'DEMO-INVITE-2026' });
-  await seededRow.getByRole('button', { name: 'Revoke' }).click();
-  // After revoking, that row no longer offers a Revoke action (status flips).
-  await expect(seededRow.getByRole('button', { name: 'Revoke' })).toHaveCount(0, { timeout: 10_000 });
+  await seededRow.getByRole('button', { name: 'Delete', exact: true }).click();
+  // The invite row is removed entirely.
+  await expect(page.locator('.invite-table tbody tr', { hasText: 'DEMO-INVITE-2026' }))
+    .toHaveCount(0, { timeout: 10_000 });
 });
 
 test('admin can ban then unban a user', async ({ page }) => {

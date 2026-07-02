@@ -105,15 +105,30 @@ describe('invite repo', () => {
     // A used invite can't be marked used again.
     expect(await storage.markInviteUsed(invite.code, usedById)).toBe(false);
 
-    const revokable = makeInvite();
-    await storage.createInvite(revokable);
-    expect(await storage.revokeInvite(revokable.code)).toBe(true);
+    const deletable = makeInvite();
+    await storage.createInvite(deletable);
+    expect(await storage.deleteInvite(deletable.code)).toBe(true);
   });
 
   it('lists active invites', async () => {
     await storage.createInvite(makeInvite());
     const list = await storage.listInvites();
     expect(Array.isArray(list)).toBe(true);
+  });
+
+  it('deletes only invalid invites (non-active or expired), keeping live ones', async () => {
+    const live = makeInvite(); // active, expires in the future
+    const used = makeInvite({ status: 'used' }); // non-active -> invalid
+    const expired = makeInvite({ expiresAt: new Date(Date.now() - 86_400_000).toISOString() }); // past -> invalid
+    await storage.createInvite(live);
+    await storage.createInvite(used);
+    await storage.createInvite(expired);
+
+    const removed = await storage.deleteInvalidInvites();
+    expect(removed).toBeGreaterThanOrEqual(2);
+    expect(await storage.getInvite(live.code)).not.toBeNull();
+    expect(await storage.getInvite(used.code)).toBeNull();
+    expect(await storage.getInvite(expired.code)).toBeNull();
   });
 });
 

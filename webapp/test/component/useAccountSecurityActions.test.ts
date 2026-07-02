@@ -6,6 +6,7 @@ vi.mock('@/lib/api/auth', () => ({
   changeMasterPassword: vi.fn(),
   deleteAllAuthorizedDevices: vi.fn(),
   deleteAuthorizedDevice: vi.fn(),
+  deleteAuthorizedDevices: vi.fn(),
   deriveLoginHash: vi.fn(),
   deleteAccountPasskey: vi.fn(),
   enableAccountPasskeyDirectUnlock: vi.fn(),
@@ -688,6 +689,57 @@ describe('useAccountSecurityActions', () => {
       actions.openRemoveDevice(device);
       await fireConfirm(options.onSetConfirm as any);
       expect(options.onNotify).toHaveBeenCalledWith('error', 'remove-fail');
+    });
+  });
+
+  describe('openRemoveSelectedDevices', () => {
+    it('warns and does not confirm when nothing selectable is provided', () => {
+      const { actions, options } = render();
+      // '' is nullish (exercises the `identifier || ''` fallback); '  ' trims empty.
+      actions.openRemoveSelectedDevices([{ identifier: '' }, { identifier: '  ' }] as any);
+      expect(options.onNotify).toHaveBeenCalledWith('warning', t('txt_no_devices_selected'));
+      expect(options.onSetConfirm).not.toHaveBeenCalled();
+    });
+
+    it('removes the selected devices, refetches, and notifies when the current device is not included', async () => {
+      mockAuth.deleteAuthorizedDevices.mockResolvedValue(undefined);
+      mockAuth.getCurrentDeviceIdentifier.mockReturnValue('other');
+      const devices = [{ identifier: 'a' }, { identifier: 'b' }] as any[];
+      const { actions, options } = render();
+      actions.openRemoveSelectedDevices(devices);
+      await fireConfirm(options.onSetConfirm as any);
+      expect(mockAuth.deleteAuthorizedDevices).toHaveBeenCalledWith(options.authedFetch, devices);
+      expect(options.refetchAuthorizedDevices).toHaveBeenCalled();
+      expect(options.onLogoutNow).not.toHaveBeenCalled();
+      expect(options.onNotify).toHaveBeenCalledWith('success', t('txt_selected_devices_removed', { count: 2 }));
+    });
+
+    it('logs out instead of refetching when the current device is among the selection', async () => {
+      mockAuth.deleteAuthorizedDevices.mockResolvedValue(undefined);
+      mockAuth.getCurrentDeviceIdentifier.mockReturnValue('a');
+      const { actions, options } = render();
+      actions.openRemoveSelectedDevices([{ identifier: 'a' }] as any);
+      await fireConfirm(options.onSetConfirm as any);
+      expect(options.onLogoutNow).toHaveBeenCalled();
+      expect(options.refetchAuthorizedDevices).not.toHaveBeenCalled();
+    });
+
+    it('notifies error on reject', async () => {
+      mockAuth.deleteAuthorizedDevices.mockRejectedValue(new Error('bulk-remove-fail'));
+      mockAuth.getCurrentDeviceIdentifier.mockReturnValue('other');
+      const { actions, options } = render();
+      actions.openRemoveSelectedDevices([{ identifier: 'a' }] as any);
+      await fireConfirm(options.onSetConfirm as any);
+      expect(options.onNotify).toHaveBeenCalledWith('error', 'bulk-remove-fail');
+    });
+
+    it('falls back to a generic message when a non-Error is thrown', async () => {
+      mockAuth.deleteAuthorizedDevices.mockRejectedValue('boom');
+      mockAuth.getCurrentDeviceIdentifier.mockReturnValue('other');
+      const { actions, options } = render();
+      actions.openRemoveSelectedDevices([{ identifier: 'a' }] as any);
+      await fireConfirm(options.onSetConfirm as any);
+      expect(options.onNotify).toHaveBeenCalledWith('error', t('txt_remove_selected_devices_failed'));
     });
   });
 

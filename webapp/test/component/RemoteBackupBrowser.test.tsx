@@ -71,9 +71,18 @@ describe('<RemoteBackupBrowser>', () => {
     expect(screen.getByText('Save this destination first before browsing its remote backup files.')).toBeInTheDocument();
   });
 
-  it('shows the cached-empty message when saved but no browser loaded', () => {
+  it('shows the loading message while the first listing is in flight', () => {
+    setup({ destinationIsSaved: true, remoteBrowser: null, loadingRemoteBrowser: true });
+    expect(screen.getByText('Loading remote backups...')).toBeInTheDocument();
+  });
+
+  it('shows the cached-empty refresh prompt when saved but no browser loaded', () => {
     setup({ destinationIsSaved: true, remoteBrowser: null });
-    expect(screen.getByText('Click Refresh to load this destination.')).toBeInTheDocument();
+    // The prompt is "Click [Refresh] to load this destination." with an inline
+    // refresh button between the prefix and suffix spans.
+    expect(screen.getByText('Click')).toBeInTheDocument();
+    expect(screen.getByText('to load this destination.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refresh/ })).toBeInTheDocument();
   });
 
   it('hides the refresh button when browsing is not allowed', () => {

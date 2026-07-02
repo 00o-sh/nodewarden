@@ -136,6 +136,19 @@ function withPrfExtension(
   };
 }
 
+export function withoutCreatePrfExtension(options: PublicKeyCredentialCreationOptions): PublicKeyCredentialCreationOptions {
+  const extensions = { ...(((options as any).extensions || {}) as Record<string, unknown>) };
+  delete extensions.prf;
+  if (!Object.keys(extensions).length) {
+    const { extensions: _extensions, ...rest } = options as any;
+    return rest as PublicKeyCredentialCreationOptions;
+  }
+  return {
+    ...options,
+    extensions: extensions as any,
+  };
+}
+
 function readPrfFirstResult(credential: PublicKeyCredential): ArrayBuffer | undefined {
   const result = (credential.getClientExtensionResults() as any).prf?.results?.first;
   return result instanceof ArrayBuffer ? result : undefined;
@@ -288,6 +301,7 @@ export async function createAccountPasskeyCredential(
     throw new Error(t('txt_passkey_browser_not_supported'));
   }
   const nativeOptions = cloneCreationOptions(response.options);
+  const noPrfOptions = withoutCreatePrfExtension(nativeOptions);
   const createWithOptions = async (options: PublicKeyCredentialCreationOptions): Promise<PublicKeyCredential> => {
     const credential = await navigator.credentials.create({ publicKey: options });
     if (!(credential instanceof PublicKeyCredential)) {
@@ -298,9 +312,9 @@ export async function createAccountPasskeyCredential(
   let credential: PublicKeyCredential;
   if (requestPrf && await canRequestPrfExtension()) {
     const prfOptions: PublicKeyCredentialCreationOptions = {
-      ...nativeOptions,
+      ...noPrfOptions,
       extensions: {
-        ...((nativeOptions as any).extensions || {}),
+        ...((noPrfOptions as any).extensions || {}),
         prf: {},
       } as any,
     };
@@ -308,10 +322,10 @@ export async function createAccountPasskeyCredential(
       credential = await createWithOptions(prfOptions);
     } catch (error) {
       if (!shouldRetryCreateWithoutPrf(error)) throw error;
-      credential = await createWithOptions(nativeOptions);
+      credential = await createWithOptions(noPrfOptions);
     }
   } else {
-    credential = await createWithOptions(nativeOptions);
+    credential = await createWithOptions(noPrfOptions);
   }
   if (!(credential instanceof PublicKeyCredential)) {
     throw new Error(t('txt_no_passkey_created'));

@@ -381,6 +381,21 @@ describe('buildBitwardenCsvString', () => {
     expect(lines.filter((l) => l && !l.startsWith('folder,'))).toHaveLength(1);
   });
 
+  it('serializes an unknown source type record generically and skips a missing known record', () => {
+    const csv = buildBitwardenCsvString({
+      items: [
+        // Unknown type 6 -> source label "type 6" is not in the known-field map,
+        // so its record falls through to the generic record serializer.
+        { type: 6, name: 'Custom', 'type 6': { alpha: 'A' } },
+        // Card type (3) but the card payload is absent -> the known-field helper
+        // hits its non-record guard and emits nothing extra.
+        { type: 3, name: 'Cardless' },
+      ],
+    } as Record<string, unknown>);
+    expect(csv).toContain('type 6.alpha: A');
+    expect(csv).toContain('Cardless');
+  });
+
   it('labels identity and sshKey source types in the fields column', async () => {
     const identity: Cipher = { id: 'i', type: 4, name: 'Me', identity: { firstName: 'Ada', lastName: 'L' } };
     const ssh: Cipher = { id: 's', type: 5, name: 'K', sshKey: { privateKey: 'pk', publicKey: 'pub', keyFingerprint: 'fp' } };

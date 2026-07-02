@@ -166,6 +166,7 @@ jobs:
           # and hand back a one-click compare link instead of erroring out.
           if [ "$CONFLICTS" = "true" ]; then
             TITLE="🚨 DO NOT MERGE: sync upstream ($LABEL) has conflicts"
+            # shellcheck disable=SC2016 # the `$` in the sed script is an end-of-line anchor, not a variable
             FILE_LIST=$(printf '%s\n' "$CONFLICTED_FILES" | sed '/^$/d' | sed 's/^/- `/; s/$/`/')
             BODY=$(printf '%s\n' \
               "⚠️ **This branch contains UNRESOLVED merge conflicts committed as file content.**" \
@@ -245,11 +246,15 @@ jobs:
           if [ "${{ steps.check.outputs.needs_update }}" != "true" ]; then
             echo "### Nothing to sync" >> "$GITHUB_STEP_SUMMARY"
           elif [ "${{ steps.merge.outputs.conflicts }}" = "true" ]; then
-            echo "### ⚠️ Upstream merge has conflicts — PR opened, resolve before merging" >> "$GITHUB_STEP_SUMMARY"
-            echo "- **Target:** ${{ steps.resolve.outputs.label }}" >> "$GITHUB_STEP_SUMMARY"
-            echo "- The \`${{ env.SYNC_BRANCH }}\` branch holds the conflicted tree (markers committed); the PR is flagged **DO NOT MERGE** until resolved." >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "### ⚠️ Upstream merge has conflicts — PR opened, resolve before merging"
+              echo "- **Target:** ${{ steps.resolve.outputs.label }}"
+              echo "- The \`${{ env.SYNC_BRANCH }}\` branch holds the conflicted tree (markers committed); the PR is flagged **DO NOT MERGE** until resolved."
+            } >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "### Sync PR opened/updated" >> "$GITHUB_STEP_SUMMARY"
-            echo "- **Target:** ${{ steps.resolve.outputs.label }}" >> "$GITHUB_STEP_SUMMARY"
-            echo "- **Branch:** \`${{ env.SYNC_BRANCH }}\`" >> "$GITHUB_STEP_SUMMARY"
+            {
+              echo "### Sync PR opened/updated"
+              echo "- **Target:** ${{ steps.resolve.outputs.label }}"
+              echo "- **Branch:** \`${{ env.SYNC_BRANCH }}\`"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
