@@ -90,9 +90,9 @@ jobs:
         id: check_docker
         run: |
           if [ -f "Dockerfile" ]; then
-            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "exists=true" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Container Config Scan (Trivy)
@@ -111,11 +111,13 @@ jobs:
           # Gitleaks typically produces results.sarif if configured or by default in some versions
           # We'll ensure it exists for our reporter
           node .github/scripts/security.cjs
-          
+
           # Also append to step summary for immediate visibility in GHA UI
-          cat security-report.md >> $GITHUB_STEP_SUMMARY
-          echo -e "\n---\n" >> $GITHUB_STEP_SUMMARY
-          cat security-report-cn.md >> $GITHUB_STEP_SUMMARY
+          {
+            cat security-report.md
+            echo -e "\n---\n"
+            cat security-report-cn.md
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Gitleaks Results to GitHub Security
         uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
