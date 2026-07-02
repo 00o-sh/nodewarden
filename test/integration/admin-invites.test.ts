@@ -35,6 +35,13 @@ describe('invite revocation', () => {
     expect(res.status).toBe(200);
     expect(typeof ((await res.json()) as any).deleted).toBe('number');
   });
+
+  it('deletes only invalid invites via scope=invalid', async () => {
+    await createInvite(); // a fresh active invite that should survive the purge
+    const res = await api('DELETE', '/api/admin/invites?scope=invalid', token);
+    expect(res.status).toBe(200);
+    expect(typeof ((await res.json()) as any).deleted).toBe('number');
+  });
 });
 
 describe('invite authorization', () => {

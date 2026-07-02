@@ -52,6 +52,27 @@ describe('unauthenticated contract', () => {
     ]);
     expect(await a.json()).toEqual(await b.json());
   });
+
+  it('serves the fill-assist manifest as public JSON', async () => {
+    const res = await SELF.fetch(url('/fill-assist/manifest.json'), { headers: baseHeaders() });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('Content-Type')).toContain('application/json');
+    const manifest = (await res.json()) as Record<string, any>;
+    expect(manifest.maps.forms.v1.filename).toBe('forms.v1.json');
+  });
+
+  it('serves the fill-assist forms map for the known filename', async () => {
+    const res = await SELF.fetch(url('/fill-assist/forms.v1.json'), { headers: baseHeaders() });
+    expect(res.status).toBe(200);
+    const forms = (await res.json()) as Record<string, any>;
+    expect(forms.schemaVersion).toBe('1.0.0');
+    expect(forms.hosts).toEqual({});
+  });
+
+  it('returns 404 for an unknown fill-assist forms filename', async () => {
+    const res = await SELF.fetch(url('/fill-assist/does-not-exist.json'), { headers: baseHeaders() });
+    expect(res.status).toBe(404);
+  });
 });
 
 describe('authentication gate', () => {
