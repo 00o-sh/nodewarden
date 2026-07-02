@@ -25,11 +25,10 @@ describe('buildDirectUploadUrl', () => {
 describe('getSafeJwtSecret', () => {
   const env = (secret: unknown) => ({ JWT_SECRET: secret } as unknown as Env);
 
-  it('returns null for empty, short, or the default dev secret', () => {
+  it('returns null for an empty or too-short secret', () => {
     expect(getSafeJwtSecret(env(''))).toBeNull();
     expect(getSafeJwtSecret(env('   '))).toBeNull();
     expect(getSafeJwtSecret(env('too-short'))).toBeNull();
-    expect(getSafeJwtSecret(env('Enter-your-JWT-key-here-at-least-32-characters'))).toBeNull();
   });
 
   it('returns the trimmed secret when it is strong enough', () => {

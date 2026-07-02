@@ -29,13 +29,13 @@ const path = require('node:path');
 const BASE = process.env.DIFF_COVERAGE_BASE || 'origin/main';
 const COVERAGE_FILE = path.resolve('coverage/webapp/coverage-final.json');
 const FILE_RE = /^webapp\/src\/.*\.(ts|tsx)$/;
-// Mirror the coverage-instrumentation `exclude` list in vitest.webapp.config.ts.
-// Those files are deliberately never instrumented (entry/asset-only modules,
-// type decls, the demo-mode shims, and the i18n locale data), so they can never
-// appear in the coverage report. Without matching the exclusion here the gate
-// would flag any changed line in them as "untested" — a state no test could
-// ever clear. Keep this in sync with that config's exclude array.
-const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:demo\.ts$|demo\.empty\.ts$|demo-brand-icons\.ts$|i18n\/locales\/))/;
+// Mirror the coverage-instrumentation `exclude` list in vitest.webapp.config.ts,
+// plus type-only modules. Those files are deliberately never instrumented
+// (entry/asset-only modules, type decls, the demo-mode shims, the i18n locale
+// data, and the pure-type lib/types.ts), so they can never appear in the
+// coverage report. Without matching the exclusion here the gate would flag any
+// changed line in them as "untested" — a state no test could ever clear.
+const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:demo\.ts$|demo\.empty\.ts$|demo-brand-icons\.ts$|types\.ts$|i18n\/locales\/))/;
 // Upstream-owned code pulled in by the sync that the fork's jsdom suite can't
 // meaningfully exercise yet, excluded from the changed-line gate pending
 // dedicated tests. Remove entries here as those tests land:

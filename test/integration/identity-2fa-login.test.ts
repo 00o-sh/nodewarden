@@ -57,4 +57,17 @@ describe('two-factor login rejection branches', () => {
     expect(res.status).toBe(200);
     expect(typeof ((await res.json()) as any).access_token).toBe('string');
   });
+
+  it('locks the account after repeated failed two-factor attempts', async () => {
+    const ip = '198.51.113.9';
+    let res: Response | null = null;
+    // Wrong authenticator codes from one IP each record a failed 2FA attempt;
+    // once the login lockout (10 attempts) trips, the 2FA path returns 429.
+    for (let i = 0; i < 12; i++) {
+      res = await login2fa('0', '000000', ip);
+      if (res.status === 429) break;
+    }
+    expect(res!.status).toBe(429);
+    expect((await res!.text()).toLowerCase()).toContain('locked');
+  });
 });

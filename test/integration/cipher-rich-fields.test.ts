@@ -46,7 +46,6 @@ describe('rich cipher field normalization', () => {
             rpName: enc('rpn'),
             userDisplayName: enc('udn'),
           },
-          { credentialId: 'incomplete' }, // missing required fields -> dropped
         ],
       },
     });
@@ -56,6 +55,19 @@ describe('rich cipher field normalization', () => {
     expect(Array.isArray(c.login.uris)).toBe(true);
     expect(c.login.uris.length).toBeGreaterThanOrEqual(3);
     expect(c.login.fido2Credentials.length).toBe(1);
+  });
+
+  it('rejects a fido2 credential whose credentialId is not an encrypted string', async () => {
+    const res = await api('POST', '/api/ciphers', token, {
+      type: 1,
+      name: enc('bad-fido2'),
+      login: {
+        username: enc('u'),
+        fido2Credentials: [{ credentialId: 'not-encrypted' }],
+      },
+    });
+    expect(res.status).toBe(400);
+    expect((await res.json() as any).ErrorModel.Message).toContain('credentialId');
   });
 
   it('sanitizes all card fields', async () => {
