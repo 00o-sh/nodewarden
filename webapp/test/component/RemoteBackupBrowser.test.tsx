@@ -112,6 +112,29 @@ describe('<RemoteBackupBrowser>', () => {
     expect(onShowPath).toHaveBeenCalledWith('a');
   });
 
+  it('falls back to the root path when navigating up from a blank parent path', () => {
+    // parentPath is '' (not null): Up stays enabled and the onClick fallback
+    // (`parentPath || ''`) resolves to the empty root path.
+    const { onShowPath } = setup({
+      remoteBrowser: makeBrowser({ currentPath: 'a', parentPath: '', items: [zipItem] }),
+      visibleItems: [zipItem],
+    });
+    const upButton = screen.getByRole('button', { name: /Up/ });
+    expect(upButton).not.toBeDisabled();
+    fireEvent.click(upButton);
+    expect(onShowPath).toHaveBeenCalledWith('');
+  });
+
+  it('shows the unknown-time label for an item without a modified date', () => {
+    const undatedItem: RemoteBackupItem = { ...zipItem, path: 'undated.zip', name: 'undated.zip', modifiedAt: null };
+    setup({
+      remoteBrowser: makeBrowser({ items: [undatedItem] }),
+      visibleItems: [undatedItem],
+    });
+    const row = screen.getByText('undated.zip').closest('.backup-browser-row') as HTMLElement;
+    expect(within(row).getByText('Unknown time')).toBeInTheDocument();
+  });
+
   it('opens a directory via the entry and the Open action', () => {
     const { onShowPath } = setup();
     // The entry button is labeled with the folder name.

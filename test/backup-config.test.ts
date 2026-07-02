@@ -203,10 +203,10 @@ describe('local-time helpers', () => {
 });
 
 describe('scheduler — isBackupDueNow / hasBackupSlotBetween', () => {
-  const dest = (overrides: Partial<BackupDestinationRecord['schedule']> = {}, lastAttemptAt: string | null = null): BackupDestinationRecord => {
+  const dest = (overrides: Partial<BackupDestinationRecord['schedule']> = {}, lastSuccessAt: string | null = null): BackupDestinationRecord => {
     const settings = normalize({ destinations: [webdav({ schedule: { enabled: true, intervalHours: 24, startTime: '03:00', timezone: 'UTC', retentionCount: 30, ...overrides } })] });
     const d = settings.destinations[0];
-    d.runtime.lastAttemptAt = lastAttemptAt;
+    d.runtime.lastSuccessAt = lastSuccessAt;
     return d;
   };
 
@@ -217,21 +217,21 @@ describe('scheduler — isBackupDueNow / hasBackupSlotBetween', () => {
     expect(isBackupDueNow(d, new Date('2026-03-10T03:10:00.000Z'), 5)).toBe(false);
   });
 
-  it('is not due when already attempted at/after the slot, or when disabled', () => {
-    const attempted = dest({}, '2026-03-10T03:01:00.000Z');
-    expect(isBackupDueNow(attempted, new Date('2026-03-10T03:02:00.000Z'), 5)).toBe(false);
+  it('is not due when already succeeded at/after the slot, or when disabled', () => {
+    const succeeded = dest({}, '2026-03-10T03:01:00.000Z');
+    expect(isBackupDueNow(succeeded, new Date('2026-03-10T03:02:00.000Z'), 5)).toBe(false);
     const disabled = dest({ enabled: false });
     expect(isBackupDueNow(disabled, new Date('2026-03-10T03:02:00.000Z'), 5)).toBe(false);
   });
 
-  it('detects a covered slot in a time range and respects lastAttempt', () => {
+  it('detects a covered slot in a time range and respects lastSuccess', () => {
     const d = dest();
     const start = new Date('2026-03-10T00:00:00.000Z');
     const end = new Date('2026-03-11T00:00:00.000Z');
     expect(hasBackupSlotBetween(d, start, end)).toBe(true);
 
-    const attempted = dest({}, '2026-03-10T03:00:00.000Z');
-    expect(hasBackupSlotBetween(attempted, start, end)).toBe(false);
+    const succeeded = dest({}, '2026-03-10T03:00:00.000Z');
+    expect(hasBackupSlotBetween(succeeded, start, end)).toBe(false);
   });
 
   it('returns false for an empty/invalid range or a disabled schedule', () => {

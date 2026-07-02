@@ -457,6 +457,37 @@ describe('useAccountSecurityActions', () => {
       expect(options.onNotify).toHaveBeenCalledWith('success', t('txt_account_passkey_saved_login_only'));
     });
 
+    it('passkey reports no PRF support + user accepts => saves login-only without building a key set', async () => {
+      mockAuth.getAccountPasskeyAttestationOptions.mockResolvedValue({ options: {}, token: 'tok' });
+      mockPasskeys.createAccountPasskeyCredential.mockResolvedValue({ ...pending, supportsPrf: false });
+      mockAuth.saveAccountPasskey.mockResolvedValue({ id: 'pk' });
+      const onSetConfirm = vi.fn((state: any) => {
+        if (state) state.onConfirm();
+      });
+      const { actions, options } = render({ onSetConfirm });
+      await actions.createAccountPasskey('n', 'pw', true);
+      // No PRF support => the key set is never built.
+      expect(mockPasskeys.buildAccountPasskeyPrfKeySet).not.toHaveBeenCalled();
+      expect(mockAuth.saveAccountPasskey).toHaveBeenCalledWith(
+        options.authedFetch,
+        expect.objectContaining({ supportsPrf: false, keySet: null })
+      );
+      expect(options.onNotify).toHaveBeenCalledWith('success', t('txt_account_passkey_saved_login_only'));
+    });
+
+    it('passkey reports no PRF support + user declines => returns null and warns', async () => {
+      mockAuth.getAccountPasskeyAttestationOptions.mockResolvedValue({ options: {}, token: 'tok' });
+      mockPasskeys.createAccountPasskeyCredential.mockResolvedValue({ ...pending, supportsPrf: false });
+      const onSetConfirm = vi.fn((state: any) => {
+        if (state) state.onCancel();
+      });
+      const { actions, options } = render({ onSetConfirm });
+      await expect(actions.createAccountPasskey('n', 'pw', true)).resolves.toBeNull();
+      expect(mockPasskeys.buildAccountPasskeyPrfKeySet).not.toHaveBeenCalled();
+      expect(options.onNotify).toHaveBeenCalledWith('warning', t('txt_account_passkey_not_saved'));
+      expect(mockAuth.saveAccountPasskey).not.toHaveBeenCalled();
+    });
+
     it('rethrows non-PRF errors from buildAccountPasskeyPrfKeySet', async () => {
       mockAuth.getAccountPasskeyAttestationOptions.mockResolvedValue({ options: {}, token: 'tok' });
       mockPasskeys.createAccountPasskeyCredential.mockResolvedValue(pending);

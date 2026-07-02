@@ -29,6 +29,11 @@ const path = require('node:path');
 const BASE = process.env.DIFF_COVERAGE_BASE || 'origin/main';
 const COVERAGE_FILE = path.resolve('coverage/webapp/coverage-final.json');
 const FILE_RE = /^webapp\/src\/.*\.(ts|tsx)$/;
+// Mirror the coverage-instrumentation excludes in vitest.webapp.config.ts: the
+// i18n locale files are pure key->string data, are never instrumented, and so
+// can never appear in the coverage report. Without this the gate would flag
+// every new translation key as "untested" — a state no test could ever clear.
+const EXCLUDE_RE = /^webapp\/src\/lib\/i18n\/locales\//;
 
 function fail(msg) {
   console.error(`\n✖ diff-coverage: ${msg}`);
@@ -60,7 +65,7 @@ function changedLines() {
   for (const line of diff.split('\n')) {
     const fileMatch = line.match(/^\+\+\+ b\/(.+)$/);
     if (fileMatch) {
-      current = FILE_RE.test(fileMatch[1]) ? fileMatch[1] : null;
+      current = FILE_RE.test(fileMatch[1]) && !EXCLUDE_RE.test(fileMatch[1]) ? fileMatch[1] : null;
       if (current && !byFile.has(current)) byFile.set(current, new Set());
       continue;
     }

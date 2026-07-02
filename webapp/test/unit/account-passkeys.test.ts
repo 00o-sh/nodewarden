@@ -4,7 +4,9 @@ import {
   assertAccountPasskey,
   buildAccountPasskeyPrfKeySet,
   buildAccountPasskeyPrfKeySetFromPrfKey,
+  canRequestPrfExtension,
   createAccountPasskeyCredential,
+  shouldRetryCreateWithoutPrf,
   unlockVaultKeyWithAccountPasskeyPrf,
 } from '@/lib/account-passkeys';
 import { base64ToBytes, bytesToBase64 } from '@/lib/crypto';
@@ -198,7 +200,7 @@ describe('createAccountPasskeyCredential', () => {
     const result = await createAccountPasskeyCredential({
       options: makeCreationOptions(),
       token: 'attest-token',
-    });
+    }, true);
 
     // The native options passed to navigator.credentials.create were decoded
     // from base64url into ArrayBuffers and a prf extension was attached.
@@ -215,7 +217,11 @@ describe('createAccountPasskeyCredential', () => {
     expect(result.token).toBe('attest-token');
     expect(result.supportsPrf).toBe(true);
     expect(result.deviceResponse).toBe(credential);
-    expect(result.createOptions).toBe(passed);
+    // The prf extension is attached only to the clone handed to
+    // navigator.credentials.create; the returned createOptions stay prf-free so
+    // they can drive the follow-up PRF assertion. They share the decoded buffers.
+    expect((result.createOptions as any).extensions?.prf).toBeUndefined();
+    expect(result.createOptions.challenge).toBe(passed.challenge);
 
     const req = result.request as any;
     expect(req.id).toBe('new-cred');
@@ -225,6 +231,39 @@ describe('createAccountPasskeyCredential', () => {
     expect(req.response.attestationObject).toBe(bytesToBase64Url(new Uint8Array([1, 2, 3])));
     expect(req.response.clientDataJson).toBe(bytesToBase64Url(new Uint8Array([4, 5, 6])));
     expect(req.response.transports).toEqual(['internal', 'hybrid']);
+  });
+
+  it('retries the create without the prf extension when the first prf attempt fails retryably', async () => {
+    const credential = new FakePublicKeyCredential({
+      id: 'retried',
+      response: new FakeAuthenticatorAttestationResponse(),
+      extensionResults: {},
+    });
+    // First attempt (with the prf extension) fails with a retryable error; the
+    // second attempt (prf-free) succeeds.
+    credentials.create
+      .mockRejectedValueOnce(Object.assign(new Error('no prf'), { name: 'NotSupportedError' }))
+      .mockResolvedValueOnce(credential);
+
+    const result = await createAccountPasskeyCredential({
+      options: makeCreationOptions(),
+      token: 'tok',
+    }, true);
+
+    expect(credentials.create).toHaveBeenCalledTimes(2);
+    // The first call carried the prf extension; the retry dropped it.
+    expect(credentials.create.mock.calls[0][0].publicKey.extensions.prf).toEqual({});
+    expect(credentials.create.mock.calls[1][0].publicKey.extensions?.prf).toBeUndefined();
+    expect(result.token).toBe('tok');
+    expect(result.supportsPrf).toBe(false);
+  });
+
+  it('does not retry when the first prf attempt fails with a non-retryable error', async () => {
+    credentials.create.mockRejectedValue(Object.assign(new Error('user cancelled'), { name: 'NotAllowedError' }));
+    await expect(
+      createAccountPasskeyCredential({ options: makeCreationOptions(), token: 'tok' }, true)
+    ).rejects.toThrow('user cancelled');
+    expect(credentials.create).toHaveBeenCalledTimes(1);
   });
 
   it('reports supportsPrf=false when the authenticator does not enable prf', async () => {
@@ -590,6 +629,50 @@ describe('buildAccountPasskeyPrfKeySet (end-to-end from a pending credential)', 
     await expect(
       buildAccountPasskeyPrfKeySet(makePending(rawId), { symEncKey, symMacKey })
     ).rejects.toBeInstanceOf(AccountPasskeyPrfUnavailableError);
+  });
+});
+
+describe('shouldRetryCreateWithoutPrf', () => {
+  const named = (name: string, message = '') => Object.assign(new Error(message), { name });
+
+  it('retries on NotSupportedError / SyntaxError / TypeError', () => {
+    expect(shouldRetryCreateWithoutPrf(named('NotSupportedError'))).toBe(true);
+    expect(shouldRetryCreateWithoutPrf(named('SyntaxError'))).toBe(true);
+    expect(shouldRetryCreateWithoutPrf(named('TypeError'))).toBe(true);
+  });
+
+  it('retries on a transient UnknownError but not a fatal one', () => {
+    expect(shouldRetryCreateWithoutPrf(named('UnknownError', 'a transient glitch'))).toBe(true);
+    expect(shouldRetryCreateWithoutPrf(named('UnknownError', 'fatal failure'))).toBe(false);
+  });
+
+  it('reads the name from a DOMException', () => {
+    expect(shouldRetryCreateWithoutPrf(new DOMException('x', 'NotSupportedError'))).toBe(true);
+    expect(shouldRetryCreateWithoutPrf(new DOMException('x', 'NotAllowedError'))).toBe(false);
+  });
+
+  it('does not retry other errors or non-error values', () => {
+    expect(shouldRetryCreateWithoutPrf(named('NotAllowedError'))).toBe(false);
+    expect(shouldRetryCreateWithoutPrf('not-an-error')).toBe(false);
+    expect(shouldRetryCreateWithoutPrf(null)).toBe(false);
+  });
+});
+
+describe('canRequestPrfExtension', () => {
+  const setUserAgent = (ua: string) => {
+    Object.defineProperty(g.navigator, 'userAgent', { value: ua, configurable: true });
+  };
+
+  it('declines for Firefox and allows other browsers', async () => {
+    const original = g.navigator.userAgent;
+    try {
+      setUserAgent('Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0');
+      expect(await canRequestPrfExtension()).toBe(false);
+      setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/120 Safari/537.36');
+      expect(await canRequestPrfExtension()).toBe(true);
+    } finally {
+      setUserAgent(original);
+    }
   });
 });
 
