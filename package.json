@@ -64,7 +64,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.16.20",
-    "@cloudflare/workers-types": "4.20260627.1",
+    "@cloudflare/workers-types": "4.20260628.1",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.61.1",
     "@preact/preset-vite": "2.10.5",
