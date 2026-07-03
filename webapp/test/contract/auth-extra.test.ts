@@ -143,19 +143,21 @@ describe('getPasswordHint contract', () => {
 describe('getApiKey / rotateApiKey contract', () => {
   // rotateApiKey rotates the security stamp + drops refresh tokens, invalidating
   // the session, so this runs against a dedicated account (never the shared ctx).
-  it('returns an api key (creating one on first request) and rotates it to a new value', async () => {
+  it('returns a fresh api key on every request and rotates to a new value', async () => {
     const account = await registerExtraAccount('auth-extra-apikey');
     const hash = (await deriveLoginHash(account.email, account.password, DEFAULT_ITERATIONS)).hash;
 
     const first = await getApiKey(account.authedFetch, hash);
     expect(first).toBeTruthy();
-    // Reading again returns the same key (no rotation).
+    // The database only stores a hash of the key, so each request mints a fresh
+    // plaintext secret rather than echoing the previous one back.
     const second = await getApiKey(account.authedFetch, hash);
-    expect(second).toBe(first);
+    expect(second).toBeTruthy();
+    expect(second).not.toBe(first);
 
     const rotated = await rotateApiKey(account.authedFetch, hash);
     expect(rotated).toBeTruthy();
-    expect(rotated).not.toBe(first);
+    expect(rotated).not.toBe(second);
     // NOTE: rotateApiKey rotates the security stamp and deletes refresh tokens,
     // so this session's access token is now invalid and cannot be refreshed.
     // Re-reading the key would require a fresh login, which is out of scope here.

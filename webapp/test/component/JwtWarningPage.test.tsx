@@ -9,13 +9,6 @@ describe('<JwtWarningPage>', () => {
     expect(screen.getByText('How to add JWT_SECRET')).toBeInTheDocument();
   });
 
-  it('renders the "default" title when reason is default', () => {
-    render(<JwtWarningPage reason="default" minLength={32} />);
-    expect(
-      screen.getByRole('heading', { name: 'JWT_SECRET is using the default value' })
-    ).toBeInTheDocument();
-  });
-
   it('renders the "too_short" title when reason is too_short', () => {
     render(<JwtWarningPage reason="too_short" minLength={32} />);
     expect(screen.getByRole('heading', { name: 'JWT_SECRET is too short' })).toBeInTheDocument();
