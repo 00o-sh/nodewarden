@@ -181,6 +181,100 @@ describe('decryptVaultCore - ciphers (item key)', () => {
   });
 });
 
+describe('decryptVaultCore - bank/license/passport objects', () => {
+  it('decrypts bank account fields into dec* keys with the user key', async () => {
+    const cipher: Cipher = {
+      id: '1',
+      type: 6,
+      bankAccount: {
+        bankName: await enc('Acme Bank'),
+        nameOnAccount: await enc('Alice A'),
+        accountNumber: await enc('123456789'),
+        routingNumber: await enc('021000021'),
+        swiftCode: await enc('AAAAUS33'),
+      } as never,
+    };
+    const result = await decryptVaultCore({ folders: [], ciphers: [cipher], symEncKeyB64, symMacKeyB64 });
+    const bank = result.ciphers[0].bankAccount as any;
+    expect(bank.decBankName).toBe('Acme Bank');
+    expect(bank.decNameOnAccount).toBe('Alice A');
+    expect(bank.decAccountNumber).toBe('123456789');
+    expect(bank.decRoutingNumber).toBe('021000021');
+    expect(bank.decSwiftCode).toBe('AAAAUS33');
+    // Missing fields resolve to empty string.
+    expect(bank.decIban).toBe('');
+  });
+
+  it('decrypts drivers license fields into dec* keys', async () => {
+    const cipher: Cipher = {
+      id: '1',
+      type: 7,
+      driversLicense: {
+        firstName: await enc('Ada'),
+        lastName: await enc('Lovelace'),
+        licenseNumber: await enc('D1234567'),
+        issuingState: await enc('CA'),
+        expirationDate: await enc('2030-01-01'),
+      } as never,
+    };
+    const result = await decryptVaultCore({ folders: [], ciphers: [cipher], symEncKeyB64, symMacKeyB64 });
+    const dl = result.ciphers[0].driversLicense as any;
+    expect(dl.decFirstName).toBe('Ada');
+    expect(dl.decLastName).toBe('Lovelace');
+    expect(dl.decLicenseNumber).toBe('D1234567');
+    expect(dl.decIssuingState).toBe('CA');
+    expect(dl.decExpirationDate).toBe('2030-01-01');
+  });
+
+  it('decrypts passport fields into dec* keys', async () => {
+    const cipher: Cipher = {
+      id: '1',
+      type: 8,
+      passport: {
+        surname: await enc('Lovelace'),
+        givenName: await enc('Ada'),
+        passportNumber: await enc('X1234567'),
+        nationality: await enc('GBR'),
+        issuingCountry: await enc('GB'),
+      } as never,
+    };
+    const result = await decryptVaultCore({ folders: [], ciphers: [cipher], symEncKeyB64, symMacKeyB64 });
+    const pp = result.ciphers[0].passport as any;
+    expect(pp.decSurname).toBe('Lovelace');
+    expect(pp.decGivenName).toBe('Ada');
+    expect(pp.decPassportNumber).toBe('X1234567');
+    expect(pp.decNationality).toBe('GBR');
+    expect(pp.decIssuingCountry).toBe('GB');
+  });
+
+  it('decrypts bank fields using a wrapped item key', async () => {
+    const { itemEnc, itemMac, wrappedKey } = await makeItemKey();
+    const cipher: Cipher = {
+      id: '1',
+      type: 6,
+      key: wrappedKey,
+      bankAccount: { bankName: await enc('ItemBank', itemEnc, itemMac) } as never,
+    };
+    const result = await decryptVaultCore({ folders: [], ciphers: [cipher], symEncKeyB64, symMacKeyB64 });
+    expect((result.ciphers[0].bankAccount as any).decBankName).toBe('ItemBank');
+  });
+});
+
+describe('decryptVaultCore - attachment key fallback', () => {
+  it('falls back to the user key for an attachment name when the cipher uses an item key', async () => {
+    const { wrappedKey } = await makeItemKey();
+    const cipher: Cipher = {
+      id: '1',
+      type: 1,
+      key: wrappedKey,
+      // Attachment filename was encrypted under the USER key, not the item key.
+      attachments: [{ id: 'a1', fileName: await enc('legacy.pdf') } as any],
+    };
+    const result = await decryptVaultCore({ folders: [], ciphers: [cipher], symEncKeyB64, symMacKeyB64 });
+    expect((result.ciphers[0].attachments?.[0] as any).decFileName).toBe('legacy.pdf');
+  });
+});
+
 describe('decryptSends', () => {
   const origin = 'https://vault.example';
 

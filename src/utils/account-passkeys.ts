@@ -68,7 +68,11 @@ function uuidToDotNetGuidBytes(value: string): Uint8Array | null {
 }
 
 function normalizeWebAuthnBase64(value: unknown): string {
-  return String(value || '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+  // Strip base64 padding by removing every '=' (padding only ever appears as a
+  // trailing run in valid base64). Using /=/g instead of the anchored /=+$/
+  // avoids the polynomial-backtracking ReDoS the quantifier exhibits on
+  // attacker-controlled WebAuthn input.
+  return String(value || '').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
 async function importHmacKey(secret: string): Promise<CryptoKey> {
