@@ -72,7 +72,7 @@ describe('backup transfer runner request validation', () => {
     it('409s when the referenced blob is missing from storage', async () => {
       const res = await post('/internal/upload-attachment-chunk', {
         destination: webdavDestination(),
-        attachments: [{ blobName: `missing-${crypto.randomUUID()}` }],
+        attachments: [{ blobName: `${crypto.randomUUID()}/${crypto.randomUUID()}` }],
       });
       expect(res.status).toBe(409);
     });

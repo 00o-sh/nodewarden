@@ -93,8 +93,12 @@ describe('AppAuthenticatedShell', () => {
     // These nav items are visible to everyone.
     expect(screen.getAllByText('Vault').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Sends').length).toBeGreaterThan(0);
-    expect(screen.getByText('Account Settings')).toBeInTheDocument();
-    expect(screen.getByText('Domain Rules')).toBeInTheDocument();
+    // Flat layout now exposes a single "Settings" side-link; Account Settings and
+    // Domain Rules were folded into the grouped-layout Settings group and are no
+    // longer standalone flat links.
+    expect(screen.getAllByText('Settings').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Account Settings')).not.toBeInTheDocument();
+    expect(screen.queryByText('Domain Rules')).not.toBeInTheDocument();
     expect(screen.getByText('Import & Export')).toBeInTheDocument();
     expect(screen.getByText('Device Management')).toBeInTheDocument();
     // Admin-only links are hidden for a user.

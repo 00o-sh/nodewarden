@@ -139,8 +139,10 @@ describe('parseBackupArchive', () => {
   });
 
   it('rejects an archive with too many entries', () => {
+    // Use valid attachment entry names so the archive trips the entry-count cap
+    // rather than the per-entry name validation that now runs during unzip.
     const entries: Record<string, Uint8Array> = {};
-    for (let i = 0; i <= 10_000; i++) entries[`f${i}.txt`] = new Uint8Array([1]);
+    for (let i = 0; i <= 10_000; i++) entries[`attachments/c/a${i}.bin`] = new Uint8Array([1]);
     expect(() => parseBackupArchive(zipSync(entries))).toThrow(/too many files/i);
   });
 

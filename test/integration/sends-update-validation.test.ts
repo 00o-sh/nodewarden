@@ -134,13 +134,13 @@ describe('update send happy paths', () => {
     expect(r.json.expirationDate).toBeNull();
   });
 
-  it('couples a non-empty emails list to email auth', async () => {
+  it('refuses a non-empty emails list as unsupported email auth', async () => {
+    // Upstream v1.7.3 dropped Send email verification: a non-empty emails list
+    // requests email auth, which the server now refuses with 501.
     const id = await createTextSend();
     const r = await update(id, { emails: 'recipient@example.com' });
-    expect(r.status).toBe(200);
-    // SendAuthType.Email === 0
-    expect(r.json.accessId).toBeTruthy();
-    expect(r.json.emails).toContain('recipient@example.com');
+    expect(r.status).toBe(501);
+    expect(r.json.error).toBe('Send email verification is not supported by this server.');
   });
 
   it('updates text content', async () => {

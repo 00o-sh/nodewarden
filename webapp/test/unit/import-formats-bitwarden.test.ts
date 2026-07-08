@@ -105,8 +105,8 @@ describe('normalizeBitwardenImport', () => {
     expect(login.login.totp).toBe('JBSWY3DPEHPK3PXP');
     expect(login.login.fido2Credentials).toEqual([{ credentialId: 'abc', userName: 'octocat' }]);
     expect(login.login.uris).toEqual([
-      { uri: 'https://github.com', match: 0 },
-      { uri: 'https://gist.github.com', match: null },
+      { uri: 'https://github.com', match: 0, uriChecksum: null },
+      { uri: 'https://gist.github.com', match: null, uriChecksum: null },
     ]);
 
     expect(login.fields).toEqual([

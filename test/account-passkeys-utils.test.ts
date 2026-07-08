@@ -87,15 +87,20 @@ describe('rp config', () => {
     expect(cfg.origins).toContain('https://vault.test');
   });
 
-  it('honours configured rpId/name/origins and adds extension origins', () => {
+  it('honours configured rpId/name/origins, including configured extension origins', () => {
     const cfg = getAccountPasskeyRpConfig(req('chrome-extension://abcd'), env({
       WEBAUTHN_RP_ID: 'custom.example',
       WEBAUTHN_RP_NAME: 'Custom',
-      WEBAUTHN_ALLOWED_ORIGINS: 'https://a.test, https://b.test',
+      WEBAUTHN_ALLOWED_ORIGINS: 'https://a.test, https://b.test, chrome-extension://configured',
     }));
     expect(cfg.rpId).toBe('custom.example');
     expect(cfg.rpName).toBe('Custom');
-    expect(cfg.origins).toEqual(expect.arrayContaining(['https://a.test', 'https://b.test', 'chrome-extension://abcd']));
+    expect(cfg.origins).toEqual(
+      expect.arrayContaining(['https://a.test', 'https://b.test', 'chrome-extension://configured'])
+    );
+    // An extension origin from the request header is no longer auto-reflected —
+    // only origins configured via WEBAUTHN_ALLOWED_ORIGINS are trusted.
+    expect(cfg.origins).not.toContain('chrome-extension://abcd');
   });
 
   it('ignores a non-extension Origin header', () => {

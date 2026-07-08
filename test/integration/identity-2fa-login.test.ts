@@ -52,7 +52,10 @@ describe('two-factor login rejection branches', () => {
   });
 
   it('completes login with a valid authenticator code', async () => {
-    const code = await totpToken(totpSecret);
+    // Enrollment (beforeAll) consumed the current-step counter (Bitwarden-compatible
+    // replay protection now applies at enrollment), so log in with a code from the
+    // next time step — still inside the ±1 verification window, but not yet consumed.
+    const code = await totpToken(totpSecret, Date.now() + 30_000);
     const res = await login2fa('0', code, '198.51.113.3');
     expect(res.status).toBe(200);
     expect(typeof ((await res.json()) as any).access_token).toBe('string');

@@ -28,8 +28,33 @@ describe('anonymous notifications hub', () => {
     expect(res.status).toBe(426);
   });
 
-  it('upgrades a websocket with a Token and completes the SignalR handshake', async () => {
+  it('404s a Token that is not a live auth request', async () => {
     const res = await SELF.fetch(url(`/notifications/anonymous-hub?Token=${crypto.randomUUID()}`), {
+      headers: { Upgrade: 'websocket', 'CF-Connecting-IP': '203.0.113.7' },
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('upgrades a websocket with a live auth-request Token and completes the SignalR handshake', async () => {
+    // The anonymous hub now validates the Token against a real, unexpired auth
+    // request, so create one first and use its id as the Token.
+    const create = await SELF.fetch(url('/api/auth-requests'), {
+      method: 'POST',
+      headers: baseHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        email: session.account.email,
+        publicKey: btoa('anon-hub-public-key'),
+        accessCode: 'anon-hub-code-123',
+        deviceIdentifier: crypto.randomUUID(),
+        deviceType: 10,
+        type: 0,
+      }),
+    });
+    expect(create.status).toBe(200);
+    const authRequestId = ((await create.json()) as any).id as string;
+    expect(typeof authRequestId).toBe('string');
+
+    const res = await SELF.fetch(url(`/notifications/anonymous-hub?Token=${authRequestId}`), {
       headers: { Upgrade: 'websocket', 'CF-Connecting-IP': '203.0.113.7' },
     });
     expect(res.status).toBe(101);

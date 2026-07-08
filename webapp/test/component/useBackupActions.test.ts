@@ -258,8 +258,8 @@ describe('useBackupActions', () => {
       const resp = { integrity: {}, fileName: 'p.zip' } as unknown as Awaited<ReturnType<typeof inspectRemoteBackupIntegrity>>;
       mockedInspect.mockResolvedValue(resp);
       const { actions, authedFetch } = setup();
-      const returned = await actions.inspectRemoteBackup('dest1', 'p.zip');
-      expect(mockedInspect).toHaveBeenCalledWith(authedFetch, 'dest1', 'p.zip');
+      const returned = await actions.inspectRemoteBackup('hash', 'dest1', 'p.zip');
+      expect(mockedInspect).toHaveBeenCalledWith(authedFetch, 'hash', 'dest1', 'p.zip');
       expect(returned).toBe(resp);
     });
 
@@ -274,8 +274,8 @@ describe('useBackupActions', () => {
     it('forwards destination and path', async () => {
       mockedDeleteRemote.mockResolvedValue(undefined);
       const { actions, authedFetch } = setup();
-      await actions.deleteRemoteBackup('dest1', 'p.zip');
-      expect(mockedDeleteRemote).toHaveBeenCalledWith(authedFetch, 'dest1', 'p.zip');
+      await actions.deleteRemoteBackup('hash', 'dest1', 'p.zip');
+      expect(mockedDeleteRemote).toHaveBeenCalledWith(authedFetch, 'hash', 'dest1', 'p.zip');
     });
 
     it('propagates errors', async () => {

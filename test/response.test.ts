@@ -94,11 +94,20 @@ describe('applyCors', () => {
     expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
   });
 
-  it('reflects a browser extension origin with credentials', () => {
+  it('reflects a configured browser extension origin with credentials', () => {
     const req = request('https://example.com/api/sync', { Origin: 'chrome-extension://abcdef' });
-    const res = applyCors(req, jsonResponse({}));
+    const env = { WEBAUTHN_ALLOWED_ORIGINS: 'chrome-extension://abcdef' } as unknown as Parameters<typeof applyCors>[2];
+    const res = applyCors(req, jsonResponse({}), env);
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('chrome-extension://abcdef');
     expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+  });
+
+  it('does not reflect an unconfigured browser extension origin', () => {
+    const req = request('https://example.com/api/sync', { Origin: 'chrome-extension://abcdef' });
+    const env = { WEBAUTHN_ALLOWED_ORIGINS: '' } as unknown as Parameters<typeof applyCors>[2];
+    const res = applyCors(req, jsonResponse({}), env);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    expect(res.headers.get('Access-Control-Allow-Credentials')).toBeNull();
   });
 
   it('does not allow an unrelated cross-origin on a non-wildcard path', () => {

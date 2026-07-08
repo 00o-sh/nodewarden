@@ -66,12 +66,6 @@ function asTrimmedString(value: unknown): string {
 
 // Linear slash trims (no `/\/+$/`-style backtracking, which CodeQL flags as a
 // polynomial ReDoS risk on attacker-supplied URLs/paths).
-function stripTrailingSlashes(value: string): string {
-  let next = String(value || '');
-  while (next.endsWith('/')) next = next.slice(0, -1);
-  return next;
-}
-
 function stripSurroundingSlashes(value: string): string {
   let next = String(value || '');
   while (next.startsWith('/')) next = next.slice(1);
@@ -259,11 +253,7 @@ function normalizeS3Destination(value: unknown, allowIncomplete = false): S3Back
   }
 
   return {
-<<<<<<< HEAD
-    endpoint: endpoint ? stripTrailingSlashes(endpoint) : '',
-=======
     endpoint: endpoint ? normalizeBackupEndpointUrl(endpoint, 'S3 endpoint') : '',
->>>>>>> a0f832e8a5fb31b31f64e466201a4f947fbb0e48
     bucket,
     addressingStyle,
     region,
@@ -292,11 +282,7 @@ function normalizeWebDavDestination(value: unknown, allowIncomplete = false): We
   }
 
   return {
-<<<<<<< HEAD
-    baseUrl: baseUrl ? stripTrailingSlashes(baseUrl) : '',
-=======
     baseUrl: baseUrl ? normalizeBackupEndpointUrl(baseUrl, 'WebDAV server URL') : '',
->>>>>>> a0f832e8a5fb31b31f64e466201a4f947fbb0e48
     username,
     password,
     remotePath,

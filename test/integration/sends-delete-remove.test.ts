@@ -1,5 +1,7 @@
-import { SELF } from 'cloudflare:test';
+import { SELF, env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { SendAuthType } from '../../src/types';
+import { StorageService } from '../../src/services/storage';
 import { ENC_STRING, Session, api, authenticate, baseHeaders, enc, url } from './helpers';
 
 // Delete / bulk-delete / remove-password / remove-auth send endpoints,
@@ -100,7 +102,16 @@ describe('remove send auth', () => {
   });
 
   it('resets an email-auth send to no auth', async () => {
-    const id = await createTextSend({ authType: 0, emails: 'recipient@example.com' });
+    // Upstream v1.7.3 refuses email auth at create/update time (501), so seed a
+    // legacy email-auth send directly into storage, then verify remove-auth
+    // clears it back to no auth.
+    const id = await createTextSend();
+    const storage = new StorageService((env as any).DB);
+    const stored = await storage.getSend(id);
+    stored!.authType = SendAuthType.Email;
+    stored!.emails = 'recipient@example.com';
+    await storage.saveSend(stored!);
+
     const res = await api('PUT', `/api/sends/${id}/remove-auth`, token, {});
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;

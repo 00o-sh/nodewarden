@@ -25,6 +25,7 @@ function buildProps(overrides: Partial<OverlayProps> = {}): OverlayProps {
     onTotpCodeChange: vi.fn(),
     onRememberDeviceChange: vi.fn(),
     onConfirmTotp: vi.fn(),
+    onSelectTotpProvider: vi.fn(),
     onCancelTotp: vi.fn(),
     onUseRecoveryCode: vi.fn(),
     totpSubmitting: false,
@@ -128,7 +129,9 @@ describe('AppGlobalOverlays', () => {
     fireEvent.click(within(dialog).getByText('Verify'));
     expect(props.onConfirmTotp).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(within(dialog).getByText('Cancel'));
+    // The TOTP dialog now dismisses via the header close (X) button (aria-label
+    // "Close"), which routes to onCancelTotp — there is no separate Cancel button.
+    fireEvent.click(within(dialog).getByLabelText('Close'));
     expect(props.onCancelTotp).toHaveBeenCalledTimes(1);
   });
 
@@ -136,7 +139,8 @@ describe('AppGlobalOverlays', () => {
     render(<AppGlobalOverlays {...buildProps({ pendingTotpOpen: true, totpSubmitting: true })} />);
     const dialog = openDialog();
     expect(within(dialog).getByText('Verify').closest('button')).toBeDisabled();
-    expect(within(dialog).getByText('Cancel').closest('button')).toBeDisabled();
+    // Dismissal is the header close (X) button now; it disables while submitting.
+    expect(within(dialog).getByLabelText('Close')).toBeDisabled();
     expect(within(dialog).getByText('Use Recovery Code').closest('button')).toBeDisabled();
   });
 
@@ -156,7 +160,9 @@ describe('AppGlobalOverlays', () => {
     fireEvent.click(confirmBtn);
     expect(props.onConfirmDisableTotp).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(within(dialog).getByText('Cancel'));
+    // Dismissal is via the header close (X) button, which routes to
+    // onCancelDisableTotp — the standalone Cancel button was removed.
+    fireEvent.click(within(dialog).getByLabelText('Close'));
     expect(props.onCancelDisableTotp).toHaveBeenCalledTimes(1);
   });
 

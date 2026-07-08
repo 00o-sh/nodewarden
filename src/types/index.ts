@@ -14,20 +14,17 @@ export interface Env {
   WEBAUTHN_RP_ID?: string;
   WEBAUTHN_RP_NAME?: string;
   WEBAUTHN_ALLOWED_ORIGINS?: string;
-<<<<<<< HEAD
   // Opt-in (set to 'true') to relay mobile push notifications through
   // Bitwarden's public push service. Disabled by default so a deployment never
   // registers an installation with / sends device tokens to a third party
   // unless the operator explicitly enables it.
   PUSH_RELAY_ENABLED?: string;
-=======
   YUBICO_CLIENT_ID?: string;
   YUBICO_SECRET_KEY?: string;
   YUBICO_VALIDATION_URLS?: string;
   'globalSettings__yubico__clientId'?: string;
   'globalSettings__yubico__key'?: string;
   'globalSettings__yubico__validationUrls'?: string;
->>>>>>> a0f832e8a5fb31b31f64e466201a4f947fbb0e48
 }
 
 export type UserRole = 'admin' | 'user';

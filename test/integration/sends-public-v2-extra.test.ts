@@ -1,5 +1,7 @@
-import { SELF } from 'cloudflare:test';
+import { SELF, env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { SendAuthType } from '../../src/types';
+import { StorageService } from '../../src/services/storage';
 import { ENC_STRING, Session, api, authenticate, baseHeaders, enc, url } from './helpers';
 
 // v2 public Send access gaps: the bearer-token file-download flow
@@ -90,14 +92,23 @@ describe('send_access grant password branch', () => {
 
 describe('send_access grant email-auth branch', () => {
   it('refuses an email-authenticated send as unsupported', async () => {
+    // Upstream v1.7.3 stopped accepting email auth through the API (create/update
+    // now return 501), so seed a legacy email-auth send straight into storage to
+    // exercise the send_access grant's hasEmailAuth refusal branch.
     const send = (await (await api('POST', '/api/sends', token, {
-      type: 0, name: enc('s'), key: ENC_STRING, authType: 0, emails: ['recipient@example.test'],
+      type: 0, name: enc('s'), key: ENC_STRING,
       deletionDate: new Date(Date.now() + 7 * 86_400_000).toISOString(),
       text: { text: enc('secret'), hidden: false },
     })).json()) as any;
 
+    const storage = new StorageService((env as any).DB);
+    const stored = await storage.getSend(send.id);
+    stored!.authType = SendAuthType.Email;
+    stored!.emails = 'recipient@example.test';
+    await storage.saveSend(stored!);
+
     const res = await grant({ send_id: send.id });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(501);
     expect(((await res.json()) as any).send_access_error_type).toBe('email_verification_not_supported');
   });
 });

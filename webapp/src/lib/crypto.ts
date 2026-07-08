@@ -421,7 +421,7 @@ function parseGoogleMigrationOtpParameter(bytes: Uint8Array): GoogleAuthenticato
 }
 
 function parseGoogleAuthenticatorMigration(raw: string): GoogleAuthenticatorMigrationTotp[] {
-  let data = '';
+  let data: string;
   try {
     data = new URL(raw).searchParams.get('data') || '';
   } catch {

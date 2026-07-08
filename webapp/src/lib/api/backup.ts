@@ -196,22 +196,14 @@ export async function exportAdminBackup(
 
 export async function downloadAdminBackupAttachmentBlob(
   authedFetch: AuthedFetch,
-<<<<<<< HEAD
-  blobName: string
-): Promise<Uint8Array<ArrayBuffer>> {
-  const params = new URLSearchParams();
-  params.set('blobName', blobName);
-  const resp = await authedFetch(`/api/admin/backup/blob?${params.toString()}`, { method: 'GET' });
-=======
   blobName: string,
   masterPasswordHash: string
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   const resp = await authedFetch('/api/admin/backup/blob', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ blobName, masterPasswordHash }),
   });
->>>>>>> a0f832e8a5fb31b31f64e466201a4f947fbb0e48
   if (!resp.ok) throw new Error(await parseErrorMessage(resp, t('txt_backup_export_failed')));
   return new Uint8Array(await resp.arrayBuffer());
 }

@@ -1,4 +1,4 @@
-import { SELF } from 'cloudflare:test';
+import { SELF, env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { ENC_STRING, Session, api, authenticate, baseHeaders, url } from './helpers';
 
@@ -107,6 +107,13 @@ describe('auth request update guards', () => {
   });
 
   it('400s answering a superseded request for the same device', async () => {
+    // Upstream added a strict 5/min auth-request-create budget keyed by IP/email/
+    // device. Earlier tests in this file share this account's email and IP, so the
+    // budget is already spent — clear the auth-request buckets so this test can
+    // create the two requests it needs to exercise the supersede guard.
+    await (env as { DB: D1Database }).DB
+      .prepare("DELETE FROM rate_limit_buckets WHERE bucket_key LIKE 'auth-request:%'")
+      .run();
     const deviceIdentifier = crypto.randomUUID();
     const first = await create({ deviceIdentifier });
     await create({ deviceIdentifier }); // a newer request supersedes the first

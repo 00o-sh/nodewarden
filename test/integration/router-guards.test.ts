@@ -23,10 +23,14 @@ describe('router guards', () => {
     expect(res.status).toBe(200);
   });
 
-  it('rejects a request whose Content-Length exceeds the body cap (413)', async () => {
+  it('rejects a body-bearing request whose Content-Length exceeds the body cap (413)', async () => {
+    // The body cap now only applies to methods that carry a body; send an actual
+    // oversized POST body so the guard trips on Content-Length before routing.
+    const oversized = new Uint8Array(26 * 1024 * 1024);
     const res = await SELF.fetch(url('/api/web-bootstrap'), {
-      method: 'GET',
-      headers: { 'CF-Connecting-IP': '203.0.113.5', 'Content-Length': String(26 * 1024 * 1024) },
+      method: 'POST',
+      headers: { 'CF-Connecting-IP': '203.0.113.5' },
+      body: oversized,
     });
     expect(res.status).toBe(413);
   });

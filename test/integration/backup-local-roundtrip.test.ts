@@ -125,20 +125,29 @@ describe('local backup export/import round-trip', () => {
   it('serves a backup attachment blob by name and 404s a missing one', async () => {
     const { blobName, bytes } = await uploadAttachment('blob-endpoint-secret');
 
-    const ok = await SELF.fetch(url(`/api/admin/backup/blob?blobName=${blobName}`), {
-      headers: baseHeaders({ Authorization: `Bearer ${token}` }),
+    const ok = await SELF.fetch(url('/api/admin/backup/blob'), {
+      method: 'POST',
+      headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ blobName, masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(ok.status).toBe(200);
     expect(new Uint8Array(await ok.arrayBuffer())).toEqual(bytes);
 
-    const missing = await SELF.fetch(url(`/api/admin/backup/blob?blobName=${crypto.randomUUID()}/${crypto.randomUUID()}`), {
-      headers: baseHeaders({ Authorization: `Bearer ${token}` }),
+    const missing = await SELF.fetch(url('/api/admin/backup/blob'), {
+      method: 'POST',
+      headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        blobName: `${crypto.randomUUID()}/${crypto.randomUUID()}`,
+        masterPasswordHash: session.account.masterPasswordHash,
+      }),
     });
     expect(missing.status).toBe(404);
 
     // A path-traversal blob name is rejected before any storage access.
-    const invalid = await SELF.fetch(url('/api/admin/backup/blob?blobName=../../etc/passwd'), {
-      headers: baseHeaders({ Authorization: `Bearer ${token}` }),
+    const invalid = await SELF.fetch(url('/api/admin/backup/blob'), {
+      method: 'POST',
+      headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ blobName: '../../etc/passwd', masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(invalid.status).toBe(400);
   });

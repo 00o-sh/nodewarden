@@ -384,15 +384,15 @@ describe('buildBitwardenCsvString', () => {
   it('serializes an unknown source type record generically and skips a missing known record', () => {
     const csv = buildBitwardenCsvString({
       items: [
-        // Unknown type 6 -> source label "type 6" is not in the known-field map,
+        // Unknown type 9 -> source label "type 9" is not in the known-field map,
         // so its record falls through to the generic record serializer.
-        { type: 6, name: 'Custom', 'type 6': { alpha: 'A' } },
+        { type: 9, name: 'Custom', 'type 9': { alpha: 'A' } },
         // Card type (3) but the card payload is absent -> the known-field helper
         // hits its non-record guard and emits nothing extra.
         { type: 3, name: 'Cardless' },
       ],
     } as Record<string, unknown>);
-    expect(csv).toContain('type 6.alpha: A');
+    expect(csv).toContain('type 9.alpha: A');
     expect(csv).toContain('Cardless');
   });
 

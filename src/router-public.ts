@@ -49,7 +49,7 @@ export interface WebBootstrapResponse {
   websiteIconsEnabled: boolean;
 }
 
-function isWebsiteIconProxyEnabled(env: Env): boolean {
+function isWebsiteIconProxyEnabled(_env: Env): boolean {
   return true;
 }
 
