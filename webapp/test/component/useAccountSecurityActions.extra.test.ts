@@ -294,6 +294,53 @@ describe('useAccountSecurityActions - yubikey + two-factor passkey', () => {
     });
   });
 
+  // The sibling cases above each cover one guard per action; these fill in the
+  // complementary guard (the profile-null OR empty-password branch the earlier
+  // test for that action did not exercise), plus the passkey default-name path.
+  describe('remaining guard branches', () => {
+    it('saveYubiKeySettings throws when profile is null', async () => {
+      const { actions } = render({ profile: null });
+      await expect(actions.saveYubiKeySettings(['k'], false, 'pw')).rejects.toThrow(t('txt_profile_unavailable'));
+    });
+
+    it('saveYubiKeyApiCredentials throws when the password is empty', async () => {
+      const { actions } = render();
+      await expect(actions.saveYubiKeyApiCredentials('cid', 'sk', '')).rejects.toThrow(t('txt_master_password_is_required'));
+    });
+
+    it('bootstrapYubiKeyApiCredentials throws when profile is null', async () => {
+      const { actions } = render({ profile: null });
+      await expect(actions.bootstrapYubiKeyApiCredentials('otp', 'pw')).rejects.toThrow(t('txt_profile_unavailable'));
+    });
+
+    it('getTwoFactorPasskeySettings throws when profile is null', async () => {
+      const { actions } = render({ profile: null });
+      await expect(actions.getTwoFactorPasskeySettings('pw')).rejects.toThrow(t('txt_profile_unavailable'));
+    });
+
+    it('deleteTwoFactorPasskey throws when profile is null', async () => {
+      const { actions } = render({ profile: null });
+      await expect(actions.deleteTwoFactorPasskey(1, 'pw')).rejects.toThrow(t('txt_profile_unavailable'));
+    });
+
+    it('disableTwoFactorPasskeys throws when the password is empty', async () => {
+      const { actions } = render();
+      await expect(actions.disableTwoFactorPasskeys('')).rejects.toThrow(t('txt_master_password_is_required'));
+    });
+
+    it('createTwoFactorPasskey uses the default name for an empty name', async () => {
+      mockAuth.getTwoFactorPasskeyChallenge.mockResolvedValue({} as any);
+      mockPasskeys.createTwoFactorPasskeyCredential.mockResolvedValue({} as any);
+      mockAuth.saveTwoFactorPasskey.mockResolvedValue({} as any);
+      const { actions } = render();
+      await actions.createTwoFactorPasskey('', 'pw');
+      expect(mockAuth.saveTwoFactorPasskey).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ name: t('txt_passkey') })
+      );
+    });
+  });
+
   describe('disableTwoFactorPasskeys', () => {
     it('throws when profile null', async () => {
       const { actions } = render({ profile: null });

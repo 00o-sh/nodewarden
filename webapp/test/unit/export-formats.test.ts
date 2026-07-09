@@ -595,6 +595,61 @@ describe('buildAccountEncryptedBitwardenJsonString', () => {
     expect(item.sshKey.fingerprint).toBe('fp');
   });
 
+  it('strips decoded (dec*) fields from encrypted login/uri/sshKey records', async () => {
+    // dec* fields are runtime-only decrypted mirrors; the encrypted export must
+    // drop them rather than leak plaintext.
+    const cipher: Cipher = {
+      id: 'd',
+      type: 1,
+      name: 'enc',
+      login: {
+        username: '2.u|s|r',
+        decUsername: 'plaintext-user',
+        uris: [{ uri: '2.u|r|i', decUri: 'https://plain.example', match: 3 }],
+      } as never,
+      sshKey: { privateKey: '2.p|k|y', decPrivateKey: 'PLAINTEXT-KEY', keyFingerprint: 'fp' } as never,
+    };
+    const doc = JSON.parse(
+      await buildAccountEncryptedBitwardenJsonString({ folders: [], ciphers: [cipher], userEncB64, userMacB64 })
+    );
+    const item = doc.items[0];
+    expect('decUsername' in item.login).toBe(false);
+    expect(item.login.username).toBe('2.u|s|r');
+    expect('decUri' in item.login.uris[0]).toBe(false);
+    expect(item.login.uris[0].uri).toBe('2.u|r|i');
+    expect('decPrivateKey' in item.sshKey).toBe(false);
+    expect(item.sshKey.privateKey).toBe('2.p|k|y');
+  });
+
+  it('defensively handles non-object login/uri/sshKey structures', async () => {
+    // isRecord() rejects primitives, so cloneWithoutDecodedFields returns null and
+    // the spread falls back to an empty object without throwing.
+    // Cipher A: login is itself a primitive.
+    const cipherA: Cipher = { id: 'ma', type: 1, name: 'enc', login: 'not-an-object' as never };
+    // Cipher B: login is a record but a uri entry and the sshKey are primitives.
+    const cipherB: Cipher = {
+      id: 'mb',
+      type: 1,
+      name: 'enc',
+      login: { uris: ['not-an-object'] } as never,
+      sshKey: 'not-an-object' as never,
+    };
+    const doc = JSON.parse(
+      await buildAccountEncryptedBitwardenJsonString({ folders: [], ciphers: [cipherA, cipherB], userEncB64, userMacB64 })
+    );
+    const [a, b] = doc.items;
+    // primitive login -> normalized record with null credential fields, empty uris
+    expect(a.login.username).toBeNull();
+    expect(a.login.password).toBeNull();
+    expect(a.login.uris).toEqual([]);
+    // uri primitive -> mapped to a normalized record with null fields
+    expect(b.login.uris[0].uri).toBeNull();
+    expect(b.login.uris[0].uriChecksum).toBeNull();
+    // sshKey primitive -> normalized record with null key fields
+    expect(b.sshKey.privateKey).toBeNull();
+    expect(b.sshKey.publicKey).toBeNull();
+  });
+
   it('defaults missing optional structures to null/[] in encrypted mode', async () => {
     const bare: Cipher = { id: 'b', type: 1, name: 'enc' };
     const doc = JSON.parse(

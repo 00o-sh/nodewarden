@@ -58,4 +58,44 @@ describe('<ConfirmDialog>', () => {
     setup({ hideCancel: true });
     expect(screen.queryByRole('button', { name: 'Keep' })).not.toBeInTheDocument();
   });
+
+  it('omits aria-describedby when no message is provided', () => {
+    // With no `message`, hasMessage is false so the dialog must not point
+    // aria-describedby at a (nonexistent) message node.
+    render(
+      <ConfirmDialog
+        open
+        title="No message here"
+        onConfirm={() => {}}
+        onCancel={() => {}}
+      />
+    );
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).not.toHaveAttribute('aria-describedby');
+  });
+
+  it('routes the header close button to onCancel, but ignores it while cancel is disabled', () => {
+    // Enabled close button dismisses via onCancel.
+    const { onCancel } = setup({ closeButton: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+
+    // With cancelDisabled, the guard short-circuits the handler so onCancel
+    // never fires even if a click event reaches the disabled button.
+    const onCancel2 = vi.fn();
+    render(
+      <ConfirmDialog
+        open
+        title="Busy"
+        message="working"
+        closeButton
+        cancelDisabled
+        onConfirm={() => {}}
+        onCancel={onCancel2}
+      />
+    );
+    const closeButtons = screen.getAllByRole('button', { name: 'Close' });
+    fireEvent.click(closeButtons[closeButtons.length - 1]);
+    expect(onCancel2).not.toHaveBeenCalled();
+  });
 });

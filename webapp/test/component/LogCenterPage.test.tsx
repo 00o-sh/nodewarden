@@ -152,4 +152,49 @@ describe('<LogCenterPage>', () => {
     // first log selected by default; its metadata ip should be visible in detail panel
     expect(screen.getByText('1.1.1.1')).toBeInTheDocument();
   });
+
+  it('derives the target from metadata.targetEmail and humanizes a metadata "type" value', async () => {
+    const entry: AuditLogEntry = {
+      id: 'log-target',
+      actorUserId: 'u9',
+      actorEmail: 'actor@example.com',
+      action: 'auth.login',
+      category: 'auth',
+      level: 'info',
+      targetType: null,
+      targetId: null,
+      targetUserEmail: null,
+      // metadata.targetEmail (a string) is used as the target fallback; the
+      // "type" key is routed through formatTargetType -> humanized "Session".
+      metadata: JSON.stringify({ targetEmail: 'meta-target@example.com', type: 'session' }),
+      createdAt: '2030-03-01T00:00:00.000Z',
+    };
+    const handlers = setup({ onLoadLogs: vi.fn().mockResolvedValue(makeResult([entry])) });
+    await waitFor(() => expect(handlers.onLoadLogs).toHaveBeenCalled());
+
+    // Target row resolves to the metadata email (also echoed in the metadata list).
+    await waitFor(() => expect(screen.getAllByText('meta-target@example.com').length).toBeGreaterThanOrEqual(1));
+    // The metadata "type" value is formatted as a humanized target type.
+    expect(screen.getByText('Session')).toBeInTheDocument();
+  });
+
+  it('formats the target from targetType when no email/id is present', async () => {
+    const entry: AuditLogEntry = {
+      id: 'log-type-target',
+      actorUserId: 'u10',
+      actorEmail: 'actor@example.com',
+      action: 'auth.login',
+      category: 'auth',
+      level: 'info',
+      targetType: 'session',
+      targetId: null,
+      targetUserEmail: null,
+      metadata: null,
+      createdAt: '2030-04-01T00:00:00.000Z',
+    };
+    const handlers = setup({ onLoadLogs: vi.fn().mockResolvedValue(makeResult([entry])) });
+    await waitFor(() => expect(handlers.onLoadLogs).toHaveBeenCalled());
+    // formatLogTarget falls through to formatTargetType('session') => "Session".
+    await screen.findByText('Session');
+  });
 });

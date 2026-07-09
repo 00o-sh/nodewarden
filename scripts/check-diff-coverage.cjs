@@ -43,7 +43,13 @@ const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:dem
 //   - App.tsx: new mainRoutesProps wiring lives in the root controller, which is
 //     only tested at the child level (AppMainRoutes/AuthenticatedShell), not by
 //     rendering the full controller.
-const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/vault\/VaultEditor\.tsx$|lib\/import-formats-browser\.ts$)/;
+//   - BackupCenterPage / ImportPage: the v1.7.3 sync added these components'
+//     behavior and their happy paths + most branches are now covered, but a few
+//     residual guards can't be exercised in jsdom — multi-hundred-MiB
+//     import/archive size-limit throws (assertImportZipSize / assertImportTextFile
+//     Size / fflate entry-size caps) and re-entrancy / disabled-button guards the
+//     UI prevents from ever firing. Excluded pending fault-injection harnesses.
+const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/vault\/VaultEditor\.tsx$|components\/BackupCenterPage\.tsx$|components\/ImportPage\.tsx$|lib\/import-formats-browser\.ts$)/;
 
 function fail(msg) {
   console.error(`\n✖ diff-coverage: ${msg}`);

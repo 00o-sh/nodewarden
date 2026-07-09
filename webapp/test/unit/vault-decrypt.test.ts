@@ -247,6 +247,22 @@ describe('decryptVaultCore - bank/license/passport objects', () => {
     expect(pp.decIssuingCountry).toBe('GB');
   });
 
+  it('returns a non-object bank/license/passport value unchanged', async () => {
+    // decryptCipherObjectFields guards against non-object sources and returns them
+    // verbatim rather than trying to walk fields.
+    const cipher: Cipher = {
+      id: '1',
+      type: 6,
+      bankAccount: 'not-an-object' as never,
+      driversLicense: 'still-not' as never,
+      passport: 'nope' as never,
+    };
+    const result = await decryptVaultCore({ folders: [], ciphers: [cipher], symEncKeyB64, symMacKeyB64 });
+    expect(result.ciphers[0].bankAccount).toBe('not-an-object');
+    expect(result.ciphers[0].driversLicense).toBe('still-not');
+    expect(result.ciphers[0].passport).toBe('nope');
+  });
+
   it('decrypts bank fields using a wrapped item key', async () => {
     const { itemEnc, itemMac, wrappedKey } = await makeItemKey();
     const cipher: Cipher = {

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { unzipSync, zipSync } from 'fflate';
 import { t } from '@/lib/i18n';
 import {
+  buildCompleteAdminBackupExport,
   deleteRemoteBackup,
   exportAdminBackup,
   extractBackupFileChecksumPrefix,
@@ -61,6 +63,62 @@ describe('api/backup exportAdminBackup', () => {
 
   it('throws the localized failure message on error', async () => {
     await expect(exportAdminBackup(vi.fn(fail()) as any, 'HASH')).rejects.toThrow(t('txt_backup_export_failed'));
+  });
+});
+
+describe('api/backup buildCompleteAdminBackupExport', () => {
+  it('fetches each manifest attachment blob and folds it into the rebuilt archive', async () => {
+    const manifest = {
+      attachmentBlobs: [{ blobName: 'blob-1', cipherId: 'ci1', attachmentId: 'at1' }],
+    };
+    const zipBytes = zipSync({
+      'manifest.json': new TextEncoder().encode(JSON.stringify(manifest)),
+    });
+    const attachmentBytes = new Uint8Array([4, 5, 6]);
+
+    const authedFetch = vi.fn((url: string) => {
+      if (url === '/api/admin/backup/export') {
+        return Promise.resolve(
+          new Response(zipBytes, {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/zip',
+              'Content-Disposition': 'attachment; filename="my_backup.zip"',
+            },
+          })
+        );
+      }
+      // /api/admin/backup/blob
+      return Promise.resolve(new Response(attachmentBytes, { status: 200 }));
+    });
+
+    const result = await buildCompleteAdminBackupExport(authedFetch as any, 'HASH', true);
+
+    // Second call downloads the blob referenced by the manifest (line 252).
+    const blobCall = authedFetch.mock.calls.find((c) => c[0] === '/api/admin/backup/blob');
+    expect(blobCall).toBeTruthy();
+    expect(JSON.parse((blobCall![1] as any).body)).toEqual({
+      blobName: 'blob-1',
+      masterPasswordHash: 'HASH',
+    });
+
+    // The rebuilt archive embeds the fetched blob at the manifest-derived path.
+    const rebuilt = unzipSync(result.bytes);
+    expect(Array.from(rebuilt['attachments/ci1/at1.bin'])).toEqual([4, 5, 6]);
+  });
+
+  it('surfaces a blob download failure', async () => {
+    const manifest = { attachmentBlobs: [{ blobName: 'blob-x', cipherId: 'c', attachmentId: 'a' }] };
+    const zipBytes = zipSync({ 'manifest.json': new TextEncoder().encode(JSON.stringify(manifest)) });
+    const authedFetch = vi.fn((url: string) => {
+      if (url === '/api/admin/backup/export') {
+        return Promise.resolve(new Response(zipBytes, { status: 200 }));
+      }
+      return Promise.resolve(new Response(null, { status: 500 }));
+    });
+    await expect(buildCompleteAdminBackupExport(authedFetch as any, 'HASH', true)).rejects.toThrow(
+      t('txt_backup_export_failed')
+    );
   });
 });
 

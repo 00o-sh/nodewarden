@@ -135,6 +135,55 @@ describe('AppGlobalOverlays', () => {
     expect(props.onCancelTotp).toHaveBeenCalledTimes(1);
   });
 
+  // Provider type constants mirrored from the component.
+  const PROVIDER_AUTHENTICATOR = 0;
+  const PROVIDER_YUBIKEY = 3;
+  const PROVIDER_WEBAUTHN = 7;
+
+  it('renders the YubiKey OTP prompt variant and switches provider via the method chooser', () => {
+    const props = buildProps({
+      pendingTotpOpen: true,
+      pendingTotpProviderType: PROVIDER_YUBIKEY,
+      pendingTotpAvailableProviders: [PROVIDER_WEBAUTHN, PROVIDER_YUBIKEY, PROVIDER_AUTHENTICATOR],
+    });
+    render(<AppGlobalOverlays {...props} />);
+    const dialog = openDialog();
+
+    // YubiKey title + press-to-authenticate copy, and a masked OTP input.
+    expect(within(dialog).getByText('Two-step verification YubiKey')).toBeInTheDocument();
+    expect(within(dialog).getByText('Press your YubiKey to authenticate.')).toBeInTheDocument();
+    const otpInput = within(dialog).getByLabelText('OTP from YubiKey') as HTMLInputElement;
+    expect(otpInput.type).toBe('password');
+
+    // Alternate providers (all except the current YubiKey) drive the switcher.
+    const switcher = within(dialog).getByText('Select another verification method');
+    fireEvent.click(switcher);
+    // The chooser lists Passkey (WebAuthn) and Authenticator app alternates.
+    fireEvent.click(within(dialog).getByText('Passkey'));
+    expect(props.onSelectTotpProvider).toHaveBeenCalledWith(PROVIDER_WEBAUTHN);
+  });
+
+  it('renders the WebAuthn/passkey prompt variant with its passkey note and no code field', () => {
+    const props = buildProps({
+      pendingTotpOpen: true,
+      pendingTotpProviderType: PROVIDER_WEBAUTHN,
+      pendingTotpAvailableProviders: [PROVIDER_WEBAUTHN, PROVIDER_YUBIKEY, PROVIDER_AUTHENTICATOR],
+    });
+    render(<AppGlobalOverlays {...props} />);
+    const dialog = openDialog();
+
+    // Passkey title stack + passkey message + the "touch your passkey" note.
+    expect(within(dialog).getByText('Use your passkey to complete two-step verification.')).toBeInTheDocument();
+    expect(within(dialog).getByText('Continue and approve the browser passkey prompt.')).toBeInTheDocument();
+    // The passkey variant does not render the TOTP code input.
+    expect(within(dialog).queryByLabelText('TOTP Code')).not.toBeInTheDocument();
+
+    // Alternate providers here include YubiKey, exercising its label.
+    fireEvent.click(within(dialog).getByText('Select another verification method'));
+    fireEvent.click(within(dialog).getByText('OTP from YubiKey'));
+    expect(props.onSelectTotpProvider).toHaveBeenCalledWith(PROVIDER_YUBIKEY);
+  });
+
   it('disables TOTP confirm/cancel/recovery while submitting', () => {
     render(<AppGlobalOverlays {...buildProps({ pendingTotpOpen: true, totpSubmitting: true })} />);
     const dialog = openDialog();

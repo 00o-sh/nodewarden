@@ -3,10 +3,12 @@ import { t } from '@/lib/i18n';
 import { bytesToBase64, encryptBw, hkdfExpand, pbkdf2 } from '@/lib/crypto';
 import type { Profile, SessionState } from '@/lib/types';
 import {
+  bootstrapYubiKeyOtpApiCredentials,
   clearProfileSnapshot,
   deleteAccountPasskey,
   deleteAllAuthorizedDevices,
   deleteAuthorizedDevice,
+  deleteTwoFactorPasskey,
   deriveLoginHash,
   deriveLoginHashLocally,
   disableTwoFactorPasskeys,
@@ -17,6 +19,7 @@ import {
   getPreloginKdfConfig,
   getProfile,
   getTotpRecoveryCode,
+  getTwoFactorPasskeyChallenge,
   getTwoFactorPasskeySettings,
   getTwoFactorProviderStatus,
   getVaultRevisionDate,
@@ -28,9 +31,12 @@ import {
   recoverTwoFactor,
   refreshAccessToken,
   revokeAuthorizedDeviceTrust,
+  revokeCurrentSession,
   rotateApiKey,
   saveProfileSnapshot,
   saveSession,
+  saveTwoFactorPasskey,
+  saveYubiKeyOtpApiCredentials,
   saveYubiKeyOtpSettings,
   setTotp,
   stripProfileSecrets,
@@ -71,6 +77,33 @@ describe('auth session persistence', () => {
 
   it('loadSession returns null for corrupt JSON', () => {
     localStorage.setItem('nodewarden.web.session.v4', '{not json');
+    expect(loadSession()).toBeNull();
+  });
+
+  it('loadSession migrates a legacy token-bearing session, stripping the secret material', () => {
+    localStorage.setItem(
+      'nodewarden.web.session.v4',
+      JSON.stringify({ email: 'a@b.com', authMode: 'token', accessToken: 'secret', refreshToken: 'r' })
+    );
+    expect(loadSession()).toEqual({ email: 'a@b.com', authMode: 'token' });
+    // The migration rewrites storage without any token material.
+    expect(JSON.parse(localStorage.getItem('nodewarden.web.session.v4')!)).toEqual({
+      email: 'a@b.com',
+      authMode: 'token',
+    });
+  });
+
+  it('loadSession migrates a legacy web-cookie session and normalizes the authMode', () => {
+    localStorage.setItem(
+      'nodewarden.web.session.v4',
+      JSON.stringify({ email: 'a@b.com', authMode: 'web-cookie', accessToken: 'secret' })
+    );
+    expect(loadSession()).toEqual({ email: 'a@b.com', authMode: 'web-cookie' });
+  });
+
+  it('loadSession returns null when the persisted shape matches no known branch', () => {
+    // email present but no authMode and no tokens => falls through to the final null.
+    localStorage.setItem('nodewarden.web.session.v4', JSON.stringify({ email: 'a@b.com' }));
     expect(loadSession()).toBeNull();
   });
 });
@@ -196,6 +229,65 @@ describe('auth loginWithPassword', () => {
     vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ error: 'invalid_grant' }, 400)));
     const result = await loginWithPassword('a@b.com', 'HASH');
     expect((result as any).error).toBe('invalid_grant');
+  });
+
+  it('sends the stored remember token as provider 5 when useRememberToken is set', async () => {
+    localStorage.setItem('nodewarden.web.totp.remember-token.v1', 'REMEMBER');
+    const fetchMock = vi.fn(() => jsonResponse({ access_token: 'at' }));
+    vi.stubGlobal('fetch', fetchMock);
+    await loginWithPassword('a@b.com', 'HASH', { useRememberToken: true });
+    const params = new URLSearchParams(fetchMock.mock.calls[0][1].body);
+    expect(params.get('twoFactorProvider')).toBe('5');
+    expect(params.get('twoFactorToken')).toBe('REMEMBER');
+  });
+
+  // When a remembered-device login is rejected *with* a fresh two-factor
+  // challenge, the stale remember token is cleared. Exercise every shape the
+  // hasTwoFactorChallenge helper understands.
+  const challengeShapes: Array<[string, Record<string, unknown>]> = [
+    ['TwoFactorProviders array', { TwoFactorProviders: [1] }],
+    ['TwoFactorProviders object', { TwoFactorProviders: { '1': null } }],
+    ['TwoFactorProviders2 array', { TwoFactorProviders2: [{ '1': {} }] }],
+    ['TwoFactorProviders2 object', { TwoFactorProviders2: { '1': {} } }],
+  ];
+  for (const [label, body] of challengeShapes) {
+    it(`clears the remember token when a remembered login is met with a ${label} challenge`, async () => {
+      localStorage.setItem('nodewarden.web.totp.remember-token.v1', 'REMEMBER');
+      vi.stubGlobal('fetch', vi.fn(() => jsonResponse(body, 400)));
+      const result = await loginWithPassword('a@b.com', 'HASH', { useRememberToken: true });
+      expect(result).toMatchObject(body);
+      expect(localStorage.getItem('nodewarden.web.totp.remember-token.v1')).toBeNull();
+    });
+  }
+
+  it('keeps the remember token when a remembered login fails without a two-factor challenge', async () => {
+    localStorage.setItem('nodewarden.web.totp.remember-token.v1', 'REMEMBER');
+    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ error: 'invalid_grant' }, 400)));
+    await loginWithPassword('a@b.com', 'HASH', { useRememberToken: true });
+    // No challenge => nothing to invalidate; the token is preserved.
+    expect(localStorage.getItem('nodewarden.web.totp.remember-token.v1')).toBe('REMEMBER');
+  });
+});
+
+describe('auth revokeCurrentSession', () => {
+  it('posts the refresh token and an Authorization header in token mode', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    await revokeCurrentSession({
+      email: 'a@b.com',
+      authMode: 'token',
+      accessToken: 'AT',
+      refreshToken: 'RT',
+    } as SessionState);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/identity/connect/revocation');
+    expect(init.headers.Authorization).toBe('Bearer AT');
+    expect(new URLSearchParams(init.body).get('token')).toBe('RT');
+  });
+
+  it('swallows network errors', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('offline'))));
+    await expect(revokeCurrentSession({ email: 'a', authMode: 'web-cookie' } as SessionState)).resolves.toBeUndefined();
   });
 });
 
@@ -358,6 +450,159 @@ describe('auth account passkeys', () => {
     const [url, init] = authedFetch.mock.calls[0];
     expect(url).toBe('/api/webauthn/k%201/delete');
     expect(JSON.parse(init.body)).toEqual({ masterPasswordHash: 'H' });
+  });
+});
+
+describe('auth two-factor error + passkey management', () => {
+  it('getYubiKeyOtpSettings surfaces the translated error on failure', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ error_description: 'wrong password' }, 400));
+    await expect(getYubiKeyOtpSettings(authedFetch as any, 'H')).rejects.toThrow('wrong password');
+  });
+
+  it('saveYubiKeyOtpSettings surfaces the translated error on failure', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ error_description: 'save failed' }, 400));
+    await expect(
+      saveYubiKeyOtpSettings(authedFetch as any, { keys: ['a'], nfc: true, masterPasswordHash: 'H' })
+    ).rejects.toThrow('save failed');
+  });
+
+  it('saveYubiKeyOtpApiCredentials PUTs the config payload and returns normalized settings', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ Enabled: true, YubicoClientId: 'cid' }));
+    const settings = await saveYubiKeyOtpApiCredentials(authedFetch as any, {
+      masterPasswordHash: 'H',
+      yubicoClientId: 'cid',
+      yubicoSecretKey: 'secret',
+    });
+    const [url, init] = authedFetch.mock.calls[0];
+    expect(url).toBe('/api/two-factor/yubikey/config');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body)).toEqual({
+      masterPasswordHash: 'H',
+      yubicoClientId: 'cid',
+      yubicoSecretKey: 'secret',
+    });
+    expect(settings).toMatchObject({ enabled: true, yubicoClientId: 'cid' });
+  });
+
+  it('saveYubiKeyOtpApiCredentials surfaces the translated error on failure', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ error_description: 'bad config' }, 400));
+    await expect(
+      saveYubiKeyOtpApiCredentials(authedFetch as any, {
+        masterPasswordHash: 'H',
+        yubicoClientId: 'c',
+        yubicoSecretKey: 's',
+      })
+    ).rejects.toThrow('bad config');
+  });
+
+  it('bootstrapYubiKeyOtpApiCredentials POSTs the otp payload and returns normalized settings', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ enabled: false }));
+    const settings = await bootstrapYubiKeyOtpApiCredentials(authedFetch as any, {
+      masterPasswordHash: 'H',
+      otp: 'ccccc',
+    });
+    const [url, init] = authedFetch.mock.calls[0];
+    expect(url).toBe('/api/two-factor/yubikey/bootstrap');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ masterPasswordHash: 'H', otp: 'ccccc' });
+    expect(settings.enabled).toBe(false);
+  });
+
+  it('bootstrapYubiKeyOtpApiCredentials surfaces the translated error on failure', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ error_description: 'auto config failed' }, 400));
+    await expect(
+      bootstrapYubiKeyOtpApiCredentials(authedFetch as any, { masterPasswordHash: 'H', otp: 'x' })
+    ).rejects.toThrow('auto config failed');
+  });
+
+  it('disableYubiKeyOtp surfaces the translated error on failure', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ error_description: 'cannot disable' }, 400));
+    await expect(disableYubiKeyOtp(authedFetch as any, 'H')).rejects.toThrow('cannot disable');
+  });
+
+  it('getTwoFactorPasskeySettings normalizes PascalCase server fields', async () => {
+    const authedFetch = vi.fn(() =>
+      jsonResponse({ Enabled: true, Keys: [{ Id: 2, Name: 'YubiBio', Migrated: false }] })
+    );
+    const settings = await getTwoFactorPasskeySettings(authedFetch as any, 'H');
+    expect(settings.enabled).toBe(true);
+    expect(settings.keys).toEqual([{ id: 2, name: 'YubiBio', migrated: false }]);
+  });
+
+  it('getTwoFactorPasskeySettings surfaces the translated error on failure', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ error_description: 'verify failed' }, 400));
+    await expect(getTwoFactorPasskeySettings(authedFetch as any, 'H')).rejects.toThrow('verify failed');
+  });
+
+  it('getTwoFactorPasskeyChallenge POSTs the hash and returns the parsed challenge', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ challenge: 'CH', token: 'T' }));
+    const result = await getTwoFactorPasskeyChallenge(authedFetch as any, 'H');
+    const [url, init] = authedFetch.mock.calls[0];
+    expect(url).toBe('/api/two-factor/get-webauthn-challenge');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ masterPasswordHash: 'H' });
+    expect(result).toEqual({ challenge: 'CH', token: 'T' });
+  });
+
+  it('getTwoFactorPasskeyChallenge surfaces the translated error on failure', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ error_description: 'setup failed' }, 400));
+    await expect(getTwoFactorPasskeyChallenge(authedFetch as any, 'H')).rejects.toThrow('setup failed');
+  });
+
+  it('saveTwoFactorPasskey PUTs the payload verbatim and returns normalized settings', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ enabled: true, keys: [{ id: 3, name: 'K', migrated: true }] }));
+    const payload = { name: 'K', masterPasswordHash: 'H', deviceResponse: { r: 1 } };
+    const settings = await saveTwoFactorPasskey(authedFetch as any, payload);
+    const [url, init] = authedFetch.mock.calls[0];
+    expect(url).toBe('/api/two-factor/webauthn');
+    expect(init.method).toBe('PUT');
+    expect(JSON.parse(init.body)).toEqual(payload);
+    expect(settings.keys).toEqual([{ id: 3, name: 'K', migrated: true }]);
+  });
+
+  it('saveTwoFactorPasskey surfaces the translated error on failure', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ error_description: 'setup failed' }, 400));
+    await expect(
+      saveTwoFactorPasskey(authedFetch as any, { name: 'K', masterPasswordHash: 'H', deviceResponse: {} })
+    ).rejects.toThrow('setup failed');
+  });
+
+  it('deleteTwoFactorPasskey DELETEs the payload and returns normalized settings', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ enabled: false, keys: [] }));
+    const settings = await deleteTwoFactorPasskey(authedFetch as any, { id: 4, masterPasswordHash: 'H' });
+    const [url, init] = authedFetch.mock.calls[0];
+    expect(url).toBe('/api/two-factor/webauthn');
+    expect(init.method).toBe('DELETE');
+    expect(JSON.parse(init.body)).toEqual({ id: 4, masterPasswordHash: 'H' });
+    expect(settings).toEqual({ enabled: false, keys: [] });
+  });
+
+  it('deleteTwoFactorPasskey surfaces the translated error on failure', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ error_description: 'delete failed' }, 400));
+    await expect(
+      deleteTwoFactorPasskey(authedFetch as any, { id: 4, masterPasswordHash: 'H' })
+    ).rejects.toThrow('delete failed');
+  });
+
+  it('disableTwoFactorPasskeys surfaces the translated error on failure', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ error_description: 'cannot disable passkeys' }, 400));
+    await expect(disableTwoFactorPasskeys(authedFetch as any, 'H')).rejects.toThrow('cannot disable passkeys');
+  });
+
+  it('getTwoFactorProviderStatus throws when the request fails', async () => {
+    const authedFetch = vi.fn(() => jsonResponse(null, 500));
+    await expect(getTwoFactorProviderStatus(authedFetch as any)).rejects.toThrow(
+      'Failed to load two-factor status'
+    );
+  });
+
+  it('getTwoFactorProviderStatus maps PascalCase Data/Type fields', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ Data: [{ Type: 3 }] }));
+    expect(await getTwoFactorProviderStatus(authedFetch as any)).toEqual({
+      totpEnabled: false,
+      yubikeyEnabled: true,
+      passkeyEnabled: false,
+    });
   });
 });
 

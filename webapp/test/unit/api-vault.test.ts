@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { bytesToBase64, decryptStr } from '@/lib/crypto';
-import type { SessionState } from '@/lib/types';
+import { bytesToBase64, decryptStr, encryptBw } from '@/lib/crypto';
+import type { Cipher, SessionState } from '@/lib/types';
 import {
   archiveCipher,
   buildCipherImportPayload,
@@ -23,6 +23,7 @@ import {
   importCiphers,
   permanentDeleteCipher,
   repairCipherAttachmentMetadata,
+  repairCipherKeyMismatches,
   unarchiveCipher,
   updateCipher,
   updateFolder,
@@ -402,5 +403,221 @@ describe('api/vault bulk operations', () => {
 
   it('throws when a bulk chunk fails', async () => {
     await expect(bulkDeleteCiphers(vi.fn(fail()) as any, ['a'])).rejects.toThrow('Bulk delete failed');
+  });
+});
+
+// Session symmetric keys used by unlockedSession(), so encrypted payload fields
+// round-trip through decryptStr with these raw byte keys.
+const USER_ENC = new Uint8Array(32).fill(7);
+const USER_MAC = new Uint8Array(32).fill(9);
+
+describe('api/vault buildCipherImportPayload for bank/license/passport items', () => {
+  it('encrypts bank account fields, leaving unset fields null (type 6)', async () => {
+    const draft = {
+      type: 6,
+      name: 'My Bank',
+      notes: '',
+      favorite: false,
+      reprompt: false,
+      folderId: '',
+      bankName: 'Chase',
+      bankAccountNumber: '000123456',
+      bankRoutingNumber: '021000021',
+      customFields: [],
+    };
+    const payload = await buildCipherImportPayload(unlockedSession(), draft as any);
+    expect(payload.type).toBe(6);
+    const bank = payload.bankAccount as Record<string, string | null>;
+    // Filled fields are Bitwarden cipher strings that decrypt back to the plaintext.
+    expect(bank.bankName).toMatch(/^2\./);
+    expect(await decryptStr(bank.bankName!, USER_ENC, USER_MAC)).toBe('Chase');
+    expect(await decryptStr(bank.accountNumber!, USER_ENC, USER_MAC)).toBe('000123456');
+    expect(await decryptStr(bank.routingNumber!, USER_ENC, USER_MAC)).toBe('021000021');
+    // Empty fields are dropped to null, not encrypted-empty.
+    expect(bank.pin).toBeNull();
+    expect(bank.iban).toBeNull();
+  });
+
+  it('encrypts drivers license fields (type 7)', async () => {
+    const draft = {
+      type: 7,
+      name: 'License',
+      notes: '',
+      favorite: false,
+      reprompt: false,
+      folderId: '',
+      licenseFirstName: 'Ada',
+      licenseNumber: 'DL-99',
+      licenseIssuingState: 'NY',
+      customFields: [],
+    };
+    const payload = await buildCipherImportPayload(unlockedSession(), draft as any);
+    expect(payload.type).toBe(7);
+    const dl = payload.driversLicense as Record<string, string | null>;
+    expect(await decryptStr(dl.firstName!, USER_ENC, USER_MAC)).toBe('Ada');
+    expect(await decryptStr(dl.licenseNumber!, USER_ENC, USER_MAC)).toBe('DL-99');
+    expect(await decryptStr(dl.issuingState!, USER_ENC, USER_MAC)).toBe('NY');
+    expect(dl.licenseClass).toBeNull();
+  });
+
+  it('encrypts passport fields (type 8)', async () => {
+    const draft = {
+      type: 8,
+      name: 'Passport',
+      notes: '',
+      favorite: false,
+      reprompt: false,
+      folderId: '',
+      passportSurname: 'Lovelace',
+      passportNumber: 'P1234567',
+      passportNationality: 'GBR',
+      customFields: [],
+    };
+    const payload = await buildCipherImportPayload(unlockedSession(), draft as any);
+    expect(payload.type).toBe(8);
+    const pp = payload.passport as Record<string, string | null>;
+    expect(await decryptStr(pp.surname!, USER_ENC, USER_MAC)).toBe('Lovelace');
+    expect(await decryptStr(pp.passportNumber!, USER_ENC, USER_MAC)).toBe('P1234567');
+    expect(await decryptStr(pp.nationality!, USER_ENC, USER_MAC)).toBe('GBR');
+    expect(pp.issuingAuthority).toBeNull();
+  });
+});
+
+describe('api/vault updateCipher strips decrypted mirror fields from typed sub-objects', () => {
+  it('drops dec* keys but preserves unknown server fields on a bank account (type 6)', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ id: 'c1' }));
+    const cipher = {
+      id: 'c1',
+      type: 6,
+      bankAccount: { decBankName: 'stale-plain', legacyServerField: 'keep-me' },
+    } as unknown as Cipher;
+    const draft = {
+      type: 6,
+      name: 'Bank',
+      notes: '',
+      favorite: false,
+      reprompt: false,
+      folderId: '',
+      bankName: 'Wells',
+      customFields: [],
+    };
+    await updateCipher(authedFetch as any, unlockedSession(), cipher, draft as any);
+    const body = JSON.parse(lastInit(authedFetch).body);
+    const bank = body.bankAccount as Record<string, unknown>;
+    // decrypted mirror stripped, unknown passthrough field kept, value re-encrypted.
+    expect(bank.decBankName).toBeUndefined();
+    expect(bank.legacyServerField).toBe('keep-me');
+    expect(await decryptStr(bank.bankName as string, USER_ENC, USER_MAC)).toBe('Wells');
+  });
+
+  it('strips dec* keys from an ssh key sub-object and mirrors the fingerprint (type 5)', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ id: 'c1' }));
+    const cipher = {
+      id: 'c1',
+      type: 5,
+      sshKey: { decPrivateKey: 'stale', extraServerField: 'keep' },
+    } as unknown as Cipher;
+    const draft = {
+      type: 5,
+      name: 'Key',
+      notes: '',
+      favorite: false,
+      reprompt: false,
+      folderId: '',
+      sshPrivateKey: 'PRIVATE',
+      sshPublicKey: 'PUBLIC',
+      sshFingerprint: 'FP',
+      customFields: [],
+    };
+    await updateCipher(authedFetch as any, unlockedSession(), cipher, draft as any);
+    const body = JSON.parse(lastInit(authedFetch).body);
+    const ssh = body.sshKey as Record<string, unknown>;
+    expect(ssh.decPrivateKey).toBeUndefined();
+    expect(ssh.extraServerField).toBe('keep');
+    expect(await decryptStr(ssh.privateKey as string, USER_ENC, USER_MAC)).toBe('PRIVATE');
+    // keyFingerprint and fingerprint carry the same encrypted value.
+    expect(ssh.keyFingerprint).toBe(ssh.fingerprint);
+    expect(await decryptStr(ssh.keyFingerprint as string, USER_ENC, USER_MAC)).toBe('FP');
+  });
+});
+
+describe('api/vault repairCipherKeyMismatches re-encrypts typed items under their item key', () => {
+  // Build a cipher whose item key is valid, but one field was mistakenly encrypted
+  // under the user key (a repairable mismatch). The decrypted mirror is present so
+  // the item counts as fully resolved and eligible for repair.
+  async function mismatchedCipher(
+    id: string,
+    type: number,
+    sub: string,
+    fieldName: string,
+    decFieldName: string,
+    plain: string
+  ): Promise<{ cipher: Cipher; itemEnc: Uint8Array; itemMac: Uint8Array }> {
+    const itemKeyBytes = new Uint8Array(64);
+    itemKeyBytes.fill(11, 0, 32);
+    itemKeyBytes.fill(13, 32, 64);
+    const itemEnc = itemKeyBytes.slice(0, 32);
+    const itemMac = itemKeyBytes.slice(32, 64);
+    // Item key wrapped under the user key.
+    const key = await encryptBw(itemKeyBytes, USER_ENC, USER_MAC);
+    // Field encrypted under the USER key instead of the item key => the mismatch.
+    const encryptedUnderUserKey = await encryptBw(new TextEncoder().encode(plain), USER_ENC, USER_MAC);
+    const cipher = {
+      id,
+      type,
+      key,
+      name: 'Item',
+      [sub]: { [fieldName]: encryptedUnderUserKey, [decFieldName]: plain },
+    } as unknown as Cipher;
+    return { cipher, itemEnc, itemMac };
+  }
+
+  it('rewrites bank, license and passport items and reports the repaired count', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ id: 'x' }));
+
+    const bank = await mismatchedCipher('c6', 6, 'bankAccount', 'accountNumber', 'decAccountNumber', 'acct-secret');
+    const license = await mismatchedCipher('c7', 7, 'driversLicense', 'licenseNumber', 'decLicenseNumber', 'DL-secret');
+    const passport = await mismatchedCipher('c8', 8, 'passport', 'passportNumber', 'decPassportNumber', 'PP-secret');
+
+    const repaired = await repairCipherKeyMismatches(authedFetch as any, unlockedSession(), [
+      bank.cipher,
+      license.cipher,
+      passport.cipher,
+    ]);
+
+    expect(repaired).toBe(3);
+    expect(authedFetch).toHaveBeenCalledTimes(3);
+
+    // Each PUT re-encrypts the field under the ITEM key (repair), recovering the plaintext.
+    const bodyFor = (id: string) =>
+      JSON.parse(
+        authedFetch.mock.calls.find((c) => c[0] === `/api/ciphers/${id}`)![1].body
+      );
+
+    const bankBody = bodyFor('c6');
+    expect(bankBody.type).toBe(6);
+    expect(await decryptStr(bankBody.bankAccount.accountNumber, bank.itemEnc, bank.itemMac)).toBe('acct-secret');
+
+    const licenseBody = bodyFor('c7');
+    expect(licenseBody.type).toBe(7);
+    expect(await decryptStr(licenseBody.driversLicense.licenseNumber, license.itemEnc, license.itemMac)).toBe(
+      'DL-secret'
+    );
+
+    const passportBody = bodyFor('c8');
+    expect(passportBody.type).toBe(8);
+    expect(await decryptStr(passportBody.passport.passportNumber, passport.itemEnc, passport.itemMac)).toBe(
+      'PP-secret'
+    );
+  });
+
+  it('skips items whose encrypted fields are still unresolved', async () => {
+    const authedFetch = vi.fn(() => jsonResponse({ id: 'x' }));
+    const { cipher } = await mismatchedCipher('c6', 6, 'bankAccount', 'accountNumber', 'decAccountNumber', 'v');
+    // Remove the decrypted mirror -> hasUnresolvedEncryptedFields() is true -> skipped.
+    delete (cipher as any).bankAccount.decAccountNumber;
+    const repaired = await repairCipherKeyMismatches(authedFetch as any, unlockedSession(), [cipher]);
+    expect(repaired).toBe(0);
+    expect(authedFetch).not.toHaveBeenCalled();
   });
 });

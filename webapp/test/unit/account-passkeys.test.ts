@@ -2,10 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AccountPasskeyPrfUnavailableError,
   assertAccountPasskey,
+  assertTwoFactorPasskey,
   buildAccountPasskeyPrfKeySet,
   buildAccountPasskeyPrfKeySetFromPrfKey,
   canRequestPrfExtension,
   createAccountPasskeyCredential,
+  createTwoFactorPasskeyCredential,
   shouldRetryCreateWithoutPrf,
   unlockVaultKeyWithAccountPasskeyPrf,
   withoutCreatePrfExtension,
@@ -630,6 +632,137 @@ describe('buildAccountPasskeyPrfKeySet (end-to-end from a pending credential)', 
     await expect(
       buildAccountPasskeyPrfKeySet(makePending(rawId), { symEncKey, symMacKey })
     ).rejects.toBeInstanceOf(AccountPasskeyPrfUnavailableError);
+  });
+});
+
+describe('createTwoFactorPasskeyCredential', () => {
+  let credentials: { create: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> };
+
+  function makeCreationOptions(overrides: Record<string, any> = {}) {
+    return {
+      challenge: bytesToBase64Url(CHALLENGE_BYTES),
+      rp: { id: 'example.com', name: 'Example' },
+      user: { id: bytesToBase64Url(USER_ID_BYTES), name: 'a@b.c', displayName: 'A' },
+      pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+      excludeCredentials: [{ id: bytesToBase64Url(EXCLUDE_ID_BYTES), type: 'public-key' }],
+      timeout: 60000,
+      authenticatorSelection: { userVerification: 'required' },
+      ...overrides,
+    };
+  }
+
+  it('throws when the browser lacks WebAuthn', async () => {
+    uninstallWebAuthn();
+    await expect(createTwoFactorPasskeyCredential(makeCreationOptions())).rejects.toThrow(
+      t('txt_passkey_browser_not_supported')
+    );
+  });
+
+  describe('with WebAuthn available', () => {
+    beforeEach(() => {
+      credentials = installWebAuthn();
+    });
+    afterEach(() => {
+      uninstallWebAuthn();
+      vi.clearAllMocks();
+    });
+
+    it('clones the options, creates the credential, and returns the encoded attestation request', async () => {
+      const credential = new FakePublicKeyCredential({
+        id: 'tf-cred',
+        rawId: buf([2, 4, 6, 8]),
+        response: new FakeAuthenticatorAttestationResponse({
+          attestationObject: buf([1, 2]),
+          clientDataJSON: buf([3, 4]),
+          transports: ['usb'],
+        }),
+      });
+      credentials.create.mockResolvedValue(credential);
+
+      const request = await createTwoFactorPasskeyCredential(makeCreationOptions());
+
+      // Options were decoded from base64url into ArrayBuffers before the native call.
+      const passed = credentials.create.mock.calls[0][0].publicKey;
+      expect(new Uint8Array(passed.challenge)).toEqual(CHALLENGE_BYTES);
+      expect(new Uint8Array(passed.user.id)).toEqual(USER_ID_BYTES);
+      // The returned value is the encoded attestation request.
+      expect(request.id).toBe('tf-cred');
+      expect(request.rawId).toBe(bytesToBase64Url(new Uint8Array([2, 4, 6, 8])));
+      expect((request.response as any).attestationObject).toBe(bytesToBase64Url(new Uint8Array([1, 2])));
+      expect((request.response as any).clientDataJson).toBe(bytesToBase64Url(new Uint8Array([3, 4])));
+      expect((request.response as any).transports).toEqual(['usb']);
+    });
+
+    it('throws when navigator returns a non-credential', async () => {
+      credentials.create.mockResolvedValue(null);
+      await expect(createTwoFactorPasskeyCredential(makeCreationOptions())).rejects.toThrow(
+        t('txt_no_passkey_created')
+      );
+    });
+  });
+});
+
+describe('assertTwoFactorPasskey', () => {
+  let credentials: { create: ReturnType<typeof vi.fn>; get: ReturnType<typeof vi.fn> };
+
+  function makeRequestOptions(overrides: Record<string, any> = {}) {
+    return {
+      challenge: bytesToBase64Url(CHALLENGE_BYTES),
+      rpId: 'example.com',
+      allowCredentials: [{ id: bytesToBase64Url(EXCLUDE_ID_BYTES), type: 'public-key' }],
+      timeout: 60000,
+      userVerification: 'preferred',
+      ...overrides,
+    };
+  }
+
+  it('throws when the browser lacks WebAuthn', async () => {
+    uninstallWebAuthn();
+    await expect(assertTwoFactorPasskey(makeRequestOptions())).rejects.toThrow(
+      t('txt_passkey_browser_not_supported')
+    );
+  });
+
+  describe('with WebAuthn available', () => {
+    beforeEach(() => {
+      credentials = installWebAuthn();
+    });
+    afterEach(() => {
+      uninstallWebAuthn();
+      vi.clearAllMocks();
+    });
+
+    it('gets the assertion and returns the encoded assertion request as JSON', async () => {
+      const credential = new FakePublicKeyCredential({
+        id: 'tf-assert',
+        rawId: buf([9, 9]),
+        response: new FakeAuthenticatorAssertionResponse({
+          authenticatorData: buf([1, 2]),
+          signature: buf([3, 4]),
+          clientDataJSON: buf([5, 6]),
+          userHandle: buf([7, 8]),
+        }),
+      });
+      credentials.get.mockResolvedValue(credential);
+
+      const json = await assertTwoFactorPasskey(makeRequestOptions());
+      const parsed = JSON.parse(json);
+
+      const passed = credentials.get.mock.calls[0][0].publicKey;
+      expect(new Uint8Array(passed.challenge)).toEqual(CHALLENGE_BYTES);
+      expect(parsed.id).toBe('tf-assert');
+      expect(parsed.rawId).toBe(bytesToBase64Url(new Uint8Array([9, 9])));
+      expect(parsed.response.authenticatorData).toBe(bytesToBase64Url(new Uint8Array([1, 2])));
+      expect(parsed.response.signature).toBe(bytesToBase64Url(new Uint8Array([3, 4])));
+      expect(parsed.response.userHandle).toBe(bytesToBase64Url(new Uint8Array([7, 8])));
+    });
+
+    it('throws when navigator returns a non-credential', async () => {
+      credentials.get.mockResolvedValue({});
+      await expect(assertTwoFactorPasskey(makeRequestOptions())).rejects.toThrow(
+        t('txt_invalid_passkey_assertion_response')
+      );
+    });
   });
 });
 

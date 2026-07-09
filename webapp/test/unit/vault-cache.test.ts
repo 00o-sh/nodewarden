@@ -215,6 +215,49 @@ describe('vault-cache', () => {
     });
   });
 
+  describe('sanitization', () => {
+    it('strips decrypted (dec*/shareUrl) fields before persisting', async () => {
+      installFakeIndexedDb();
+      const mod = await freshModule();
+      const snapshot = {
+        ciphers: [
+          {
+            id: 'c1',
+            type: 1,
+            name: 'enc-name',
+            decName: 'plaintext',
+            shareUrl: 'https://leak.example',
+            login: { username: 'enc', decUsername: 'plaintext-user' },
+          },
+        ],
+        folders: [{ id: 'f1', name: 'enc', decName: 'Work' }],
+        sends: [],
+      } as never;
+      await mod.saveCachedVaultCoreSnapshot('vk', 1, snapshot);
+      const record = await mod.loadCachedVaultCoreSnapshot('vk');
+      const cipher = (record?.snapshot.ciphers[0] ?? {}) as any;
+      expect(cipher.id).toBe('c1');
+      expect(cipher.name).toBe('enc-name');
+      expect('decName' in cipher).toBe(false);
+      expect('shareUrl' in cipher).toBe(false);
+      // Nested dec* fields are stripped recursively.
+      expect('decUsername' in cipher.login).toBe(false);
+      expect(cipher.login.username).toBe('enc');
+      expect('decName' in (record?.snapshot.folders[0] as any)).toBe(false);
+    });
+
+    it('coerces non-array snapshot sections to empty arrays', async () => {
+      installFakeIndexedDb();
+      const mod = await freshModule();
+      const malformed = { ciphers: undefined, folders: null, sends: 'nope' } as never;
+      await mod.saveCachedVaultCoreSnapshot('vk', 1, malformed);
+      const record = await mod.loadCachedVaultCoreSnapshot('vk');
+      expect(record?.snapshot.ciphers).toEqual([]);
+      expect(record?.snapshot.folders).toEqual([]);
+      expect(record?.snapshot.sends).toEqual([]);
+    });
+  });
+
   describe('failure handling', () => {
     it('returns null when the database fails to open', async () => {
       installFakeIndexedDb({ failOpen: true });

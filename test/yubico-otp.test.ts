@@ -366,8 +366,9 @@ describe('verifyYubicoOtp', () => {
     } as unknown as Env;
     const seen: string[] = [];
     const fetchMock = vi.fn(async (input: string) => {
-      seen.push(new URL(input).origin);
-      if (input.startsWith('https://first.test')) return new Response('down', { status: 503 });
+      const origin = new URL(input).origin;
+      seen.push(origin);
+      if (origin === 'https://first.test') return new Response('down', { status: 503 });
       const params = new URL(input).searchParams;
       const body = await signedResponseBody(SECRET, {
         otp: params.get('otp')!,

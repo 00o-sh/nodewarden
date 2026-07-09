@@ -138,4 +138,100 @@ describe('<VaultDetailView>', () => {
     setup(makeLoginCipher({ decNotes: 'remember this' }));
     expect(screen.getByText('remember this')).toBeInTheDocument();
   });
+
+  it('renders the live TOTP code and countdown when totpLive is set', () => {
+    const cipher = makeLoginCipher({
+      login: {
+        decUsername: 'octocat',
+        decPassword: 's3cret-pass',
+        decTotp: 'otpauth://totp/x?secret=ABC',
+        uris: [{ uri: 'https://github.com', decUri: 'https://github.com' }],
+      },
+    } as Partial<Cipher>);
+    setup(cipher, { totpLive: { code: '123456', remain: 12, period: 30 } });
+    // Codes render grouped into two halves ("123 456").
+    expect(screen.getByText('123 456')).toBeInTheDocument();
+    // The countdown ring uses the remaining seconds.
+    expect(screen.getByText('12')).toBeInTheDocument();
+  });
+
+  it('renders bank account details for a bank cipher (type 6)', () => {
+    const bank = {
+      id: 'bank1',
+      type: 6,
+      decName: 'Chase Checking',
+      bankAccount: {
+        decBankName: 'Chase',
+        decNameOnAccount: 'Jane Doe',
+        decAccountType: 'Checking',
+        decAccountNumber: '000123456789',
+        decRoutingNumber: '021000021',
+        decBranchNumber: '004',
+        decPin: '4321',
+        decSwiftCode: 'CHASUS33',
+        decIban: 'GB29NWBK60161331926819',
+        decBankContactPhone: '+1-800-935-9935',
+      },
+    } as unknown as Cipher;
+    setup(bank);
+    expect(screen.getByText('Bank Account Details')).toBeInTheDocument();
+    expect(screen.getByText('Chase')).toBeInTheDocument();
+    expect(screen.getByText('Jane Doe')).toBeInTheDocument();
+    expect(screen.getByText('000123456789')).toBeInTheDocument();
+    expect(screen.getByText('GB29NWBK60161331926819')).toBeInTheDocument();
+  });
+
+  it('renders drivers license details for a license cipher (type 7)', () => {
+    const license = {
+      id: 'lic1',
+      type: 7,
+      decName: 'My License',
+      driversLicense: {
+        decFirstName: 'John',
+        decMiddleName: 'Q',
+        decLastName: 'Public',
+        decDateOfBirth: '1990-01-02',
+        decLicenseNumber: 'D1234567',
+        decIssuingCountry: 'USA',
+        decIssuingState: 'CA',
+        decIssueDate: '2020-01-01',
+        decExpirationDate: '2028-01-01',
+        decIssuingAuthority: 'DMV',
+        decLicenseClass: 'C',
+      },
+    } as unknown as Cipher;
+    setup(license);
+    expect(screen.getByText('Driver License Details')).toBeInTheDocument();
+    expect(screen.getByText('John Q Public')).toBeInTheDocument();
+    expect(screen.getByText('D1234567')).toBeInTheDocument();
+    expect(screen.getByText('CA')).toBeInTheDocument();
+  });
+
+  it('renders passport details for a passport cipher (type 8)', () => {
+    const passport = {
+      id: 'pass1',
+      type: 8,
+      decName: 'My Passport',
+      passport: {
+        decSurname: 'Public',
+        decGivenName: 'John',
+        decDateOfBirth: '1990-01-02',
+        decSex: 'M',
+        decBirthPlace: 'Springfield',
+        decNationality: 'American',
+        decIssuingCountry: 'USA',
+        decPassportNumber: 'X1234567',
+        decPassportType: 'P',
+        decNationalIdentificationNumber: 'N999',
+        decIssuingAuthority: 'State Dept',
+        decIssueDate: '2019-05-01',
+        decExpirationDate: '2029-05-01',
+      },
+    } as unknown as Cipher;
+    setup(passport);
+    expect(screen.getByText('Passport Details')).toBeInTheDocument();
+    expect(screen.getByText('John Public')).toBeInTheDocument();
+    expect(screen.getByText('X1234567')).toBeInTheDocument();
+    expect(screen.getByText('American')).toBeInTheDocument();
+  });
 });

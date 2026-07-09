@@ -189,6 +189,39 @@ describe('AppAuthenticatedShell', () => {
     expect(window.localStorage.getItem(NAV_KEY)).toBe('grouped-expanded');
   });
 
+  it('marks the flat Settings link active on the settings route (not device-management)', () => {
+    // location === '/settings' makes settingsActive true, forcing the
+    // `settingsActive && !deviceManagementActive` right operand to evaluate.
+    render(<AppAuthenticatedShell {...buildProps({ location: '/settings' })} />);
+    const settingsLink = screen
+      .getAllByText('Settings')
+      .map((s) => s.closest('a'))
+      .find((a) => a?.className.includes('side-link'));
+    expect(settingsLink?.className).toContain('active');
+    // The Device Management link stays inactive since we are not on its route.
+    const deviceLink = screen
+      .getAllByText('Device Management')
+      .map((s) => s.closest('a'))
+      .find((a) => a?.className.includes('side-link'));
+    expect(deviceLink?.className).not.toContain('active');
+  });
+
+  it('marks Device Management (not flat Settings) active on the device-management route', () => {
+    render(<AppAuthenticatedShell {...buildProps({ location: '/settings/security/device-management' })} />);
+    const deviceLink = screen
+      .getAllByText('Device Management')
+      .map((s) => s.closest('a'))
+      .find((a) => a?.className.includes('side-link'));
+    expect(deviceLink?.className).toContain('active');
+    // deviceManagementActive => flatSettingsActive is false, so the Settings
+    // flat link must NOT carry the active class.
+    const settingsLink = screen
+      .getAllByText('Settings')
+      .map((s) => s.closest('a'))
+      .find((a) => a?.className.includes('side-link'));
+    expect(settingsLink?.className).not.toContain('active');
+  });
+
   it('honours a persisted grouped-smart nav layout on mount and toggles groups', () => {
     window.localStorage.setItem(NAV_KEY, 'grouped-smart');
     render(<AppAuthenticatedShell {...buildProps({ profile: adminProfile, location: '/sends' })} />);
