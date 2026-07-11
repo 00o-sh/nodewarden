@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { login, vaultRow } from './helpers';
+import { login, openAccountSettings, vaultRow } from './helpers';
 
 // Folder filtering, folder creation, top-level navigation between pages, admin,
 // settings, theme toggle and lock/logout — the "can the user move around the
@@ -34,11 +34,14 @@ test('creating a folder adds it to the sidebar', async ({ page }) => {
 });
 
 test('navigates to Settings which renders account settings', async ({ page }) => {
-  await page.getByRole('link', { name: 'Account Settings' }).click();
-  await expect(page).toHaveURL(/\/settings\/account/);
-  // The settings page renders its known modules.
-  await expect(page.getByRole('heading', { name: 'Language' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: /session timeout/i })).toBeVisible();
+  await openAccountSettings(page);
+  // The categorized settings page renders its tab rail with the known sections.
+  await expect(page.getByRole('button', { name: 'Appearance' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /session timeout/i })).toBeVisible();
+  // Appearance is the default tab and exposes the display-language selector.
+  await expect(
+    page.locator('.settings-submodule', { hasText: 'Display language' }).getByRole('combobox')
+  ).toBeVisible();
 });
 
 test('navigates to Admin which renders users and invites', async ({ page }) => {

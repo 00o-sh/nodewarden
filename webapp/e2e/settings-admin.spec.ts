@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { login } from './helpers';
+import { login, openAccountSettings, openDomainRules, openSettingsTab } from './helpers';
 
 // Settings (language persistence, 2FA section, password-change form), the Admin
 // panel (invite create/revoke, user ban/unban), the Domain Rules editor, and
@@ -11,11 +11,11 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('changing the language persists across a reload', async ({ page }) => {
-  await page.getByRole('link', { name: 'Account Settings' }).click();
-  await expect(page).toHaveURL(/\/settings\/account/);
+  await openAccountSettings(page);
 
+  // The Appearance tab is active by default and holds the display-language select.
   const languageSelect = page
-    .locator('.settings-module', { hasText: 'Language' })
+    .locator('.settings-submodule', { hasText: 'Display language' })
     .getByRole('combobox');
   // Switching locale persists to localStorage and reloads the app (which, in
   // demo mode, drops the in-memory session back to the login screen).
@@ -40,21 +40,29 @@ test('changing the language persists across a reload', async ({ page }) => {
 });
 
 test('the 2FA (TOTP) section shows the enabled state', async ({ page }) => {
-  await page.getByRole('link', { name: 'Account Settings' }).click();
-  await expect(page).toHaveURL(/\/settings\/account/);
+  await openAccountSettings(page);
+  await openSettingsTab(page, 'Two-step login');
 
-  // Demo enables TOTP, so the module shows an "Enabled" pill and an active
-  // Disable button while the Enable button is locked.
-  const totpModule = page.locator('.settings-module', { hasText: 'TOTP' }).first();
-  await expect(totpModule.locator('.totp-status-pill')).toBeVisible();
-  await expect(totpModule.getByRole('button', { name: /disable totp/i })).toBeEnabled();
+  // Demo enables TOTP, so the Authenticator app provider row carries an
+  // "Enabled" badge.
+  const totpRow = page.locator('.two-step-provider-row', { hasText: 'Authenticator app' });
+  await expect(totpRow.locator('.two-step-enabled-badge')).toBeVisible();
+
+  // Managing it (after the master-password gate, which resolves in demo mode)
+  // opens the TOTP dialog with an active Disable action — proving the enabled,
+  // not the setup, state.
+  await totpRow.getByRole('button', { name: 'Manage' }).click();
+  const prompt = page.locator('.dialog-card', { hasText: 'Enter your master password' });
+  await prompt.locator('input[type="password"]').fill('demo-password');
+  await prompt.locator('[data-dialog-confirm]').click();
+  await expect(page.getByRole('button', { name: /disable totp/i })).toBeEnabled();
 });
 
 test('the change-master-password form renders its fields', async ({ page }) => {
-  await page.getByRole('link', { name: 'Account Settings' }).click();
-  await expect(page).toHaveURL(/\/settings\/account/);
+  await openAccountSettings(page);
+  await openSettingsTab(page, 'Master Password');
 
-  const module = page.locator('.settings-module', { hasText: 'Change Master Password' });
+  const module = page.locator('.settings-submodule', { hasText: 'Change Master Password' });
   await expect(module.getByRole('heading', { name: 'Change Master Password' })).toBeVisible();
   await expect(module.locator('input[type="password"]')).toHaveCount(3);
   await expect(module.getByRole('button', { name: 'Change Password' })).toBeVisible();
@@ -96,8 +104,7 @@ test('admin can ban then unban a user', async ({ page }) => {
 });
 
 test('domain rules: add a custom equivalent-domain rule', async ({ page }) => {
-  await page.getByRole('link', { name: 'Domain Rules' }).first().click();
-  await expect(page).toHaveURL(/\/settings\/domain-rules/);
+  await openDomainRules(page);
   await expect(page.getByRole('heading', { name: 'Custom equivalent domains' })).toBeVisible();
 
   const customCard = page.locator('.domain-rules-custom');
@@ -123,9 +130,8 @@ test('navigate across routes and use browser back/forward', async ({ page }) => 
   // client-side routing (links + history) is fully exercised here instead.
 
   // Go to Settings, then Sends, then the TOTP page via sidebar links.
-  await page.getByRole('link', { name: 'Account Settings' }).click();
-  await expect(page).toHaveURL(/\/settings\/account/);
-  await expect(page.getByRole('heading', { name: 'Language' })).toBeVisible();
+  await openAccountSettings(page);
+  await expect(page.getByRole('button', { name: 'Appearance' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Sends' }).first().click();
   await expect(page).toHaveURL(/\/sends/);
