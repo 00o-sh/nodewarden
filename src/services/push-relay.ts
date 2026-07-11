@@ -69,27 +69,10 @@ export async function ensurePushInstallationCredentials(db: D1Database): Promise
       method: 'POST',
       headers: {
         accept: 'application/json',
-        'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
-        'cache-control': 'no-cache',
         'content-type': 'application/json',
-        origin: 'https://bitwarden.com',
-        pragma: 'no-cache',
-        priority: 'u=1, i',
-        referer: 'https://bitwarden.com/host/',
-        'sec-ch-ua': '"Google Chrome";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'same-site',
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
       },
       body: JSON.stringify({
-        formName: 'request_host',
-        url: '/host/',
-        locale: 'zh-CN',
         email: randomInstallationEmail(),
-        region: 'us',
       }),
     },
     'Failed to request Bitwarden push installation:'
@@ -101,9 +84,9 @@ export async function ensurePushInstallationCredentials(db: D1Database): Promise
     return null;
   }
 
-  const body = (await response.json().catch(() => null)) as { id?: string; key?: string; enabled?: boolean } | null;
-  const id = String(body?.id || '').trim();
-  const key = String(body?.key || '').trim();
+  const body = (await response.json().catch(() => null)) as { id?: string; Id?: string; key?: string; Key?: string; enabled?: boolean; Enabled?: boolean } | null;
+  const id = String(body?.id || body?.Id || '').trim();
+  const key = String(body?.key || body?.Key || '').trim();
   if (!id || !key) {
     console.error('Bitwarden push installation response did not include id/key');
     return null;
@@ -243,7 +226,7 @@ export async function unregisterMobilePushDevice(env: Env, pushUuid: string | nu
   if (!isPushRelayEnabled(env)) return false;
   const normalized = String(pushUuid || '').trim();
   if (!normalized) return false;
-  return postToPushRelay(env, `/push/delete/${encodeURIComponent(normalized)}`);
+  return postToPushRelay(env, '/push/delete', { id: normalized });
 }
 
 export async function notifyMobilePush(
