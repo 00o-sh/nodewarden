@@ -83,7 +83,7 @@
     "jsdom": "29.1.1",
     "opencc-js": "1.4.0",
     "oxlint": "1.72.0",
-    "postcss": "8.5.16",
+    "postcss": "8.5.23",
     "tailwindcss": "4.3.2",
     "tsx": "4.22.5",
     "typescript": "6.0.3",
