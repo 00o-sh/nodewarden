@@ -5,6 +5,11 @@ import { handleRequest } from './router';
 import { StorageService } from './services/storage';
 import { applyCors, jsonResponse } from './utils/response';
 import { runScheduledBackupIfDue } from './handlers/backup';
+import {
+  isBackendRequestPath,
+  isWebVaultHidden,
+  webVaultNotFoundResponse,
+} from './web-vault-visibility';
 
 let dbInitialized = false;
 let dbInitError: string | null = null;
@@ -63,7 +68,7 @@ export async function maybeServeAsset(request: Request, env: Env): Promise<Respo
   if (!env.ASSETS) return null;
   if (request.method !== 'GET' && request.method !== 'HEAD') return null;
   const url = new URL(request.url);
-  if (isWorkerHandledPath(url.pathname)) return null;
+  if (isBackendRequestPath(url.pathname)) return null;
 
   const response = await env.ASSETS.fetch(request);
   return addSearchIndexHeaders(request, response);
@@ -95,6 +100,12 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     void ctx;
     const normalizedRequest = normalizeRequestUrl(request);
+    const requestPath = new URL(normalizedRequest.url).pathname;
+
+    if (isWebVaultHidden(env) && !isBackendRequestPath(requestPath)) {
+      return webVaultNotFoundResponse(normalizedRequest);
+    }
+
     const assetResponse = await maybeServeAsset(normalizedRequest, env);
     if (assetResponse) {
       return applyCors(normalizedRequest, assetResponse, env);
