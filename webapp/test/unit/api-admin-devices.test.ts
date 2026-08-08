@@ -6,24 +6,32 @@ const ok = () => Promise.resolve(new Response(null, { status: 200 }));
 const bad = () => Promise.resolve(new Response(null, { status: 500 }));
 
 describe('api/admin invite deletion', () => {
-  it('deleteInvite hits the code-scoped endpoint and resolves on success', async () => {
+  it('deleteInvite hits the code-scoped endpoint with the master-password hash and resolves on success', async () => {
     const authedFetch = vi.fn(ok);
-    await deleteInvite(authedFetch as any, 'CODE 1');
-    expect(authedFetch).toHaveBeenCalledWith('/api/admin/invites/CODE%201', { method: 'DELETE' });
+    await deleteInvite(authedFetch as any, 'CODE 1', 'mph');
+    const [url, init] = authedFetch.mock.calls[0];
+    expect(url).toBe('/api/admin/invites/CODE%201');
+    expect(init.method).toBe('DELETE');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(init.body)).toEqual({ masterPasswordHash: 'mph' });
   });
 
   it('deleteInvite throws on a non-ok response', async () => {
-    await expect(deleteInvite(vi.fn(bad) as any, 'CODE1')).rejects.toThrow('Delete invite failed');
+    await expect(deleteInvite(vi.fn(bad) as any, 'CODE1', 'mph')).rejects.toThrow('Delete invite failed');
   });
 
-  it('deleteInvalidInvites targets the invalid scope and resolves on success', async () => {
+  it('deleteInvalidInvites targets the invalid scope with the master-password hash and resolves on success', async () => {
     const authedFetch = vi.fn(ok);
-    await deleteInvalidInvites(authedFetch as any);
-    expect(authedFetch).toHaveBeenCalledWith('/api/admin/invites?scope=invalid', { method: 'DELETE' });
+    await deleteInvalidInvites(authedFetch as any, 'mph');
+    const [url, init] = authedFetch.mock.calls[0];
+    expect(url).toBe('/api/admin/invites?scope=invalid');
+    expect(init.method).toBe('DELETE');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(init.body)).toEqual({ masterPasswordHash: 'mph' });
   });
 
   it('deleteInvalidInvites throws on a non-ok response', async () => {
-    await expect(deleteInvalidInvites(vi.fn(bad) as any)).rejects.toThrow('Delete invalid invites failed');
+    await expect(deleteInvalidInvites(vi.fn(bad) as any, 'mph')).rejects.toThrow('Delete invalid invites failed');
   });
 });
 

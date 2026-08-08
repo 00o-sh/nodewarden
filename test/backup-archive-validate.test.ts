@@ -98,18 +98,22 @@ describe('validateBackupPayloadContents', () => {
     }), {})).toThrow(/duplicate account passkey credential id/i);
   });
 
-  it('rejects an invalid and a duplicate trusted two-factor device token', () => {
+  it('ignores trusted two-factor device token rows (device-trust is excluded from backups)', () => {
+    // As of v1.8.0 device-trust data is no longer part of a backup, so validation
+    // does not inspect trusted_two_factor_device_tokens at all. Even rows that
+    // would previously have been rejected (invalid or duplicate) are ignored
+    // rather than causing a validation failure.
     expect(() => validateBackupPayloadContents(payload({
       users: [user],
       trusted_two_factor_device_tokens: [{ token: 't1', user_id: 'u1', device_identifier: 'd1', expires_at: 0 }],
-    }), {})).toThrow(/invalid trusted two-factor device token row/i);
+    }), {})).not.toThrow();
     expect(() => validateBackupPayloadContents(payload({
       users: [user],
       trusted_two_factor_device_tokens: [
         { token: 't1', user_id: 'u1', device_identifier: 'd1', expires_at: 9_999_999_999_999 },
         { token: 't1', user_id: 'u1', device_identifier: 'd2', expires_at: 9_999_999_999_999 },
       ],
-    }), {})).toThrow(/duplicate trusted two-factor device token/i);
+    }), {})).not.toThrow();
   });
 });
 

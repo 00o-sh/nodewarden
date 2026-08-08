@@ -413,7 +413,9 @@ describe('<PublicSendPage> extra', () => {
     });
     render(<PublicSendPage accessId="acc-1" keyPart={VALID_KEY} />);
     await screen.findByText('soon gone');
-    expect(screen.getByText(t('txt_expires_at_value', { value: '2030-12-31T00:00:00.000Z' }))).toBeInTheDocument();
+    // v1.8.0 formats the expiration date via toLocaleString() rather than the raw ISO value.
+    const formattedExpiration = new Date('2030-12-31T00:00:00.000Z').toLocaleString();
+    expect(screen.getByText(t('txt_expires_at_value', { value: formattedExpiration }))).toBeInTheDocument();
   });
 
   it('downloads a file send and writes bytes to disk', async () => {

@@ -19,9 +19,14 @@ function token(params: Record<string, string>, opts: { ip?: boolean } = {}): Pro
 }
 
 describe('handleToken grant validation', () => {
-  it('403s when the client IP cannot be determined', async () => {
+  it('503s when the client IP cannot be determined', async () => {
+    // v1.8.0: a non-refresh grant with no determinable client IP is answered
+    // with 503 temporarily_unavailable (+ Retry-After) rather than 403, since
+    // the IP is required for rate limiting and its absence is a transient
+    // infrastructure condition, not a client error.
     const res = await token({ grant_type: 'password', username: 'a@b.test', password: 'x' }, { ip: false });
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as any).error).toBe('temporarily_unavailable');
   });
 
   it('400s a webauthn grant missing token and deviceResponse', async () => {

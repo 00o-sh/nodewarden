@@ -9,7 +9,7 @@ let memberToken: string;
 
 beforeAll(async () => {
   admin = await authenticate('adminforbidden');
-  const invite = (await (await api('POST', '/api/admin/invites', admin.accessToken, {})).json()) as any;
+  const invite = (await (await api('POST', '/api/admin/invites', admin.accessToken, { masterPasswordHash: admin.account.masterPasswordHash })).json()) as any;
   const member = newAccount('member');
   const reg = await register(member, invite.code);
   expect(reg.status).toBe(200);

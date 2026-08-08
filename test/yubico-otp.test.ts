@@ -7,7 +7,6 @@ import {
   requestYubicoApiCredentials,
   userYubiKeyPublicIds,
   verifyYubicoOtp,
-  yubicoCredentialsFromEnv,
   yubiKeyPublicIdFromOtp,
 } from '../src/utils/yubico-otp';
 
@@ -143,28 +142,6 @@ describe('userYubiKeyPublicIds / isYubiKeyEnabled', () => {
   });
 });
 
-describe('yubicoCredentialsFromEnv', () => {
-  it('prefers globalSettings__ keys over YUBICO_ env vars', () => {
-    const env = {
-      globalSettings__yubico__clientId: ' 12345 ',
-      globalSettings__yubico__key: ' base64secret ',
-      YUBICO_CLIENT_ID: '99999',
-      YUBICO_SECRET_KEY: 'other',
-    } as unknown as Env;
-    expect(yubicoCredentialsFromEnv(env)).toEqual({ clientId: '12345', secretKey: 'base64secret' });
-  });
-
-  it('falls back to YUBICO_ env vars', () => {
-    const env = { YUBICO_CLIENT_ID: '77777', YUBICO_SECRET_KEY: 'abc' } as unknown as Env;
-    expect(yubicoCredentialsFromEnv(env)).toEqual({ clientId: '77777', secretKey: 'abc' });
-  });
-
-  it('returns null when no client id is configured', () => {
-    expect(yubicoCredentialsFromEnv({} as Env)).toBeNull();
-    expect(yubicoCredentialsFromEnv({ YUBICO_SECRET_KEY: 'abc' } as unknown as Env)).toBeNull();
-  });
-});
-
 describe('requestYubicoApiCredentials', () => {
   it('rejects a malformed OTP before making any request', async () => {
     const fetchMock = vi.fn();
@@ -254,20 +231,16 @@ describe('verifyYubicoOtp', () => {
     expect(params.get('h')).toBeTruthy(); // request is signed when a secret is present
   });
 
-  it('verifies an OK response with no secret and sends no signature', async () => {
-    let seenUrl = '';
-    const fetchMock = vi.fn(async (input: string) => {
-      seenUrl = input;
-      const params = new URL(input).searchParams;
-      const body = `otp=${params.get('otp')}\r\nnonce=${params.get('nonce')}\r\nstatus=OK`;
-      return okResponse(body);
-    });
+  it('requires a secret key: an empty secret is rejected without any request', async () => {
+    // v1.8.0: OTP validation is always the signed flow. A configured client id
+    // with no secret key is refused before contacting the validation server.
+    const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(
       verifyYubicoOtp({} as Env, FULL_OTP, { clientId: '4242', secretKey: '' })
-    ).resolves.toBe(true);
-    expect(new URL(seenUrl).searchParams.has('h')).toBe(false);
+    ).resolves.toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('rejects a non-OK validation status (e.g. REPLAYED_OTP)', async () => {
@@ -394,18 +367,4 @@ describe('verifyYubicoOtp', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('defaults the credentials argument to env-derived credentials', async () => {
-    const env = {
-      globalSettings__yubico__clientId: '4242',
-      globalSettings__yubico__key: '', // no secret -> unsigned flow
-    } as unknown as Env;
-    const fetchMock = vi.fn(async (input: string) => {
-      const params = new URL(input).searchParams;
-      return okResponse(`otp=${params.get('otp')}\r\nnonce=${params.get('nonce')}\r\nstatus=OK`);
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    // credentials arg omitted -> pulled from env
-    await expect(verifyYubicoOtp(env, FULL_OTP)).resolves.toBe(true);
-    expect(new URL(fetchMock.mock.calls[0][0] as string).searchParams.get('id')).toBe('4242');
-  });
 });

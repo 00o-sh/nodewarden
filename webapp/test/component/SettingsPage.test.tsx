@@ -32,6 +32,7 @@ function yubiSettings(overrides: Partial<YubiKeyOtpSettings> = {}): YubiKeyOtpSe
     keys: ['', '', '', '', ''],
     nfc: false,
     yubicoConfigured: false,
+    yubicoCanManage: false,
     yubicoClientId: '',
     yubicoSecretKey: '',
     ...overrides,
@@ -279,7 +280,8 @@ describe('<SettingsPage>', () => {
       .closest('[role="dialog"]') as HTMLElement;
     fireEvent.click(within(nameDialog).getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(onCreateAccountPasskey).toHaveBeenCalledTimes(1));
-    expect(onCreateAccountPasskey).toHaveBeenCalledWith(expect.any(String), 'master-pw', false);
+    // v1.8.0 defaults the account-passkey mode toggle to direct-unlock (true).
+    expect(onCreateAccountPasskey).toHaveBeenCalledWith(expect.any(String), 'master-pw', true);
   });
 
   it('lists account passkeys and fires delete via the prompt', async () => {
@@ -399,7 +401,7 @@ describe('<SettingsPage>', () => {
     );
   });
 
-  it('creates an account passkey in direct-unlock mode with a custom name', async () => {
+  it('creates an account passkey in login-only mode with a custom name', async () => {
     const created: AccountPasskeyCredential = {
       id: 'pk-new',
       name: 'Hardware Key',
@@ -420,12 +422,13 @@ describe('<SettingsPage>', () => {
       .closest('[role="dialog"]') as HTMLElement;
     const nameInput = within(nameDialog).getByDisplayValue('Account passkey') as HTMLInputElement;
     fireEvent.input(nameInput, { target: { value: 'Hardware Key' } });
-    // Toggle to direct-unlock mode, which swaps the help copy.
+    // The mode toggle now defaults to direct-unlock (checked); toggle it off to
+    // switch to login-only mode, which swaps the help copy.
     const toggle = nameDialog.querySelector('input[type="checkbox"]') as HTMLInputElement;
     fireEvent.click(toggle);
     fireEvent.click(within(nameDialog).getByRole('button', { name: 'Save' }));
     await waitFor(() =>
-      expect(onCreateAccountPasskey).toHaveBeenCalledWith('Hardware Key', 'master-pw', true),
+      expect(onCreateAccountPasskey).toHaveBeenCalledWith('Hardware Key', 'master-pw', false),
     );
     // A returned credential triggers a passkey list refresh.
     await waitFor(() => expect(onListAccountPasskeys).toHaveBeenCalledTimes(2));
@@ -472,7 +475,7 @@ describe('<SettingsPage>', () => {
   it('bootstraps Yubico validation credentials when not configured', async () => {
     const onGetYubiKeySettings = vi.fn(async () => yubiSettings({ yubicoConfigured: false }));
     const onBootstrapYubiKeyApiCredentials = vi.fn(async () =>
-      yubiSettings({ yubicoConfigured: true, enabled: false }),
+      yubiSettings({ yubicoConfigured: true, yubicoCanManage: true, enabled: false }),
     );
     buildProps({ onGetYubiKeySettings, onBootstrapYubiKeyApiCredentials });
     openProviderManage('Yubico OTP security key');
@@ -497,6 +500,7 @@ describe('<SettingsPage>', () => {
       yubiSettings({
         enabled: true,
         yubicoConfigured: true,
+        yubicoCanManage: true,
         yubicoClientId: 'cid-1',
         yubicoSecretKey: 'secret-1',
         keys: [storedLong, 'short', '', '', ''],
@@ -544,6 +548,7 @@ describe('<SettingsPage>', () => {
       yubiSettings({
         enabled: true,
         yubicoConfigured: true,
+        yubicoCanManage: true,
         yubicoClientId: 'cid-1',
         yubicoSecretKey: 'secret-1',
         keys: ['', '', '', '', ''],
@@ -570,7 +575,7 @@ describe('<SettingsPage>', () => {
 
   it('disables all YubiKeys through the manage dialog', async () => {
     const onGetYubiKeySettings = vi.fn(async () =>
-      yubiSettings({ enabled: true, yubicoConfigured: true, yubicoClientId: 'cid-1', keys: ['', '', '', '', ''] }),
+      yubiSettings({ enabled: true, yubicoConfigured: true, yubicoCanManage: true, yubicoClientId: 'cid-1', keys: ['', '', '', '', ''] }),
     );
     const onDisableYubiKey = vi.fn(async () => {});
     buildProps({ onGetYubiKeySettings, onDisableYubiKey });
@@ -587,7 +592,7 @@ describe('<SettingsPage>', () => {
 
   it('notifies an error when saving YubiKey settings fails', async () => {
     const onGetYubiKeySettings = vi.fn(async () =>
-      yubiSettings({ enabled: true, yubicoConfigured: true, yubicoClientId: 'cid-1', keys: ['', '', '', '', ''] }),
+      yubiSettings({ enabled: true, yubicoConfigured: true, yubicoCanManage: true, yubicoClientId: 'cid-1', keys: ['', '', '', '', ''] }),
     );
     const onSaveYubiKeySettings = vi.fn(async () => {
       throw new Error('yubi save failed');
@@ -618,7 +623,7 @@ describe('<SettingsPage>', () => {
 
   it('closes the YubiKey manage dialog via the close button', async () => {
     const onGetYubiKeySettings = vi.fn(async () =>
-      yubiSettings({ enabled: false, yubicoConfigured: true, yubicoClientId: 'cid-1', keys: ['', '', '', '', ''] }),
+      yubiSettings({ enabled: false, yubicoConfigured: true, yubicoCanManage: true, yubicoClientId: 'cid-1', keys: ['', '', '', '', ''] }),
     );
     buildProps({ onGetYubiKeySettings });
     openProviderManage('Yubico OTP security key');

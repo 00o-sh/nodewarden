@@ -140,7 +140,10 @@ describe('validateBackupPayloadContents referential integrity', () => {
     expect(check(emptyDb({ users: [user], webauthn_credentials: [{ id: '', user_id: 'u1', credential_id: '', public_key: '' }] }))).toThrow(/invalid account passkey row/);
   });
 
-  it('rejects an invalid trusted two-factor token row', () => {
-    expect(check(emptyDb({ users: [user], trusted_two_factor_device_tokens: [{ token: '', user_id: 'u1', device_identifier: '', expires_at: 0 }] }))).toThrow(/invalid trusted two-factor device token row/);
+  it('ignores trusted two-factor token rows (device-trust is excluded from backups)', () => {
+    // v1.8.0 excludes device-trust data from backups, so validation no longer
+    // inspects trusted_two_factor_device_tokens — even an otherwise-invalid row
+    // is ignored rather than rejected.
+    expect(check(emptyDb({ users: [user], trusted_two_factor_device_tokens: [{ token: '', user_id: 'u1', device_identifier: '', expires_at: 0 }] }))).not.toThrow();
   });
 });

@@ -49,57 +49,65 @@ describe('api/admin listAdminInvites', () => {
 });
 
 describe('api/admin createInvite', () => {
-  it('POSTs the requested expiry window', async () => {
+  it('POSTs the requested expiry window with the master-password hash', async () => {
     const authedFetch = vi.fn(emptyOk);
-    await createInvite(authedFetch as any, 48);
+    await createInvite(authedFetch as any, 48, 'mph');
     const [url, init] = authedFetch.mock.calls[0];
     expect(url).toBe('/api/admin/invites');
     expect(init.method).toBe('POST');
     expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
-    expect(JSON.parse(init.body)).toEqual({ expiresInHours: 48 });
+    expect(JSON.parse(init.body)).toEqual({ expiresInHours: 48, masterPasswordHash: 'mph' });
   });
 
   it('throws when the response is not ok', async () => {
-    await expect(createInvite(vi.fn(fail) as any, 1)).rejects.toThrow('Create invite failed');
+    await expect(createInvite(vi.fn(fail) as any, 1, 'mph')).rejects.toThrow('Create invite failed');
   });
 });
 
 describe('api/admin deleteAllInvites', () => {
-  it('DELETEs the whole invite collection', async () => {
+  it('DELETEs the whole invite collection with the master-password hash', async () => {
     const authedFetch = vi.fn(emptyOk);
-    await deleteAllInvites(authedFetch as any);
-    expect(authedFetch).toHaveBeenCalledWith('/api/admin/invites', { method: 'DELETE' });
+    await deleteAllInvites(authedFetch as any, 'mph');
+    const [url, init] = authedFetch.mock.calls[0];
+    expect(url).toBe('/api/admin/invites');
+    expect(init.method).toBe('DELETE');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(init.body)).toEqual({ masterPasswordHash: 'mph' });
   });
 
   it('throws when the response is not ok', async () => {
-    await expect(deleteAllInvites(vi.fn(fail) as any)).rejects.toThrow('Delete all invites failed');
+    await expect(deleteAllInvites(vi.fn(fail) as any, 'mph')).rejects.toThrow('Delete all invites failed');
   });
 });
 
 describe('api/admin setUserStatus', () => {
   it('PUTs the status to the encoded user endpoint', async () => {
     const authedFetch = vi.fn(emptyOk);
-    await setUserStatus(authedFetch as any, 'user id/1', 'banned');
+    await setUserStatus(authedFetch as any, 'user id/1', 'banned', 'mph');
     const [url, init] = authedFetch.mock.calls[0];
     expect(url).toBe('/api/admin/users/user%20id%2F1/status');
     expect(init.method).toBe('PUT');
-    expect(JSON.parse(init.body)).toEqual({ status: 'banned' });
+    expect(JSON.parse(init.body)).toEqual({ status: 'banned', masterPasswordHash: 'mph' });
   });
 
   it('throws when the response is not ok', async () => {
-    await expect(setUserStatus(vi.fn(fail) as any, 'u1', 'active')).rejects.toThrow('Update user status failed');
+    await expect(setUserStatus(vi.fn(fail) as any, 'u1', 'active', 'mph')).rejects.toThrow('Update user status failed');
   });
 });
 
 describe('api/admin deleteUser', () => {
-  it('DELETEs the encoded user endpoint', async () => {
+  it('DELETEs the encoded user endpoint with the master-password hash', async () => {
     const authedFetch = vi.fn(emptyOk);
-    await deleteUser(authedFetch as any, 'u 1');
-    expect(authedFetch).toHaveBeenCalledWith('/api/admin/users/u%201', { method: 'DELETE' });
+    await deleteUser(authedFetch as any, 'u 1', 'mph');
+    const [url, init] = authedFetch.mock.calls[0];
+    expect(url).toBe('/api/admin/users/u%201');
+    expect(init.method).toBe('DELETE');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(init.body)).toEqual({ masterPasswordHash: 'mph' });
   });
 
   it('throws when the response is not ok', async () => {
-    await expect(deleteUser(vi.fn(fail) as any, 'u1')).rejects.toThrow('Delete user failed');
+    await expect(deleteUser(vi.fn(fail) as any, 'u1', 'mph')).rejects.toThrow('Delete user failed');
   });
 });
 

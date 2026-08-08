@@ -12,8 +12,8 @@ beforeAll(async () => {
 
 describe('duplicate registration', () => {
   it('409s registering an already-registered email with a fresh invite', async () => {
-    const invite1 = (await (await api('POST', '/api/admin/invites', admin.accessToken, {})).json()) as any;
-    const invite2 = (await (await api('POST', '/api/admin/invites', admin.accessToken, {})).json()) as any;
+    const invite1 = (await (await api('POST', '/api/admin/invites', admin.accessToken, { masterPasswordHash: admin.account.masterPasswordHash })).json()) as any;
+    const invite2 = (await (await api('POST', '/api/admin/invites', admin.accessToken, { masterPasswordHash: admin.account.masterPasswordHash })).json()) as any;
     const member = newAccount('dupe');
 
     expect((await register(member, invite1.code)).status).toBe(200);

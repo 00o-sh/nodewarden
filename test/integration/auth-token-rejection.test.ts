@@ -1,6 +1,6 @@
 import { SELF } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { Session, TestAccount, api, authenticate, baseHeaders, login, newAccount, register, sync, url } from './helpers';
+import { ENC_STRING, Session, TestAccount, api, authenticate, baseHeaders, login, newAccount, register, sync, url } from './helpers';
 
 // The access-token verification middleware (verifyAccessTokenWithUser): rejects
 // malformed headers / bad tokens, a banned user, and a token whose security
@@ -14,7 +14,7 @@ beforeAll(async () => {
 });
 
 async function makeUser(label: string): Promise<{ account: TestAccount; token: string; id: string }> {
-  const invite = (await (await api('POST', '/api/admin/invites', adminToken, {})).json()) as any;
+  const invite = (await (await api('POST', '/api/admin/invites', adminToken, { masterPasswordHash: admin.account.masterPasswordHash })).json()) as any;
   const account = newAccount(label);
   expect((await register(account, invite.code)).status).toBe(200);
   const token = ((await (await login(account)).json()) as any).access_token;
@@ -39,7 +39,7 @@ describe('access token rejection', () => {
   it('rejects a token for a banned user', async () => {
     const { token, id } = await makeUser('authrej-banned');
     expect((await sync(token)).status).toBe(200); // works before the ban
-    expect((await api('PUT', `/api/admin/users/${id}/status`, adminToken, { status: 'banned' })).status).toBe(200);
+    expect((await api('PUT', `/api/admin/users/${id}/status`, adminToken, { status: 'banned', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(200);
     expect((await sync(token)).status).toBe(401); // status no longer active
   });
 
@@ -48,9 +48,12 @@ describe('access token rejection', () => {
     expect((await sync(token)).status).toBe(200);
 
     // Changing the password rotates the security stamp, invalidating the old token.
+    // v1.8.0 aligns with Bitwarden clients: the re-wrapped user key must be sent
+    // alongside the new password hash (newMasterPasswordHash and key together).
     const changed = await api('POST', '/api/accounts/password', token, {
       masterPasswordHash: account.masterPasswordHash,
       newMasterPasswordHash: btoa(`new-${crypto.randomUUID()}`),
+      key: ENC_STRING,
     });
     expect(changed.status).toBe(200);
 

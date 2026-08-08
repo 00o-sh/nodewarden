@@ -12,7 +12,7 @@ beforeAll(async () => {
 });
 
 async function inviteAndRegister(label: string) {
-  const invite = (await (await api('POST', '/api/admin/invites', token, {})).json()) as any;
+  const invite = (await (await api('POST', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash })).json()) as any;
   const account = newAccount(label);
   expect((await register(account, invite.code)).status).toBe(200);
   const userId = ((await (await login(account)).json()) as any).access_token;
@@ -27,12 +27,12 @@ describe('user status management', () => {
     const target = users.find((u: any) => u.email === account.email);
     expect(target).toBeTruthy();
 
-    const banned = await api('PUT', `/api/admin/users/${target.id}/status`, token, { status: 'banned' });
+    const banned = await api('PUT', `/api/admin/users/${target.id}/status`, token, { status: 'banned', masterPasswordHash: session.account.masterPasswordHash });
     expect(banned.status).toBe(200);
     // Banned user can no longer authenticate.
     expect((await login(account)).status).toBe(400);
 
-    const reactivated = await api('PUT', `/api/admin/users/${target.id}/status`, token, { status: 'active' });
+    const reactivated = await api('PUT', `/api/admin/users/${target.id}/status`, token, { status: 'active', masterPasswordHash: session.account.masterPasswordHash });
     expect(reactivated.status).toBe(200);
     expect((await login(account)).status).toBe(200);
   });
@@ -40,7 +40,7 @@ describe('user status management', () => {
   it('refuses to ban yourself (400)', async () => {
     const me = ((await (await api('GET', '/api/admin/users', token)).json()) as any).data
       .find((u: any) => u.email === session.account.email);
-    const res = await api('PUT', `/api/admin/users/${me.id}/status`, token, { status: 'banned' });
+    const res = await api('PUT', `/api/admin/users/${me.id}/status`, token, { status: 'banned', masterPasswordHash: session.account.masterPasswordHash });
     expect(res.status).toBe(400);
   });
 
@@ -49,7 +49,7 @@ describe('user status management', () => {
     const target = ((await (await api('GET', '/api/admin/users', token)).json()) as any).data
       .find((u: any) => u.email === account.email);
 
-    const del = await api('DELETE', `/api/admin/users/${target.id}`, token);
+    const del = await api('DELETE', `/api/admin/users/${target.id}`, token, { masterPasswordHash: session.account.masterPasswordHash });
     expect(del.status).toBe(204);
     expect((await login(account)).status).toBe(400);
   });

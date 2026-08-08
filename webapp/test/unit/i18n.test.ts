@@ -71,13 +71,13 @@ describe('i18n', () => {
     });
 
     it('falls back to en for an unsupported language', async () => {
-      setNavigatorLanguages(['fr-FR']);
+      setNavigatorLanguages(['ja-JP']);
       const mod = await freshModule();
       expect(mod.getLocale()).toBe('en');
     });
 
     it('falls back to en when storage access throws', async () => {
-      setNavigatorLanguages(['fr-FR']);
+      setNavigatorLanguages(['ja-JP']);
       vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
         throw new Error('blocked');
       });
@@ -217,7 +217,7 @@ describe('i18n', () => {
     it('lists every supported locale value', async () => {
       const mod = await freshModule();
       const values = mod.AVAILABLE_LOCALES.map((l) => l.value);
-      expect(values).toEqual(['en', 'zh-CN', 'zh-TW', 'ru', 'es']);
+      expect(values).toEqual(['en', 'zh-CN', 'zh-TW', 'ru', 'es', 'fi', 'de', 'fr', 'it', 'sv']);
     });
   });
 });

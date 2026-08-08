@@ -41,36 +41,36 @@ describe('admin set user status', () => {
   });
 
   it('400s an invalid status value', async () => {
-    expect((await api('PUT', `/api/admin/users/${crypto.randomUUID()}/status`, token, { status: 'sideways' })).status).toBe(400);
+    expect((await api('PUT', `/api/admin/users/${crypto.randomUUID()}/status`, token, { status: 'sideways', masterPasswordHash: session.account.masterPasswordHash })).status).toBe(400);
   });
 
   it('400s banning yourself', async () => {
-    expect((await api('PUT', `/api/admin/users/${adminId}/status`, token, { status: 'banned' })).status).toBe(400);
+    expect((await api('PUT', `/api/admin/users/${adminId}/status`, token, { status: 'banned', masterPasswordHash: session.account.masterPasswordHash })).status).toBe(400);
   });
 
   it('404s an unknown user', async () => {
-    expect((await api('PUT', `/api/admin/users/${crypto.randomUUID()}/status`, token, { status: 'active' })).status).toBe(404);
+    expect((await api('PUT', `/api/admin/users/${crypto.randomUUID()}/status`, token, { status: 'active', masterPasswordHash: session.account.masterPasswordHash })).status).toBe(404);
   });
 });
 
 describe('admin delete user', () => {
   it('400s deleting yourself', async () => {
-    expect((await api('DELETE', `/api/admin/users/${adminId}`, token)).status).toBe(400);
+    expect((await api('DELETE', `/api/admin/users/${adminId}`, token, { masterPasswordHash: session.account.masterPasswordHash })).status).toBe(400);
   });
 
   it('404s deleting an unknown user', async () => {
-    expect((await api('DELETE', `/api/admin/users/${crypto.randomUUID()}`, token)).status).toBe(404);
+    expect((await api('DELETE', `/api/admin/users/${crypto.randomUUID()}`, token, { masterPasswordHash: session.account.masterPasswordHash })).status).toBe(404);
   });
 });
 
 describe('admin invites', () => {
   it('creates an invite', async () => {
-    const res = await api('POST', '/api/admin/invites', token, {});
+    const res = await api('POST', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash });
     expect(res.status).toBe(201);
     expect(typeof ((await res.json()) as any).code).toBe('string');
   });
 
   it('404s revoking an unknown invite', async () => {
-    expect((await api('DELETE', `/api/admin/invites/${crypto.randomUUID()}`, token)).status).toBe(404);
+    expect((await api('DELETE', `/api/admin/invites/${crypto.randomUUID()}`, token, { masterPasswordHash: session.account.masterPasswordHash })).status).toBe(404);
   });
 });

@@ -153,7 +153,7 @@ describe('local backup export/import round-trip', () => {
   });
 
   it('forbids a non-admin from exporting, importing, or reading blobs (403)', async () => {
-    const invite = (await (await api('POST', '/api/admin/invites', token, {})).json()) as any;
+    const invite = (await (await api('POST', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash })).json()) as any;
     const user = newAccount('blocal-nonadmin');
     expect((await register(user, invite.code)).status).toBe(200);
     const userToken = ((await (await login(user)).json()) as any).access_token;

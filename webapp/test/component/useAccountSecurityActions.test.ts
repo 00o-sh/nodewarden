@@ -97,10 +97,12 @@ function render(overrides: Partial<Deps> = {}) {
 
 // Runs the confirm dialog by invoking the onConfirm callback the hook passed to
 // onSetConfirm, then awaits the async work scheduled inside it.
-async function fireConfirm(onSetConfirm: ReturnType<typeof vi.fn>) {
+async function fireConfirm(onSetConfirm: ReturnType<typeof vi.fn>, masterPassword?: string) {
   const state = onSetConfirm.mock.calls.at(-1)?.[0];
   expect(state).toBeTruthy();
-  state.onConfirm();
+  // Master-password-gated confirms (v1.8.0) receive the typed password; the
+  // others ignore the extra argument.
+  state.onConfirm(masterPassword);
   // Allow the inner void async IIFE to settle.
   await new Promise((r) => setTimeout(r, 0));
   return state;
@@ -768,8 +770,11 @@ describe('useAccountSecurityActions', () => {
       mockAuth.deleteAllAuthorizedDevices.mockResolvedValue(undefined);
       const { actions, options } = render();
       actions.openRemoveAllDevices();
-      await fireConfirm(options.onSetConfirm as any);
-      expect(mockAuth.deleteAllAuthorizedDevices).toHaveBeenCalledWith(options.authedFetch);
+      // v1.8.0 gates wipe-device on the master password: the confirm derives the
+      // hash from the typed password and passes it to the admin API call.
+      await fireConfirm(options.onSetConfirm as any, 'master-pass');
+      expect(mockAuth.deriveLoginHash).toHaveBeenCalledWith('user@example.com', 'master-pass', 600000);
+      expect(mockAuth.deleteAllAuthorizedDevices).toHaveBeenCalledWith(options.authedFetch, 'derived-hash');
       expect(options.onNotify).toHaveBeenCalledWith('success', t('txt_all_devices_removed'));
       expect(options.onLogoutNow).toHaveBeenCalled();
     });
@@ -778,7 +783,7 @@ describe('useAccountSecurityActions', () => {
       mockAuth.deleteAllAuthorizedDevices.mockRejectedValue(new Error('remove-all-fail'));
       const { actions, options } = render();
       actions.openRemoveAllDevices();
-      await fireConfirm(options.onSetConfirm as any);
+      await fireConfirm(options.onSetConfirm as any, 'master-pass');
       expect(options.onNotify).toHaveBeenCalledWith('error', 'remove-all-fail');
       expect(options.onLogoutNow).not.toHaveBeenCalled();
     });

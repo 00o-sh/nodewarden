@@ -59,7 +59,7 @@ describe('account passkey update-assertion-options', () => {
   });
 
   it('404s when the account has no passkeys registered', async () => {
-    const invite = (await (await api('POST', '/api/admin/invites', token, {})).json()) as any;
+    const invite = (await (await api('POST', '/api/admin/invites', token, { masterPasswordHash: mph })).json()) as any;
     const user = newAccount('acctpk-nopk');
     expect((await register(user, invite.code)).status).toBe(200);
     const userToken = ((await (await login(user)).json()) as any).access_token;

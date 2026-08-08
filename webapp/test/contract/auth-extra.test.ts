@@ -52,7 +52,7 @@ beforeAll(async () => {
 // Register a brand-new (non-admin) account through the real invite flow, minting
 // the invite as the admin `ctx`. Returns an unlocked session like registerAndLogin.
 async function registerExtraAccount(label: string): Promise<ContractSession> {
-  await createInvite(ctx.authedFetch, 168);
+  await createInvite(ctx.authedFetch, 168, ctx.masterPasswordHash);
   const invites = await listAdminInvites(ctx.authedFetch);
   const active = invites.filter((i) => i.status === 'active');
   const inviteCode = active[active.length - 1].code;
@@ -143,17 +143,17 @@ describe('getPasswordHint contract', () => {
 describe('getApiKey / rotateApiKey contract', () => {
   // rotateApiKey rotates the security stamp + drops refresh tokens, invalidating
   // the session, so this runs against a dedicated account (never the shared ctx).
-  it('returns a fresh api key on every request and rotates to a new value', async () => {
+  it('returns a stable api key across reads and rotates to a new value', async () => {
     const account = await registerExtraAccount('auth-extra-apikey');
     const hash = (await deriveLoginHash(account.email, account.password, DEFAULT_ITERATIONS)).hash;
 
     const first = await getApiKey(account.authedFetch, hash);
     expect(first).toBeTruthy();
-    // The database only stores a hash of the key, so each request mints a fresh
-    // plaintext secret rather than echoing the previous one back.
+    // v1.8.0 aligned API keys with Bitwarden clients: the stored key is returned
+    // verbatim, so repeated reads yield the same secret (only rotation changes it).
     const second = await getApiKey(account.authedFetch, hash);
     expect(second).toBeTruthy();
-    expect(second).not.toBe(first);
+    expect(second).toBe(first);
 
     const rotated = await rotateApiKey(account.authedFetch, hash);
     expect(rotated).toBeTruthy();

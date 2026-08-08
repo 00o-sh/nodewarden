@@ -40,7 +40,7 @@ describe('logout broadcast', () => {
     await waitFor((m) => m.startsWith('{}')); // handshake ack
 
     // Deleting all devices broadcasts a LogOut to every connected socket.
-    expect((await api('DELETE', '/api/devices', session.accessToken)).status).toBe(200);
+    expect((await api('DELETE', '/api/devices', session.accessToken, { masterPasswordHash: session.account.masterPasswordHash })).status).toBe(200);
 
     const push = await waitFor((m) => m.includes('"Type":11'));
     const frame = JSON.parse(push.replace(RECORD_SEPARATOR, ''));

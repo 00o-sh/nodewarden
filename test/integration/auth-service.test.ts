@@ -2,6 +2,7 @@ import { env } from 'cloudflare:test';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { AuthService } from '../../src/services/auth';
 import { StorageService } from '../../src/services/storage';
+import type { User } from '../../src/types';
 import { Session, authenticate } from './helpers';
 
 // The AuthService driven directly against the real D1 binding and real WebCrypto
@@ -11,6 +12,7 @@ let session: Session;
 let auth: AuthService;
 let storage: StorageService;
 let userId: string;
+let user: User;
 let deviceIdentifier: string;
 
 beforeAll(async () => {
@@ -19,6 +21,7 @@ beforeAll(async () => {
   storage = new StorageService((env as any).DB);
   const verified = await auth.verifyAccessTokenWithUser(`Bearer ${session.accessToken}`);
   expect(verified).toBeTruthy();
+  user = verified!.user;
   userId = verified!.user.id;
   deviceIdentifier = session.account.deviceIdentifier;
 });
@@ -76,15 +79,21 @@ describe('refreshAccessTokenDetailed', () => {
     }
   });
 
-  it('reports device_missing when the token carries no device binding', async () => {
-    const token = await auth.generateRefreshToken(userId, null);
+  it('accepts a refresh token that carries no device binding (device-less session)', async () => {
+    // v1.8.0: a device-less refresh token is valid — the device checks are only
+    // applied when the token was bound to a device. It refreshes to a device-less
+    // access token rather than being rejected as device_missing.
+    const token = await auth.generateRefreshToken(user, null);
     const res = await auth.refreshAccessTokenDetailed(token);
-    expect(res.ok).toBe(false);
-    if (!res.ok) expect(res.reason).toBe('device_missing');
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.device).toBeNull();
+      expect(typeof res.accessToken).toBe('string');
+    }
   });
 
   it('reports device_missing when the bound device no longer exists', async () => {
-    const token = await auth.generateRefreshToken(userId, { identifier: crypto.randomUUID(), sessionStamp: 's' });
+    const token = await auth.generateRefreshToken(user, { identifier: crypto.randomUUID(), sessionStamp: 's' });
     const res = await auth.refreshAccessTokenDetailed(token);
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.reason).toBe('device_missing');
@@ -93,7 +102,7 @@ describe('refreshAccessTokenDetailed', () => {
   it('reports device_session_mismatch when the session stamp is stale', async () => {
     const device = await storage.getDevice(userId, deviceIdentifier);
     expect(device).toBeTruthy();
-    const token = await auth.generateRefreshToken(userId, { identifier: device!.deviceIdentifier, sessionStamp: 'stale-stamp' });
+    const token = await auth.generateRefreshToken(user, { identifier: device!.deviceIdentifier, sessionStamp: 'stale-stamp' });
     const res = await auth.refreshAccessTokenDetailed(token);
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.reason).toBe('device_session_mismatch');
@@ -110,9 +119,9 @@ describe('static caches and inactive-user rejection', () => {
 
   // Mutating tests run last: banning the user invalidates the primary session.
   it('rejects tokens and refreshes once the user is no longer active', async () => {
-    const refresh = await auth.generateRefreshToken(userId, { identifier: deviceIdentifier, sessionStamp: 'whatever' });
-    const user = await storage.getUserById(userId);
-    await storage.saveUser({ ...user!, status: 'banned' });
+    const refresh = await auth.generateRefreshToken(user, { identifier: deviceIdentifier, sessionStamp: 'whatever' });
+    const dbUser = await storage.getUserById(userId);
+    await storage.saveUser({ ...dbUser!, status: 'banned' });
     AuthService.invalidateUserCache(userId); // drop the cached active copy
 
     expect(await auth.verifyAccessTokenWithUser(`Bearer ${session.accessToken}`)).toBeNull();

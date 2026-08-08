@@ -32,13 +32,16 @@ test('selecting an item shows its detail, and password reveals + copies', async 
   await expect(page.getByText('Login Credentials')).toBeVisible();
   await expect(page.getByText('demo@nodewarden.app').first()).toBeVisible();
 
-  // Password starts masked; Reveal shows the real value.
-  await expect(page.getByText('correct-horse-battery-staple')).toHaveCount(0);
-  await page.getByRole('button', { name: /^reveal$/i }).first().click();
-  await expect(page.getByText('correct-horse-battery-staple')).toBeVisible();
+  // Password starts masked; revealing (scoped to the Password row — hidden custom
+  // fields render their own Reveal button) swaps the mask for the real value.
+  // Assert on the value cell's text: the revealed <strong> is a min-w-0 flex child
+  // whose box Chromium can compute as zero-size, so text is checked, not visibility.
+  const passwordRow = page.locator('.kv-row', { hasText: 'Password' });
+  await expect(passwordRow.locator('.kv-main > strong')).toHaveText(/^\*+$/);
+  await passwordRow.getByRole('button', { name: /^reveal$/i }).click();
+  await expect(passwordRow.locator('.kv-main > strong')).toHaveText('correct-horse-battery-staple');
 
   // Copy the password and assert it landed on the clipboard.
-  const passwordRow = page.locator('.kv-row', { hasText: 'Password' });
   await passwordRow.getByRole('button', { name: /^copy$/i }).click();
   const clip = await page.evaluate(() => navigator.clipboard.readText());
   expect(clip).toBe('correct-horse-battery-staple');

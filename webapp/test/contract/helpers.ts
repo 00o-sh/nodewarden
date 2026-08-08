@@ -23,6 +23,9 @@ export interface ContractSession {
   session: SessionState;
   authedFetch: AuthedFetch;
   masterKey: Uint8Array;
+  // The account's login hash (Bitwarden master-password hash), needed by
+  // v1.8.0 admin/wipe actions that re-verify the master password server-side.
+  masterPasswordHash: string;
 }
 
 export async function registerAndLogin(label = 'user'): Promise<ContractSession> {
@@ -58,7 +61,7 @@ export async function registerAndLogin(label = 'user'): Promise<ContractSession>
     }
   );
 
-  return { email, password, session, authedFetch, masterKey: prelogin.masterKey };
+  return { email, password, session, authedFetch, masterKey: prelogin.masterKey, masterPasswordHash: prelogin.hash };
 }
 
 export async function fetchProfile(ctx: ContractSession): Promise<Profile> {

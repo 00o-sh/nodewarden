@@ -10,14 +10,14 @@ let memberId: string;
 
 beforeAll(async () => {
   admin = await authenticate('disableduseradmin');
-  const invite = (await (await api('POST', '/api/admin/invites', admin.accessToken, {})).json()) as any;
+  const invite = (await (await api('POST', '/api/admin/invites', admin.accessToken, { masterPasswordHash: admin.account.masterPasswordHash })).json()) as any;
   const member = newAccount('banned-member');
   expect((await register(member, invite.code)).status).toBe(200);
   const memberToken = ((await (await login(member)).json()) as any).access_token;
   memberId = ((await (await api('GET', '/api/accounts/profile', memberToken)).json()) as any).id;
 
   // Admin bans the member.
-  const ban = await api('PUT', `/api/admin/users/${memberId}/status`, admin.accessToken, { status: 'banned' });
+  const ban = await api('PUT', `/api/admin/users/${memberId}/status`, admin.accessToken, { status: 'banned', masterPasswordHash: admin.account.masterPasswordHash });
   expect(ban.status).toBe(200);
 });
 

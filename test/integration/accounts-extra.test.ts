@@ -33,11 +33,14 @@ describe('key updates', () => {
 });
 
 describe('verify devices toggle', () => {
-  it('enables verify-devices with a valid secret', async () => {
+  it('rejects enabling verify-devices even with a valid secret (feature disabled)', async () => {
+    // v1.8.0: new-device verification is unsupported; the endpoint always 400s
+    // and never changes state.
     const res = await api('POST', '/api/accounts/verify-devices', token, {
       verifyDevices: true,
       secret: mph,
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    expect((await res.text()).toLowerCase()).toContain('not available');
   });
 });

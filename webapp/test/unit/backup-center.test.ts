@@ -186,6 +186,7 @@ describe('persisted remote browser state', () => {
       pathByDestination: {},
       pageByKey: {},
       selectedDestinationId: null,
+      refreshedAt: {},
     });
   });
 
@@ -195,6 +196,7 @@ describe('persisted remote browser state', () => {
       pathByDestination: { d1: 'sub' },
       pageByKey: { 'd1:sub': 2 },
       selectedDestinationId: 'd1',
+      refreshedAt: {},
     };
     persistRemoteBrowserState('user-1', state);
     expect(loadPersistedRemoteBrowserState('user-1')).toEqual(state);

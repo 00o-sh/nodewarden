@@ -89,7 +89,7 @@ describe('backup export -> import round-trip', () => {
 
   it('forbids backup export for a non-admin (403)', async () => {
     const { newAccount, register, login } = await import('./helpers');
-    const invite = (await (await api('POST', '/api/admin/invites', token, {})).json()) as any;
+    const invite = (await (await api('POST', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash })).json()) as any;
     const user = newAccount('nonadminbk');
     expect((await register(user, invite.code)).status).toBe(200);
     const userToken = ((await (await login(user)).json()) as any).access_token;

@@ -76,7 +76,7 @@ beforeAll(async () => {
   admin = await registerAndLogin('admin');
 
   // Mint an invite as admin, read its code back, register the member with it.
-  await createInvite(admin.authedFetch, 168);
+  await createInvite(admin.authedFetch, 168, admin.masterPasswordHash);
   const invites = await listAdminInvites(admin.authedFetch);
   const active = invites.filter((i) => i.status === 'active');
   memberInviteCode = active[active.length - 1].code;
@@ -111,7 +111,7 @@ describe('admin invites contract', () => {
     const before = await listAdminInvites(admin.authedFetch);
     const beforeActive = before.filter((i) => i.status === 'active').length;
 
-    await createInvite(admin.authedFetch, 48);
+    await createInvite(admin.authedFetch, 48, admin.masterPasswordHash);
 
     const after = await listAdminInvites(admin.authedFetch);
     const activeInvites = after.filter((i) => i.status === 'active');
@@ -121,7 +121,7 @@ describe('admin invites contract', () => {
     expect(created.code).toBeTruthy();
     expect(created.inviteLink).toContain(created.code);
 
-    await deleteInvite(admin.authedFetch, created.code);
+    await deleteInvite(admin.authedFetch, created.code, admin.masterPasswordHash);
 
     const afterDelete = await listAdminInvites(admin.authedFetch);
     const stillActive = afterDelete.find((i) => i.code === created.code && i.status === 'active');
@@ -129,11 +129,11 @@ describe('admin invites contract', () => {
   });
 
   it('deletes all invites', async () => {
-    await createInvite(admin.authedFetch, 24);
+    await createInvite(admin.authedFetch, 24, admin.masterPasswordHash);
     const seeded = await listAdminInvites(admin.authedFetch);
     expect(seeded.some((i) => i.status === 'active')).toBe(true);
 
-    await deleteAllInvites(admin.authedFetch);
+    await deleteAllInvites(admin.authedFetch, admin.masterPasswordHash);
 
     const after = await listAdminInvites(admin.authedFetch);
     expect(after.some((i) => i.status === 'active')).toBe(false);
@@ -223,11 +223,11 @@ describe('admin user status/delete contract', () => {
     expect(memberRow).toBeDefined();
     const memberId = memberRow!.id;
 
-    await setUserStatus(admin.authedFetch, memberId, 'banned');
+    await setUserStatus(admin.authedFetch, memberId, 'banned', admin.masterPasswordHash);
     const afterBan = await listAdminUsers(admin.authedFetch);
     expect(afterBan.find((u) => u.id === memberId)!.status).toBe('banned');
 
-    await setUserStatus(admin.authedFetch, memberId, 'active');
+    await setUserStatus(admin.authedFetch, memberId, 'active', admin.masterPasswordHash);
     const afterReactivate = await listAdminUsers(admin.authedFetch);
     expect(afterReactivate.find((u) => u.id === memberId)!.status).toBe('active');
   });
@@ -238,7 +238,7 @@ describe('admin user status/delete contract', () => {
     expect(memberRow).toBeDefined();
     const memberId = memberRow!.id;
 
-    await deleteUser(admin.authedFetch, memberId);
+    await deleteUser(admin.authedFetch, memberId, admin.masterPasswordHash);
 
     const after = await listAdminUsers(admin.authedFetch);
     expect(after.some((u) => u.id === memberId)).toBe(false);
