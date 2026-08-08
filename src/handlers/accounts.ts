@@ -1171,9 +1171,8 @@ export async function handleBootstrapTwoFactorYubiKeyConfig(request: Request, en
     return errorResponse('Yubico validation credentials are already configured.', 403);
   }
 
-  let credentials;
   if (user.role === 'admin') {
-    credentials = await requestYubicoApiCredentials(user.email, otp);
+    const credentials = await requestYubicoApiCredentials(user.email, otp);
     if (!credentials?.clientId || !credentials.secretKey) {
       return errorResponse('Unable to initialize Yubico validation credentials.', 400);
     }
@@ -1188,7 +1187,6 @@ export async function handleBootstrapTwoFactorYubiKeyConfig(request: Request, en
         initialized?.credentials ? 403 : 400
       );
     }
-    credentials = initialized.credentials;
   }
 
   await writeAuditEvent(storage, {

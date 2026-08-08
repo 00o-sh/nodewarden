@@ -20,7 +20,13 @@ function assert(condition, message) {
 }
 
 function sqlTouchesTable(sql, table) {
-  return new RegExp(`\\b(?:from|into|table)\\s+[\"']?${table}\\b`, 'i').test(sql);
+  // Use a single hardcoded regex (no dynamically-built RegExp) and compare the
+  // captured identifier by value, so there is no ReDoS surface from `table`.
+  const target = String(table).toLowerCase();
+  for (const match of String(sql).matchAll(/\b(?:from|into|table)\s+["'`]?([A-Za-z_][A-Za-z0-9_]*)/gi)) {
+    if (match[1].toLowerCase() === target) return true;
+  }
+  return false;
 }
 
 function emptyBackupDb(extra = {}) {
