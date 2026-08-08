@@ -23,16 +23,19 @@ test('copy the username from an item detail', async ({ page, context }) => {
 test('reveal then hide the password toggle in detail', async ({ page }) => {
   await selectVaultItem(page, 'GitHub');
 
-  // Starts masked.
-  await expect(page.getByText('correct-horse-battery-staple')).toHaveCount(0);
+  // Starts masked. Assert on the Password row's value cell: the revealed <strong>
+  // is a min-w-0 flex child whose box Chromium can compute as zero-size, so its
+  // text is checked rather than generic visibility.
+  const passwordRow = page.locator('.kv-row', { hasText: 'Password' });
+  const passwordValue = passwordRow.locator('.kv-main > strong');
+  await expect(passwordValue).toHaveText(/^\*+$/);
   // Reveal (scoped to the Password row — hidden custom fields render their own
   // Reveal button) shows the value and flips the button to Hide.
-  const passwordRow = page.locator('.kv-row', { hasText: 'Password' });
   await passwordRow.getByRole('button', { name: /^reveal$/i }).click();
-  await expect(page.getByText('correct-horse-battery-staple')).toBeVisible();
+  await expect(passwordValue).toHaveText('correct-horse-battery-staple');
   // Hide masks it again.
   await passwordRow.getByRole('button', { name: /^hide$/i }).click();
-  await expect(page.getByText('correct-horse-battery-staple')).toHaveCount(0);
+  await expect(passwordValue).toHaveText(/^\*+$/);
 });
 
 test('TOTP code renders and can be copied from detail', async ({ page, context }) => {
