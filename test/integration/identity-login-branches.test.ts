@@ -13,7 +13,7 @@ beforeAll(async () => {
 });
 
 async function makeUser(label: string): Promise<{ account: TestAccount; token: string; id: string }> {
-  const invite = (await (await api('POST', '/api/admin/invites', adminToken, {})).json()) as any;
+  const invite = (await (await api('POST', '/api/admin/invites', adminToken, { masterPasswordHash: admin.account.masterPasswordHash })).json()) as any;
   const account = newAccount(label);
   expect((await register(account, invite.code)).status).toBe(200);
   const token = ((await (await login(account)).json()) as any).access_token;
@@ -52,7 +52,7 @@ describe('password grant — login branches', () => {
 
   it('rejects login for a disabled (banned) account', async () => {
     const { account, id } = await makeUser('idlogin-banned');
-    expect((await api('PUT', `/api/admin/users/${id}/status`, adminToken, { status: 'banned' })).status).toBe(200);
+    expect((await api('PUT', `/api/admin/users/${id}/status`, adminToken, { status: 'banned', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(200);
 
     const res = await loginForm(account);
     expect(res.status).toBe(400);

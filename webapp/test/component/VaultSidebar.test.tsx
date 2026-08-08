@@ -1,6 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRef } from 'preact';
 import { fireEvent, render, screen, within } from '@testing-library/preact';
+import { createWouterMock } from './helpers/wouterMock';
+
+// v1.8.0 VaultSidebar renders a wouter <Link> to the new Password Security page.
+// Real wouter resolves its internal `react` import to the real React under jsdom,
+// which has no renderer; mock it with the shared preact-native stand-in.
+vi.mock('wouter', () => createWouterMock());
+
 import VaultSidebar from '@/components/vault/VaultSidebar';
 import type { Folder } from '@/lib/types';
 

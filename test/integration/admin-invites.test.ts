@@ -10,13 +10,13 @@ beforeAll(async () => {
 });
 
 async function createInvite(): Promise<string> {
-  return ((await (await api('POST', '/api/admin/invites', token, {})).json()) as any).code;
+  return ((await (await api('POST', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash })).json()) as any).code;
 }
 
 describe('invite revocation', () => {
   it('revokes a single invite so it can no longer be used', async () => {
     const code = await createInvite();
-    const res = await api('DELETE', `/api/admin/invites/${code}`, token);
+    const res = await api('DELETE', `/api/admin/invites/${code}`, token, { masterPasswordHash: session.account.masterPasswordHash });
     expect(res.status).toBe(204);
 
     // The revoked invite no longer registers a user.
@@ -24,21 +24,21 @@ describe('invite revocation', () => {
   });
 
   it('returns 404 revoking an unknown invite', async () => {
-    const res = await api('DELETE', `/api/admin/invites/${crypto.randomUUID().replace(/-/g, '')}`, token);
+    const res = await api('DELETE', `/api/admin/invites/${crypto.randomUUID().replace(/-/g, '')}`, token, { masterPasswordHash: session.account.masterPasswordHash });
     expect(res.status).toBe(404);
   });
 
   it('deletes all invites', async () => {
     await createInvite();
     await createInvite();
-    const res = await api('DELETE', '/api/admin/invites', token);
+    const res = await api('DELETE', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash });
     expect(res.status).toBe(200);
     expect(typeof ((await res.json()) as any).deleted).toBe('number');
   });
 
   it('deletes only invalid invites via scope=invalid', async () => {
     await createInvite(); // a fresh active invite that should survive the purge
-    const res = await api('DELETE', '/api/admin/invites?scope=invalid', token);
+    const res = await api('DELETE', '/api/admin/invites?scope=invalid', token, { masterPasswordHash: session.account.masterPasswordHash });
     expect(res.status).toBe(200);
     expect(typeof ((await res.json()) as any).deleted).toBe('number');
   });

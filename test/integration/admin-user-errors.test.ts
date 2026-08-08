@@ -15,7 +15,7 @@ beforeAll(async () => {
 });
 
 async function makeUser(label: string): Promise<{ token: string; id: string }> {
-  const invite = (await (await api('POST', '/api/admin/invites', adminToken, {})).json()) as any;
+  const invite = (await (await api('POST', '/api/admin/invites', adminToken, { masterPasswordHash: admin.account.masterPasswordHash })).json()) as any;
   const account = newAccount(label);
   expect((await register(account, invite.code)).status).toBe(200);
   const token = ((await (await login(account)).json()) as any).access_token;
@@ -26,7 +26,7 @@ async function makeUser(label: string): Promise<{ token: string; id: string }> {
 describe('admin set user status — error branches', () => {
   it('rejects an invalid status, invalid JSON, and an unknown user', async () => {
     const { id } = await makeUser('adminerr-status');
-    expect((await api('PUT', `/api/admin/users/${id}/status`, adminToken, { status: 'weird' })).status).toBe(400);
+    expect((await api('PUT', `/api/admin/users/${id}/status`, adminToken, { status: 'weird', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(400);
 
     const badJson = await SELF.fetch(url(`/api/admin/users/${id}/status`), {
       method: 'PUT',
@@ -35,7 +35,7 @@ describe('admin set user status — error branches', () => {
     });
     expect(badJson.status).toBe(400);
 
-    expect((await api('PUT', `/api/admin/users/${crypto.randomUUID()}/status`, adminToken, { status: 'banned' })).status).toBe(404);
+    expect((await api('PUT', `/api/admin/users/${crypto.randomUUID()}/status`, adminToken, { status: 'banned', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(404);
   });
 
   it('forbids a non-admin from changing user status (403)', async () => {
@@ -67,7 +67,7 @@ describe('admin delete user — error branches and blob cleanup', () => {
     expect((await SELF.fetch(fileReserve.url, { method: 'POST', headers: baseHeaders(), body: sendBytes })).status).toBeLessThan(300);
 
     // Admin deletes the user; the handler cleans up both R2 blobs.
-    const del = await api('DELETE', `/api/admin/users/${id}`, adminToken);
+    const del = await api('DELETE', `/api/admin/users/${id}`, adminToken, { masterPasswordHash: admin.account.masterPasswordHash });
     expect(del.status).toBe(204);
 
     // The user is gone from the admin listing.
@@ -76,8 +76,8 @@ describe('admin delete user — error branches and blob cleanup', () => {
   });
 
   it('rejects self-deletion, an unknown user, and a non-admin caller', async () => {
-    expect((await api('DELETE', `/api/admin/users/${adminId}`, adminToken)).status).toBe(400);
-    expect((await api('DELETE', `/api/admin/users/${crypto.randomUUID()}`, adminToken)).status).toBe(404);
+    expect((await api('DELETE', `/api/admin/users/${adminId}`, adminToken, { masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(400);
+    expect((await api('DELETE', `/api/admin/users/${crypto.randomUUID()}`, adminToken, { masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(404);
 
     const { token, id } = await makeUser('adminerr-del-na');
     expect((await api('DELETE', `/api/admin/users/${id}`, token)).status).toBe(403);

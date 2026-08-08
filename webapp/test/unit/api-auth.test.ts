@@ -316,7 +316,7 @@ describe('auth refreshAccessToken', () => {
     const transient = await refreshAccessToken({ email: 'a', authMode: 'token', refreshToken: 'r' } as SessionState);
     expect(transient).toMatchObject({ ok: false, transient: true });
 
-    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ error: 'x' }, 400)));
+    vi.stubGlobal('fetch', vi.fn(() => jsonResponse({ error: 'invalid_grant' }, 400)));
     const hard = await refreshAccessToken({ email: 'a', authMode: 'token', refreshToken: 'r' } as SessionState);
     expect(hard).toMatchObject({ ok: false, transient: false });
   });
@@ -660,10 +660,14 @@ describe('auth authorized devices', () => {
     expect(JSON.parse(init.body)).toEqual({ name: 'My Laptop' });
   });
 
-  it('deleteAllAuthorizedDevices DELETEs the collection', async () => {
+  it('deleteAllAuthorizedDevices DELETEs the collection with the master-password hash', async () => {
     const authedFetch = vi.fn(emptyOk);
-    await deleteAllAuthorizedDevices(authedFetch as any);
-    expect(authedFetch).toHaveBeenCalledWith('/api/devices', { method: 'DELETE' });
+    await deleteAllAuthorizedDevices(authedFetch as any, 'mph');
+    const [url, init] = authedFetch.mock.calls[0];
+    expect(url).toBe('/api/devices');
+    expect(init.method).toBe('DELETE');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/json' });
+    expect(JSON.parse(init.body)).toEqual({ masterPasswordHash: 'mph' });
   });
 });
 

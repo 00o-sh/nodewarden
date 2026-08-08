@@ -61,8 +61,8 @@ describe('handleRegister validation branches', () => {
   it('reports a duplicate email as a conflict', async () => {
     // Register a member through a real invite, then attempt the same email again
     // with a second invite — the unique-constraint path returns 409.
-    const invite1 = (await (await api('POST', '/api/admin/invites', token, {})).json()) as any;
-    const invite2 = (await (await api('POST', '/api/admin/invites', token, {})).json()) as any;
+    const invite1 = (await (await api('POST', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash })).json()) as any;
+    const invite2 = (await (await api('POST', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash })).json()) as any;
     const member = newAccount('dupemail');
     expect((await register(member, invite1.code)).status).toBe(200);
     const dup = await register(member, invite2.code);

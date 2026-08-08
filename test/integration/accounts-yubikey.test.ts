@@ -76,7 +76,7 @@ describe('YubiKey config (Yubico API credentials)', () => {
       masterPasswordHash: session.account.masterPasswordHash,
     });
     expect(res.status).toBe(400);
-    expect((await res.text()).toLowerCase()).toContain('client id is required');
+    expect((await res.text()).toLowerCase()).toContain('client id and secret key are required');
   });
 
   it('stores the Yubico client id and secret, surfacing them in settings', async () => {

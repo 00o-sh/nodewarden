@@ -215,7 +215,10 @@ describe('createAccountPasskeyCredential', () => {
     expect(new Uint8Array(passed.user.id)).toEqual(USER_ID_BYTES);
     expect(passed.excludeCredentials[0].id).toBeInstanceOf(ArrayBuffer);
     expect(new Uint8Array(passed.excludeCredentials[0].id)).toEqual(EXCLUDE_ID_BYTES);
-    expect(passed.extensions.prf).toEqual({});
+    // v1.8.0 aligns the PRF request with the Bitwarden clients: a single `eval`
+    // form carrying the login salt (no bare `{}` create-time toggle).
+    expect(passed.extensions.prf.eval.first).toBeInstanceOf(Uint8Array);
+    expect(passed.extensions.prf.eval.first).toHaveLength(32);
 
     expect(result.token).toBe('attest-token');
     expect(result.supportsPrf).toBe(true);
@@ -236,29 +239,21 @@ describe('createAccountPasskeyCredential', () => {
     expect(req.response.transports).toEqual(['internal', 'hybrid']);
   });
 
-  it('retries the create without the prf extension when the first prf attempt fails retryably', async () => {
-    const credential = new FakePublicKeyCredential({
-      id: 'retried',
-      response: new FakeAuthenticatorAttestationResponse(),
-      extensionResults: {},
-    });
-    // First attempt (with the prf extension) fails with a retryable error; the
-    // second attempt (prf-free) succeeds.
-    credentials.create
-      .mockRejectedValueOnce(Object.assign(new Error('no prf'), { name: 'NotSupportedError' }))
-      .mockResolvedValueOnce(credential);
+  it('makes a single prf create attempt and propagates a failure without retrying', async () => {
+    // v1.8.0 aligns account-passkey creation with the Bitwarden clients: the PRF
+    // create is attempted once. A failure (even a formerly-"retryable" one) is no
+    // longer swallowed by a second prf-free attempt; it propagates to the caller.
+    credentials.create.mockRejectedValue(
+      Object.assign(new Error('no prf'), { name: 'NotSupportedError' })
+    );
 
-    const result = await createAccountPasskeyCredential({
-      options: makeCreationOptions(),
-      token: 'tok',
-    }, true);
+    await expect(
+      createAccountPasskeyCredential({ options: makeCreationOptions(), token: 'tok' }, true)
+    ).rejects.toThrow('no prf');
 
-    expect(credentials.create).toHaveBeenCalledTimes(2);
-    // The first call carried the prf extension; the retry dropped it.
-    expect(credentials.create.mock.calls[0][0].publicKey.extensions.prf).toEqual({});
-    expect(credentials.create.mock.calls[1][0].publicKey.extensions?.prf).toBeUndefined();
-    expect(result.token).toBe('tok');
-    expect(result.supportsPrf).toBe(false);
+    expect(credentials.create).toHaveBeenCalledTimes(1);
+    // The only attempt carried the prf extension in its aligned `eval` form.
+    expect(credentials.create.mock.calls[0][0].publicKey.extensions.prf.eval.first).toBeInstanceOf(Uint8Array);
   });
 
   it('does not retry when the first prf attempt fails with a non-retryable error', async () => {
@@ -366,7 +361,7 @@ describe('assertAccountPasskey', () => {
     ).rejects.toThrow(t('txt_invalid_passkey_assertion_options'));
   });
 
-  it('runs the credential-scoped prf attempt, derives a 64-byte key, encodes the assertion', async () => {
+  it('runs the prf assertion, derives a 64-byte key, encodes the assertion', async () => {
     const prfFirst = buf([1, 2, 3, 4, 5, 6, 7, 8]);
     const credential = new FakePublicKeyCredential({
       id: 'asrt-cred',
@@ -386,14 +381,15 @@ describe('assertAccountPasskey', () => {
       token: 'assert-token',
     });
 
-    // First attempt uses evalByCredential because allowCredentials is present.
+    // v1.8.0 aligns the PRF request with the Bitwarden clients: a single native
+    // get carrying the `eval` form of the extension (no per-credential
+    // `evalByCredential` map), even when allowCredentials is present.
     const firstCall = credentials.get.mock.calls[0][0].publicKey;
     expect(firstCall.challenge).toBeInstanceOf(ArrayBuffer);
     expect(new Uint8Array(firstCall.challenge)).toEqual(CHALLENGE_BYTES);
     expect(firstCall.allowCredentials[0].id).toBeInstanceOf(ArrayBuffer);
-    const credId = bytesToBase64Url(EXCLUDE_ID_BYTES);
-    expect(firstCall.extensions.prf.evalByCredential[credId]).toBeTruthy();
-    expect(firstCall.extensions.prf.evalByCredential[credId].first).toBeInstanceOf(Uint8Array);
+    expect(firstCall.extensions.prf.evalByCredential).toBeUndefined();
+    expect(firstCall.extensions.prf.eval.first).toBeInstanceOf(Uint8Array);
 
     expect(result.token).toBe('assert-token');
     expect(result.prfKey).toBeInstanceOf(Uint8Array);
@@ -428,26 +424,19 @@ describe('assertAccountPasskey', () => {
     expect((result.deviceResponse as any).response.userHandle).toBeUndefined();
   });
 
-  it('retries with the legacy prf extension after a NotSupportedError', async () => {
-    const prfFirst = buf([9, 9, 9, 9]);
-    const goodCredential = new FakePublicKeyCredential({
-      response: new FakeAuthenticatorAssertionResponse(),
-      extensionResults: prfExtensionResult(prfFirst),
-    });
+  it('makes a single prf assertion attempt and propagates a NotSupportedError without retrying', async () => {
+    // v1.8.0 aligns with the Bitwarden clients: the assertion is attempted once
+    // with the `eval` extension. The former legacy `evalByCredential`->`eval`
+    // retry is gone, so a NotSupportedError now propagates to the caller.
     const notSupported = new DOMException('nope', 'NotSupportedError');
-    credentials.get
-      .mockRejectedValueOnce(notSupported)
-      .mockResolvedValueOnce(goodCredential);
+    credentials.get.mockRejectedValue(notSupported);
 
-    const result = await assertAccountPasskey({
-      options: makeRequestOptions(),
-      token: 'tok',
-    });
+    await expect(
+      assertAccountPasskey({ options: makeRequestOptions(), token: 'tok' })
+    ).rejects.toBe(notSupported);
 
-    expect(credentials.get).toHaveBeenCalledTimes(2);
-    // Second attempt is the legacy extension.
-    expect(credentials.get.mock.calls[1][0].publicKey.extensions.prf.eval).toBeTruthy();
-    expect(result.prfKey).toHaveLength(64);
+    expect(credentials.get).toHaveBeenCalledTimes(1);
+    expect(credentials.get.mock.calls[0][0].publicKey.extensions.prf.eval).toBeTruthy();
   });
 
   it('throws when navigator.get returns a non-credential', async () => {

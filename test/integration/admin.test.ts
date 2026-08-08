@@ -31,7 +31,7 @@ describe('admin endpoints', () => {
   });
 
   it('creates and lists invites', async () => {
-    const created = await api('POST', '/api/admin/invites', token, { expiresInHours: 24 });
+    const created = await api('POST', '/api/admin/invites', token, { expiresInHours: 24, masterPasswordHash: session.account.masterPasswordHash });
     expect(created.status).toBe(201);
     const invite = (await created.json()) as any;
     expect(typeof invite.code).toBe('string');
@@ -44,7 +44,7 @@ describe('admin endpoints', () => {
 
 describe('invite-driven registration', () => {
   it('allows a second user to register with a valid invite code', async () => {
-    const invite = (await (await api('POST', '/api/admin/invites', token, {})).json()) as any;
+    const invite = (await (await api('POST', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash })).json()) as any;
     const second = newAccount('invited');
     const res = await register(second, invite.code);
     expect(res.status).toBe(200);
@@ -54,7 +54,7 @@ describe('invite-driven registration', () => {
 describe('authorization', () => {
   it('forbids a non-admin from the admin API (403)', async () => {
     // Make a second (non-admin) user via an invite, then call an admin route.
-    const invite = (await (await api('POST', '/api/admin/invites', token, {})).json()) as any;
+    const invite = (await (await api('POST', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash })).json()) as any;
     const user = newAccount('regular');
     expect((await register(user, invite.code)).status).toBe(200);
     const userToken = ((await (await login(user)).json()) as any).access_token;

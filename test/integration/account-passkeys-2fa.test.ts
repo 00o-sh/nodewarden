@@ -32,7 +32,9 @@ function userIp(): string {
 // Create a fresh (non-admin) user via an admin invite so each describe block
 // gets its own passkey budget (the 2FA cap is 5 per user).
 async function makeUser(label: string): Promise<User> {
-  const invite = (await (await api('POST', '/api/admin/invites', admin.accessToken, {})).json()) as any;
+  const invite = (await (await api('POST', '/api/admin/invites', admin.accessToken, {
+    masterPasswordHash: admin.account.masterPasswordHash,
+  })).json()) as any;
   const account = newAccount(label);
   const ip = userIp();
   const reg = await SELF.fetch(url('/api/accounts/register'), {

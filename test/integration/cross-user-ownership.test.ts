@@ -23,7 +23,7 @@ beforeAll(async () => {
     type: 0, name: ENC_STRING, key: ENC_STRING, deletionDate: future(), text: { text: ENC_STRING, hidden: false },
   })).json()) as any).id;
 
-  const invite = (await (await api('POST', '/api/admin/invites', admin.accessToken, {})).json()) as any;
+  const invite = (await (await api('POST', '/api/admin/invites', admin.accessToken, { masterPasswordHash: admin.account.masterPasswordHash })).json()) as any;
   const member = newAccount('member');
   expect((await register(member, invite.code)).status).toBe(200);
   memberToken = ((await (await login(member)).json()) as any).access_token;

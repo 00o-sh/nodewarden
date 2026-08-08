@@ -25,48 +25,54 @@ beforeAll(async () => {
 });
 
 describe('two-factor device-verification-settings', () => {
-  it('reports device verification enabled by default', async () => {
+  it('reports device verification disabled by default', async () => {
+    // v1.8.0: new-device verification is unsupported (no email delivery channel),
+    // so the settings endpoint always reports it disabled.
     const res = await api('POST', '/api/two-factor/get-device-verification-settings', token, {});
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;
     expect(body.Object).toBe('deviceVerificationSettings');
-    // A freshly-registered account has verifyDevices !== false.
-    expect(body.Enabled).toBe(true);
-    expect(body.VerifyDevices).toBe(true);
+    expect(body.Enabled).toBe(false);
+    expect(body.VerifyDevices).toBe(false);
   });
 
   it('400s a malformed device-verification-settings body', async () => {
     expect((await raw('PUT', '/api/two-factor/device-verification-settings', 'application/json', '{bad')).status).toBe(400);
   });
 
-  it('400s when enabled is not a boolean', async () => {
+  it('ignores a non-boolean enabled value and stays disabled', async () => {
+    // A non-`true` value is not an enable attempt: the endpoint returns the
+    // disabled state (master password is no longer consulted).
     const res = await api('PUT', '/api/two-factor/device-verification-settings', token, { enabled: 'yes', masterPasswordHash: mph });
-    expect(res.status).toBe(400);
-    expect((await res.text()).toLowerCase()).toContain('enabled must be true or false');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as any;
+    expect(body.Enabled).toBe(false);
+    expect(body.VerifyDevices).toBe(false);
   });
 
-  it('400s when the master password verification fails', async () => {
-    const res = await api('PUT', '/api/two-factor/device-verification-settings', token, { enabled: false, masterPasswordHash: 'definitely-wrong' });
+  it('rejects enabling device verification via PUT', async () => {
+    // Enabling is unsupported and rejected regardless of the master password.
+    const res = await api('PUT', '/api/two-factor/device-verification-settings', token, { enabled: true, masterPasswordHash: mph });
     expect(res.status).toBe(400);
-    expect((await res.text()).toLowerCase()).toContain('verification failed');
+    expect((await res.text()).toLowerCase()).toContain('not available');
   });
 
-  it('disables device verification with a verified master password', async () => {
+  it('keeps device verification disabled and reports it as such', async () => {
     const res = await api('PUT', '/api/two-factor/device-verification-settings', token, { enabled: false, masterPasswordHash: mph });
     expect(res.status).toBe(200);
     const body = (await res.json()) as any;
     expect(body.Enabled).toBe(false);
     expect(body.VerifyDevices).toBe(false);
 
-    // The change is persisted: the read endpoint now reports disabled.
+    // The read endpoint continues to report disabled.
     const after = (await (await api('POST', '/api/two-factor/get-device-verification-settings', token, {})).json()) as any;
     expect(after.Enabled).toBe(false);
   });
 
-  it('re-enables device verification via POST with a verified master password', async () => {
-    // The route accepts POST as well as PUT.
+  it('rejects re-enabling device verification via POST', async () => {
+    // The route accepts POST as well as PUT; enabling is rejected either way.
     const res = await api('POST', '/api/two-factor/device-verification-settings', token, { enabled: true, masterPasswordHash: mph });
-    expect(res.status).toBe(200);
-    expect(((await res.json()) as any).Enabled).toBe(true);
+    expect(res.status).toBe(400);
+    expect((await res.text()).toLowerCase()).toContain('not available');
   });
 });

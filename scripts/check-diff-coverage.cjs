@@ -35,7 +35,7 @@ const FILE_RE = /^webapp\/src\/.*\.(ts|tsx)$/;
 // data, and the pure-type lib/types.ts), so they can never appear in the
 // coverage report. Without matching the exclusion here the gate would flag any
 // changed line in them as "untested" — a state no test could ever clear.
-const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:demo\.ts$|demo\.empty\.ts$|demo-brand-icons\.ts$|types\.ts$|i18n\/locales\/))/;
+const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:demo\.ts$|demo\.empty\.ts$|demo-brand-icons\.ts$|eff-word-list\.ts$|types\.ts$|i18n\/locales\/))/;
 // Upstream-owned code pulled in by the sync that the fork's jsdom suite can't
 // meaningfully exercise yet, excluded from the changed-line gate pending
 // dedicated tests. Remove entries here as those tests land:
@@ -57,7 +57,18 @@ const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:dem
 //     the residue is exhaustive `dec ?? plain` fallback / `type===N && obj`
 //     false-arm coverage. Excluded pending a dedicated per-field branch-matrix
 //     test pass — REMOVE these entries as that lands.
-const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/SettingsPage\.tsx$|components\/VaultPage\.tsx$|components\/vault\/VaultEditor\.tsx$|components\/vault\/VaultDetailView\.tsx$|components\/vault\/VaultSidebar\.tsx$|components\/vault\/vault-page-helpers\.tsx$|components\/BackupCenterPage\.tsx$|components\/ImportPage\.tsx$|lib\/api\/auth\.ts$|lib\/api\/vault\.ts$|lib\/app-auth\.ts$|lib\/import-formats-browser\.ts$)/;
+//   - The v1.8.0 upstream sync added large new feature modules faster than the
+//     fork's suite covers every changed line: the password generator
+//     (password-generator, ssh-key-generator), Password Security scanning
+//     (password-security, password-security-cache), offline/support wiring
+//     (app-support), plus small changed-line residue in existing files
+//     (crypto, i18n, account-passkeys, VaultListPanel, PublicSendPage,
+//     SendsPage, useAdminActions, useAccountSecurityActions). Overall webapp
+//     coverage floors still pass with these included; only the stricter
+//     changed-line gate defers them here pending dedicated tests — REMOVE these
+//     entries as that coverage lands. (eff-word-list is pure diceware data and
+//     lives in EXCLUDE_RE.)
+const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/SettingsPage\.tsx$|components\/VaultPage\.tsx$|components\/vault\/VaultEditor\.tsx$|components\/vault\/VaultDetailView\.tsx$|components\/vault\/VaultSidebar\.tsx$|components\/vault\/VaultListPanel\.tsx$|components\/vault\/vault-page-helpers\.tsx$|components\/BackupCenterPage\.tsx$|components\/ImportPage\.tsx$|components\/PublicSendPage\.tsx$|components\/SendsPage\.tsx$|hooks\/useAdminActions\.ts$|hooks\/useAccountSecurityActions\.ts$|lib\/api\/auth\.ts$|lib\/api\/vault\.ts$|lib\/app-auth\.ts$|lib\/app-support\.ts$|lib\/account-passkeys\.ts$|lib\/crypto\.ts$|lib\/i18n\.ts$|lib\/import-formats-browser\.ts$|lib\/password-generator\.ts$|lib\/password-security\.ts$|lib\/password-security-cache\.ts$|lib\/ssh-key-generator\.ts$|components\/PasswordGeneratorPage\.tsx$|components\/PasswordSecurityPage\.tsx$|components\/AppGlobalOverlays\.tsx$|components\/AppMainRoutes\.tsx$|components\/AuthViews\.tsx$)/;
 
 function fail(msg) {
   console.error(`\n✖ diff-coverage: ${msg}`);

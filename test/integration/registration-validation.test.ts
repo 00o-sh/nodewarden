@@ -68,12 +68,12 @@ describe('registration validation', () => {
   });
 
   it('409s registering an already-used email', async () => {
-    const invite1 = (await (await api('POST', '/api/admin/invites', adminToken, {})).json()) as any;
+    const invite1 = (await (await api('POST', '/api/admin/invites', adminToken, { masterPasswordHash: admin.account.masterPasswordHash })).json()) as any;
     const account = newAccount('regval-dup');
     expect((await registerRaw({ inviteCode: invite1.code }, account)).status).toBe(200);
 
     // Same email again, with a fresh invite -> conflict.
-    const invite2 = (await (await api('POST', '/api/admin/invites', adminToken, {})).json()) as any;
+    const invite2 = (await (await api('POST', '/api/admin/invites', adminToken, { masterPasswordHash: admin.account.masterPasswordHash })).json()) as any;
     expect((await registerRaw({ inviteCode: invite2.code }, account)).status).toBe(409);
   });
 });

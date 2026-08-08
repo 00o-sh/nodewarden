@@ -42,12 +42,15 @@ describe('password verification', () => {
     expect(res.status).toBe(200);
   });
 
-  it('toggles verify-devices with a valid secret', async () => {
+  it('rejects verify-devices even with a valid secret (feature disabled)', async () => {
+    // v1.8.0: new-device verification is unsupported (no email delivery channel).
+    // The endpoint never changes state and always returns 400.
     const res = await api('POST', '/api/accounts/verify-devices', token, {
       verifyDevices: false,
       secret: masterPasswordHash,
     });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    expect((await res.text()).toLowerCase()).toContain('not available');
   });
 
   it('rejects verify-devices with a bad secret (400)', async () => {

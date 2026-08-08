@@ -22,7 +22,7 @@ async function refresh(refreshToken: string): Promise<Response> {
 }
 
 describe('refresh_token grant', () => {
-  it('rotates the refresh token and issues a working access token', async () => {
+  it('reuses the refresh token and issues a working access token', async () => {
     const res = await refresh(session.refreshToken);
     expect(res.status).toBe(200);
     const body = (await res.json()) as Record<string, any>;
@@ -30,13 +30,14 @@ describe('refresh_token grant', () => {
     expect(body.token_type).toBe('Bearer');
     expect(typeof body.access_token).toBe('string');
     expect(typeof body.refresh_token).toBe('string');
-    // Rotation: the new refresh token differs from the one just used.
-    expect(body.refresh_token).not.toBe(session.refreshToken);
+    // v1.8.0 session-reuse: the refresh token is NOT rotated. The same token is
+    // returned (its sliding expiry is extended) so a session survives a refresh.
+    expect(body.refresh_token).toBe(session.refreshToken);
 
     // The freshly minted access token authenticates a sync.
     expect((await sync(body.access_token)).status).toBe(200);
 
-    // The rotated token can itself be refreshed again (chain continues).
+    // The same token can be refreshed again (the session continues).
     const second = await refresh(body.refresh_token);
     expect(second.status).toBe(200);
     expect(typeof ((await second.json()) as any).access_token).toBe('string');

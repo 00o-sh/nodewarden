@@ -56,9 +56,10 @@ describe('presented-token session revocation', () => {
     const res = await revoke(login.access_token, login.refresh_token);
     expect(res.status).toBe(200);
 
-    // The device session stamp was rotated: the presented access token no
-    // longer authenticates.
-    expect((await sync(login.access_token)).status).toBe(401);
+    // v1.8.0: revocation no longer rotates the device/security stamp, so the
+    // already-issued access token keeps authenticating until it expires. Only
+    // the refresh token is torn down (checked below).
+    expect((await sync(login.access_token)).status).toBe(200);
 
     // The device's refresh token was deleted: it can no longer mint tokens.
     const refresh = await SELF.fetch(url('/identity/connect/token'), {
@@ -70,9 +71,8 @@ describe('presented-token session revocation', () => {
     expect(((await refresh.json()) as any).error).toBe('invalid_grant');
   });
 
-  it('revokes the user session behind a device-less presented access token', async () => {
-    // Logging in without a device identifier yields a token with no `did`, so
-    // revocation rotates the user security stamp instead of a device stamp.
+  it('revokes the refresh token behind a device-less presented access token', async () => {
+    // Logging in without a device identifier yields a token with no `did`.
     const login = (await (await loginForm(session.account, {}, false)).json()) as any;
     expect(typeof login.access_token).toBe('string');
     expect((await sync(login.access_token)).status).toBe(200);
@@ -80,8 +80,18 @@ describe('presented-token session revocation', () => {
     const res = await revoke(login.access_token, login.refresh_token);
     expect(res.status).toBe(200);
 
-    // Security stamp rotation invalidates the presented access token.
-    expect((await sync(login.access_token)).status).toBe(401);
+    // v1.8.0: revocation no longer rotates the security stamp, so the presented
+    // access token still authenticates until it expires.
+    expect((await sync(login.access_token)).status).toBe(200);
+
+    // Revocation did tear down the refresh token: it can no longer mint tokens.
+    const refresh = await SELF.fetch(url('/identity/connect/token'), {
+      method: 'POST',
+      headers: baseHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
+      body: new URLSearchParams({ grant_type: 'refresh_token', client_id: 'web', refresh_token: login.refresh_token }).toString(),
+    });
+    expect(refresh.status).toBe(400);
+    expect(((await refresh.json()) as any).error).toBe('invalid_grant');
   });
 });
 

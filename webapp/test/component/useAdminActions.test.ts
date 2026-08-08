@@ -12,8 +12,15 @@ vi.mock('@/lib/api/admin', () => ({
   setUserStatus: vi.fn(),
 }));
 
+// v1.8.0 requires the master password for admin actions: the hook derives the
+// login hash from the password typed into the confirm dialog before every call.
+vi.mock('@/lib/api/auth', () => ({
+  deriveLoginHash: vi.fn(),
+}));
+
 import useAdminActions from '@/hooks/useAdminActions';
 import { createInvite, deleteAllInvites, deleteInvalidInvites, deleteInvite, deleteUser, setUserStatus } from '@/lib/api/admin';
+import { deriveLoginHash } from '@/lib/api/auth';
 
 const mockedCreateInvite = vi.mocked(createInvite);
 const mockedDeleteAllInvites = vi.mocked(deleteAllInvites);
@@ -21,6 +28,10 @@ const mockedDeleteInvalidInvites = vi.mocked(deleteInvalidInvites);
 const mockedDeleteInvite = vi.mocked(deleteInvite);
 const mockedDeleteUser = vi.mocked(deleteUser);
 const mockedSetUserStatus = vi.mocked(setUserStatus);
+const mockedDeriveLoginHash = vi.mocked(deriveLoginHash);
+
+const EMAIL = 'admin@example.com';
+const KDF = 600000;
 
 function setup() {
   const authedFetch = vi.fn();
@@ -29,9 +40,31 @@ function setup() {
   const refetchUsers = vi.fn().mockResolvedValue(undefined);
   const refetchInvites = vi.fn().mockResolvedValue(undefined);
   const { result } = renderHook(() =>
-    useAdminActions({ authedFetch, onNotify, onSetConfirm, refetchUsers, refetchInvites })
+    useAdminActions({
+      authedFetch,
+      email: EMAIL,
+      defaultKdfIterations: KDF,
+      onNotify,
+      onSetConfirm,
+      refetchUsers,
+      refetchInvites,
+    })
   );
   return { actions: result.current, authedFetch, onNotify, onSetConfirm, refetchUsers, refetchInvites };
+}
+
+// Fire the confirm dialog's onConfirm with a typed master password and flush the
+// inner void async IIFE (derive hash -> api call -> refetch -> notify).
+async function confirmWith(
+  onSetConfirm: ReturnType<typeof vi.fn>,
+  masterPassword: string = 'master-pass'
+): Promise<AppConfirmState> {
+  const confirm = capturedConfirm(onSetConfirm);
+  await act(async () => {
+    confirm.onConfirm(masterPassword);
+    await new Promise((r) => setTimeout(r, 0));
+  });
+  return confirm;
 }
 
 // Pull the AppConfirmState that was passed to onSetConfirm (the confirm payload).
@@ -49,6 +82,7 @@ beforeEach(() => {
   mockedDeleteInvite.mockResolvedValue(undefined);
   mockedDeleteUser.mockResolvedValue(undefined);
   mockedSetUserStatus.mockResolvedValue(undefined);
+  mockedDeriveLoginHash.mockResolvedValue({ hash: 'derived-hash' } as any);
 });
 
 afterEach(() => {
@@ -86,53 +120,73 @@ describe('useAdminActions', () => {
     });
   });
 
-  describe('createInvite', () => {
-    it('creates the invite, refetches, and notifies success', async () => {
-      const { actions, authedFetch, refetchInvites, onNotify } = setup();
+  describe('createInvite (master-password-gated)', () => {
+    it('opens a master-password confirm and does not call the api until confirmed', async () => {
+      const { actions, onSetConfirm } = setup();
       await act(async () => {
         await actions.createInvite(48);
       });
-      expect(mockedCreateInvite).toHaveBeenCalledWith(authedFetch, 48);
+      expect(onSetConfirm).toHaveBeenCalledTimes(1);
+      const confirm = capturedConfirm(onSetConfirm);
+      expect(confirm.requireMasterPassword).toBe(true);
+      expect(typeof confirm.onConfirm).toBe('function');
+      expect(mockedCreateInvite).not.toHaveBeenCalled();
+    });
+
+    it('derives the hash, creates the invite, refetches, and notifies success on confirm', async () => {
+      const { actions, authedFetch, onSetConfirm, refetchInvites, onNotify } = setup();
+      await act(async () => {
+        await actions.createInvite(48);
+      });
+      await confirmWith(onSetConfirm);
+      expect(mockedDeriveLoginHash).toHaveBeenCalledWith(EMAIL, 'master-pass', KDF);
+      expect(mockedCreateInvite).toHaveBeenCalledWith(authedFetch, 48, 'derived-hash');
       expect(refetchInvites).toHaveBeenCalledTimes(1);
       expect(onNotify).toHaveBeenCalledWith('success', expect.any(String));
     });
 
-    it('notifies error when the api rejects', async () => {
+    it('notifies error when the api rejects after confirm', async () => {
       mockedCreateInvite.mockRejectedValue(new Error('nope'));
-      const { actions, refetchInvites, onNotify } = setup();
+      const { actions, onSetConfirm, refetchInvites, onNotify } = setup();
       await act(async () => {
         await actions.createInvite(1);
       });
+      await confirmWith(onSetConfirm);
       expect(refetchInvites).not.toHaveBeenCalled();
       expect(onNotify).toHaveBeenCalledWith('error', 'nope');
     });
   });
 
-  describe('toggleUserStatus', () => {
-    it('flips active -> banned, refetches, and notifies success', async () => {
-      const { actions, authedFetch, refetchUsers, onNotify } = setup();
+  describe('toggleUserStatus (master-password-gated)', () => {
+    it('flips active -> banned on confirm, refetches, and notifies success', async () => {
+      const { actions, authedFetch, onSetConfirm, refetchUsers, onNotify } = setup();
       await act(async () => {
         await actions.toggleUserStatus('u1', 'active');
       });
-      expect(mockedSetUserStatus).toHaveBeenCalledWith(authedFetch, 'u1', 'banned');
+      expect(mockedSetUserStatus).not.toHaveBeenCalled();
+      await confirmWith(onSetConfirm);
+      expect(mockedDeriveLoginHash).toHaveBeenCalledWith(EMAIL, 'master-pass', KDF);
+      expect(mockedSetUserStatus).toHaveBeenCalledWith(authedFetch, 'u1', 'banned', 'derived-hash');
       expect(refetchUsers).toHaveBeenCalledTimes(1);
       expect(onNotify).toHaveBeenCalledWith('success', expect.any(String));
     });
 
-    it('flips banned -> active', async () => {
-      const { actions, authedFetch } = setup();
+    it('flips banned -> active on confirm', async () => {
+      const { actions, authedFetch, onSetConfirm } = setup();
       await act(async () => {
         await actions.toggleUserStatus('u2', 'banned');
       });
-      expect(mockedSetUserStatus).toHaveBeenCalledWith(authedFetch, 'u2', 'active');
+      await confirmWith(onSetConfirm);
+      expect(mockedSetUserStatus).toHaveBeenCalledWith(authedFetch, 'u2', 'active', 'derived-hash');
     });
 
-    it('notifies error when the api rejects', async () => {
+    it('notifies error when the api rejects after confirm', async () => {
       mockedSetUserStatus.mockRejectedValue(new Error('status fail'));
-      const { actions, refetchUsers, onNotify } = setup();
+      const { actions, onSetConfirm, refetchUsers, onNotify } = setup();
       await act(async () => {
         await actions.toggleUserStatus('u1', 'active');
       });
+      await confirmWith(onSetConfirm);
       expect(refetchUsers).not.toHaveBeenCalled();
       expect(onNotify).toHaveBeenCalledWith('error', 'status fail');
     });
@@ -156,13 +210,10 @@ describe('useAdminActions', () => {
       await act(async () => {
         await actions.deleteInvite('CODE1');
       });
-      const confirm = capturedConfirm(onSetConfirm);
-      await act(async () => {
-        confirm.onConfirm();
-        await Promise.resolve();
-      });
+      await confirmWith(onSetConfirm);
       expect(onSetConfirm).toHaveBeenLastCalledWith(null);
-      expect(mockedDeleteInvite).toHaveBeenCalledWith(authedFetch, 'CODE1');
+      expect(mockedDeriveLoginHash).toHaveBeenCalledWith(EMAIL, 'master-pass', KDF);
+      expect(mockedDeleteInvite).toHaveBeenCalledWith(authedFetch, 'CODE1', 'derived-hash');
       expect(refetchInvites).toHaveBeenCalledTimes(1);
       expect(onNotify).toHaveBeenCalledWith('success', expect.any(String));
     });
@@ -173,11 +224,7 @@ describe('useAdminActions', () => {
       await act(async () => {
         await actions.deleteInvite('CODE1');
       });
-      const confirm = capturedConfirm(onSetConfirm);
-      await act(async () => {
-        confirm.onConfirm();
-        await Promise.resolve();
-      });
+      await confirmWith(onSetConfirm);
       expect(refetchInvites).not.toHaveBeenCalled();
       expect(onNotify).toHaveBeenCalledWith('error', 'delete fail');
     });
@@ -188,11 +235,7 @@ describe('useAdminActions', () => {
       await act(async () => {
         await actions.deleteInvite('CODE1');
       });
-      const confirm = capturedConfirm(onSetConfirm);
-      await act(async () => {
-        confirm.onConfirm();
-        await Promise.resolve();
-      });
+      await confirmWith(onSetConfirm);
       expect(onNotify).toHaveBeenCalledWith('error', t('txt_delete_invite_failed'));
     });
   });
@@ -206,12 +249,9 @@ describe('useAdminActions', () => {
       const confirm = capturedConfirm(onSetConfirm);
       expect(confirm.danger).toBe(true);
       expect(mockedDeleteInvalidInvites).not.toHaveBeenCalled();
-      await act(async () => {
-        confirm.onConfirm();
-        await Promise.resolve();
-      });
+      await confirmWith(onSetConfirm);
       expect(onSetConfirm).toHaveBeenLastCalledWith(null);
-      expect(mockedDeleteInvalidInvites).toHaveBeenCalledWith(authedFetch);
+      expect(mockedDeleteInvalidInvites).toHaveBeenCalledWith(authedFetch, 'derived-hash');
       expect(refetchInvites).toHaveBeenCalledTimes(1);
       expect(onNotify).toHaveBeenCalledWith('success', expect.any(String));
     });
@@ -222,11 +262,7 @@ describe('useAdminActions', () => {
       await act(async () => {
         await actions.deleteInvalidInvites();
       });
-      const confirm = capturedConfirm(onSetConfirm);
-      await act(async () => {
-        confirm.onConfirm();
-        await Promise.resolve();
-      });
+      await confirmWith(onSetConfirm);
       expect(refetchInvites).not.toHaveBeenCalled();
       expect(onNotify).toHaveBeenCalledWith('error', 'del invalid fail');
     });
@@ -237,11 +273,7 @@ describe('useAdminActions', () => {
       await act(async () => {
         await actions.deleteInvalidInvites();
       });
-      const confirm = capturedConfirm(onSetConfirm);
-      await act(async () => {
-        confirm.onConfirm();
-        await Promise.resolve();
-      });
+      await confirmWith(onSetConfirm);
       expect(onNotify).toHaveBeenCalledWith('error', t('txt_delete_invalid_invites_failed'));
     });
   });
@@ -264,13 +296,9 @@ describe('useAdminActions', () => {
       await act(async () => {
         await actions.deleteAllInvites();
       });
-      const confirm = capturedConfirm(onSetConfirm);
-      await act(async () => {
-        confirm.onConfirm();
-        await Promise.resolve();
-      });
+      await confirmWith(onSetConfirm);
       expect(onSetConfirm).toHaveBeenLastCalledWith(null);
-      expect(mockedDeleteAllInvites).toHaveBeenCalledWith(authedFetch);
+      expect(mockedDeleteAllInvites).toHaveBeenCalledWith(authedFetch, 'derived-hash');
       expect(refetchInvites).toHaveBeenCalledTimes(1);
       expect(onNotify).toHaveBeenCalledWith('success', expect.any(String));
     });
@@ -281,11 +309,7 @@ describe('useAdminActions', () => {
       await act(async () => {
         await actions.deleteAllInvites();
       });
-      const confirm = capturedConfirm(onSetConfirm);
-      await act(async () => {
-        confirm.onConfirm();
-        await Promise.resolve();
-      });
+      await confirmWith(onSetConfirm);
       expect(refetchInvites).not.toHaveBeenCalled();
       expect(onNotify).toHaveBeenCalledWith('error', 'del all fail');
     });
@@ -308,13 +332,9 @@ describe('useAdminActions', () => {
       await act(async () => {
         await actions.deleteUser('u9');
       });
-      const confirm = capturedConfirm(onSetConfirm);
-      await act(async () => {
-        confirm.onConfirm();
-        await Promise.resolve();
-      });
+      await confirmWith(onSetConfirm);
       expect(onSetConfirm).toHaveBeenLastCalledWith(null);
-      expect(mockedDeleteUser).toHaveBeenCalledWith(authedFetch, 'u9');
+      expect(mockedDeleteUser).toHaveBeenCalledWith(authedFetch, 'u9', 'derived-hash');
       expect(refetchUsers).toHaveBeenCalledTimes(1);
       expect(onNotify).toHaveBeenCalledWith('success', expect.any(String));
     });
@@ -325,11 +345,7 @@ describe('useAdminActions', () => {
       await act(async () => {
         await actions.deleteUser('u9');
       });
-      const confirm = capturedConfirm(onSetConfirm);
-      await act(async () => {
-        confirm.onConfirm();
-        await Promise.resolve();
-      });
+      await confirmWith(onSetConfirm);
       expect(refetchUsers).not.toHaveBeenCalled();
       expect(onNotify).toHaveBeenCalledWith('error', 'del user fail');
     });

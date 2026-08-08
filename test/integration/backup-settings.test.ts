@@ -23,7 +23,7 @@ describe('admin backup settings', () => {
   });
 
   it('forbids a non-admin from reading backup settings (403)', async () => {
-    const invite = (await (await api('POST', '/api/admin/invites', token, {})).json()) as any;
+    const invite = (await (await api('POST', '/api/admin/invites', token, { masterPasswordHash: session.account.masterPasswordHash })).json()) as any;
     const user = newAccount('nonadmin');
     expect((await register(user, invite.code)).status).toBe(200);
     const userToken = ((await (await login(user)).json()) as any).access_token;

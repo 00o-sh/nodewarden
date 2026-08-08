@@ -47,7 +47,7 @@ describe('MessagePack notification protocol', () => {
 
     // Deleting all devices broadcasts a LogOut push to every connected socket,
     // encoded via the MessagePack invocation builder for this connection.
-    expect((await api('DELETE', '/api/devices', session.accessToken)).status).toBe(200);
+    expect((await api('DELETE', '/api/devices', session.accessToken, { masterPasswordHash: session.account.masterPasswordHash })).status).toBe(200);
 
     // The push is a framed MessagePack invocation, much larger than the ack.
     const frame = await waitFor(() => binaryFrames.find((f) => f.byteLength > 8));

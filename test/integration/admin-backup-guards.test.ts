@@ -96,11 +96,23 @@ describe('admin local export / attachment blob guards', () => {
   });
 
   it('400s a blob download with a missing blob name', async () => {
-    expect((await api('GET', '/api/admin/backup/blob', token)).status).toBe(400);
+    // The blob endpoint is POST-only (v1.8.0): it requires master-password
+    // verification, which must travel in the JSON body, never the URL. A valid
+    // password gets past verification so the missing-blob-name guard is reached.
+    expect(
+      (await api('POST', '/api/admin/backup/blob', token, { masterPasswordHash: session.account.masterPasswordHash })).status
+    ).toBe(400);
   });
 
   it('400s a blob download with a traversal blob name', async () => {
-    expect((await api('GET', '/api/admin/backup/blob?blobName=attachments/../secret', token)).status).toBe(400);
+    expect(
+      (
+        await api('POST', '/api/admin/backup/blob', token, {
+          blobName: 'attachments/../secret',
+          masterPasswordHash: session.account.masterPasswordHash,
+        })
+      ).status
+    ).toBe(400);
   });
 
   it('404s a blob download for an absent blob', async () => {

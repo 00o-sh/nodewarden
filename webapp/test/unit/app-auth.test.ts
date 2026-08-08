@@ -291,10 +291,10 @@ describe('hydrateLockedSession', () => {
     expect(result.profile).toBe(fallback);
   });
 
-  it('serves the offline snapshot when refresh fails but the service is unreachable', async () => {
+  it('serves the offline snapshot when refresh fails transiently but the service is unreachable', async () => {
     offline.hasOfflineUnlockRecord.mockReturnValue(true);
     setNavigatorOnLine(true);
-    api.refreshAccessToken.mockResolvedValue({ ok: false, transient: false });
+    api.refreshAccessToken.mockResolvedValue({ ok: false, transient: true, error: 'temporarily unavailable' });
     network.probeNodeWardenService.mockResolvedValue(false);
     const offlineProfile = makeProfile({ name: 'OfflineRefresh' });
     offline.loadOfflineProfileSnapshot.mockReturnValue(offlineProfile);

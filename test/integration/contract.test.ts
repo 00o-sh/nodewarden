@@ -32,6 +32,7 @@ describe('unauthenticated contract', () => {
     expect(Object.keys(config.featureStates).sort()).toEqual(
       [
         'cipher-key-encryption',
+        'desktop-ui-settings-dialog',
         'duo-redirect',
         'email-verification',
         'fill-assist-targeting-rules',
