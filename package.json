@@ -117,7 +117,7 @@
       "@babel/core": "7.29.7"
     },
     "esbuild": "0.28.1",
-    "ws": "8.21.1",
+    "ws": "8.21.2",
     "brace-expansion": "5.0.9",
     "fast-uri": "3.1.5",
     "nanoid": "6.0.1",
