@@ -96,11 +96,11 @@
     "@noble/hashes": "2.2.0",
     "@simplewebauthn/server": "13.3.2",
     "@tanstack/react-query": "5.101.2",
-    "@zip.js/zip.js": "2.8.26",
+    "@zip.js/zip.js": "2.8.29",
     "fflate": "0.8.3",
     "jsqr": "1.4.0",
     "lucide-preact": "1.23.0",
-    "preact": "10.29.4",
+    "preact": "10.29.7",
     "qrcode-generator": "2.0.4",
     "wouter": "3.10.0"
   },
