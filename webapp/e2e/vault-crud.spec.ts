@@ -32,9 +32,10 @@ test('selecting an item shows its detail, and password reveals + copies', async 
   await expect(page.getByText('Login Credentials')).toBeVisible();
   await expect(page.getByText('demo@nodewarden.app').first()).toBeVisible();
 
-  // Password starts masked; Reveal shows the real value.
+  // Password starts masked; Reveal (scoped to the Password row — hidden custom
+  // fields render their own Reveal button) shows the real value.
   await expect(page.getByText('correct-horse-battery-staple')).toHaveCount(0);
-  await page.getByRole('button', { name: /^reveal$/i }).first().click();
+  await page.locator('.kv-row', { hasText: 'Password' }).getByRole('button', { name: /^reveal$/i }).click();
   await expect(page.getByText('correct-horse-battery-staple')).toBeVisible();
 
   // Copy the password and assert it landed on the clipboard.

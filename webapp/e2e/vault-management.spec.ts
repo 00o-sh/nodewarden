@@ -25,11 +25,13 @@ test('reveal then hide the password toggle in detail', async ({ page }) => {
 
   // Starts masked.
   await expect(page.getByText('correct-horse-battery-staple')).toHaveCount(0);
-  // Reveal shows the value and flips the button to Hide.
-  await page.getByRole('button', { name: /^reveal$/i }).first().click();
+  // Reveal (scoped to the Password row — hidden custom fields render their own
+  // Reveal button) shows the value and flips the button to Hide.
+  const passwordRow = page.locator('.kv-row', { hasText: 'Password' });
+  await passwordRow.getByRole('button', { name: /^reveal$/i }).click();
   await expect(page.getByText('correct-horse-battery-staple')).toBeVisible();
   // Hide masks it again.
-  await page.getByRole('button', { name: /^hide$/i }).first().click();
+  await passwordRow.getByRole('button', { name: /^hide$/i }).click();
   await expect(page.getByText('correct-horse-battery-staple')).toHaveCount(0);
 });
 

@@ -18,9 +18,11 @@ export async function login(page: Page): Promise<void> {
 }
 
 // A single vault row keyed by its visible name. Rows are `.list-item` containers
-// whose title text is the cipher's decrypted name.
+// whose title text is the cipher's decrypted name. Match the title text exactly so
+// a name that is a prefix of another (e.g. "Amazon" vs "Amazon Web Services", added
+// by the v1.8.0 duplicate-detection demo data) does not resolve to multiple rows.
 export function vaultRow(page: Page, name: string) {
-  return page.locator('.list-item', { hasText: name });
+  return page.locator('.list-item').filter({ has: page.getByText(name, { exact: true }) });
 }
 
 export async function selectVaultItem(page: Page, name: string): Promise<void> {
