@@ -50,7 +50,10 @@ beforeAll(async () => {
 describe('TOTP login replay protection', () => {
   it('accepts a fresh TOTP code once and rejects the same code on replay', async () => {
     // One fixed code, used twice. The first login consumes its time-counter.
-    const code = await totpToken(secret);
+    // Enrollment (beforeAll) already consumed the current-step counter, so use a
+    // code from the previous time step (still inside the ±1 window, not yet
+    // consumed). The sibling test below uses the next step, so the two never collide.
+    const code = await totpToken(secret, Date.now() - 30_000);
 
     const first = await loginWith(code);
     expect(first.status).toBe(200);

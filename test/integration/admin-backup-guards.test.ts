@@ -51,11 +51,27 @@ describe('admin remote backup browse/download guards', () => {
   });
 
   it('409s an integrity check with an unknown destination', async () => {
-    expect((await api('GET', '/api/admin/backup/remote/integrity?destinationId=nope&path=backup.zip', token)).status).toBe(409);
+    expect(
+      (
+        await api('POST', '/api/admin/backup/remote/integrity', token, {
+          destinationId: 'nope',
+          path: 'backup.zip',
+          masterPasswordHash: session.account.masterPasswordHash,
+        })
+      ).status
+    ).toBe(409);
   });
 
   it('409s deleting from an unknown destination', async () => {
-    expect((await api('DELETE', '/api/admin/backup/remote/file?destinationId=nope&path=backup.zip', token)).status).toBe(409);
+    expect(
+      (
+        await api('DELETE', '/api/admin/backup/remote/file', token, {
+          destinationId: 'nope',
+          path: 'backup.zip',
+          masterPasswordHash: session.account.masterPasswordHash,
+        })
+      ).status
+    ).toBe(409);
   });
 });
 
@@ -88,7 +104,14 @@ describe('admin local export / attachment blob guards', () => {
   });
 
   it('404s a blob download for an absent blob', async () => {
-    expect((await api('GET', `/api/admin/backup/blob?blobName=attachments/${crypto.randomUUID()}/${crypto.randomUUID()}.bin`, token)).status).toBe(404);
+    expect(
+      (
+        await api('POST', '/api/admin/backup/blob', token, {
+          blobName: `${crypto.randomUUID()}/${crypto.randomUUID()}.bin`,
+          masterPasswordHash: session.account.masterPasswordHash,
+        })
+      ).status
+    ).toBe(404);
   });
 });
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Profile, SessionState, TokenSuccess } from '@/lib/types';
+import { t } from '@/lib/i18n';
 
 // app-auth.ts composes a number of api/storage modules. We mock those module
 // boundaries so the orchestration logic (bootstrap state machine, login/unlock
@@ -348,6 +349,62 @@ describe('performPasswordLogin', () => {
     }
   });
 
+  it('parses a mixed array of provider descriptors (objects, names, junk) and the provider-data map', async () => {
+    api.loginWithPassword.mockResolvedValue({
+      // Objects (Type/type), name strings (webauthn/yubikey), and unusable
+      // entries (unknown name, empty) all flow through the provider parser.
+      TwoFactorProviders: [{ Type: 7 }, { type: 3 }, 'webauthn', 'yubikey', 'garbage', ''],
+      TwoFactorProviders2: { '7': { challenge: 'c7' }, unknownKey: {} },
+    });
+    const mod = await loadModule();
+    const result = await mod.performPasswordLogin('u@example.com', 'pw', 600000);
+    expect(result.kind).toBe('totp');
+    if (result.kind === 'totp') {
+      // SUPPORTED order is [webauthn(7), yubikey(3), authenticator(0)].
+      expect(result.pendingTotp.providerType).toBe(7);
+      expect(result.pendingTotp.availableProviders).toEqual([7, 3]);
+      expect(result.pendingTotp.providerData).toEqual({ challenge: 'c7' });
+      expect(result.pendingTotp.providerDataByType).toEqual({ 7: { challenge: 'c7' } });
+    }
+  });
+
+  it('falls back to the authenticator provider and reads provider2 data when providers is an empty object', async () => {
+    api.loginWithPassword.mockResolvedValue({
+      TwoFactorProviders: {},
+      TwoFactorProviders2: { WebAuthn: { challenge: 'cw' } },
+    });
+    const mod = await loadModule();
+    const result = await mod.performPasswordLogin('u@example.com', 'pw', 600000);
+    expect(result.kind).toBe('totp');
+    if (result.kind === 'totp') {
+      // No parseable provider => authenticator (0) default; availableProviders
+      // falls back to [providerType].
+      expect(result.pendingTotp.providerType).toBe(0);
+      expect(result.pendingTotp.availableProviders).toEqual([0]);
+      // The WebAuthn key normalizes to provider 7 in the by-type map, so the
+      // direct lookup for provider 0 misses and providerData stays undefined.
+      expect(result.pendingTotp.providerData).toBeUndefined();
+      expect(result.pendingTotp.providerDataByType).toEqual({ 7: { challenge: 'cw' } });
+    }
+  });
+
+  it('parses an object-shaped provider map, skipping entries explicitly set to false', async () => {
+    api.loginWithPassword.mockResolvedValue({
+      TwoFactorProviders: { '0': true, '7': false, WebAuthn: { challenge: 'cw' } },
+    });
+    const mod = await loadModule();
+    const result = await mod.performPasswordLogin('u@example.com', 'pw', 600000);
+    expect(result.kind).toBe('totp');
+    if (result.kind === 'totp') {
+      // '7' is disabled (false) and skipped; '0' and WebAuthn(7) remain.
+      expect(result.pendingTotp.availableProviders).toEqual([7, 0]);
+      expect(result.pendingTotp.providerType).toBe(7);
+      // No TwoFactorProviders2 => empty by-type map, undefined provider data.
+      expect(result.pendingTotp.providerDataByType).toEqual({});
+      expect(result.pendingTotp.providerData).toBeUndefined();
+    }
+  });
+
   it('throws when the token has no profile key', async () => {
     api.loginWithPassword.mockResolvedValue(makeToken({ Key: '' }));
     const mod = await loadModule();
@@ -445,6 +502,15 @@ describe('performTotpLogin', () => {
     api.loginWithPassword.mockResolvedValue({ error_description: 'Two-step token is invalid. Try again.' });
     const mod = await loadModule();
     await expect(mod.performTotpLogin(pending, '000000', false)).rejects.toThrow();
+  });
+
+  it('uses the passkey-specific failure message for a rejected webauthn provider', async () => {
+    // An empty error_description forces the provider-specific fallback message.
+    api.loginWithPassword.mockResolvedValue({ error_description: '' });
+    const mod = await loadModule();
+    await expect(
+      mod.performTotpLogin({ ...pending, providerType: 7 }, '000000', false)
+    ).rejects.toThrow(t('txt_passkey_verification_failed'));
   });
 });
 
@@ -569,6 +635,17 @@ describe('performUnlock', () => {
     const mod = await loadModule();
     const result = await mod.performUnlock(session, makeProfile(), 'pw', 600000);
     expect(result.kind).toBe('totp');
+  });
+
+  it('falls back to [providerType] for availableProviders when unlock 2fa lists no parseable providers', async () => {
+    api.loginWithPassword.mockResolvedValue({ TwoFactorProviders: {} });
+    const mod = await loadModule();
+    const result = await mod.performUnlock(session, makeProfile(), 'pw', 600000);
+    expect(result.kind).toBe('totp');
+    if (result.kind === 'totp') {
+      expect(result.pendingTotp.providerType).toBe(0);
+      expect(result.pendingTotp.availableProviders).toEqual([0]);
+    }
   });
 
   it('falls back to offline unlock when the network login throws and the service is unreachable', async () => {

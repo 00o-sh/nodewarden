@@ -28,3 +28,26 @@ export async function selectVaultItem(page: Page, name: string): Promise<void> {
   // The detail pane renders the item's name in its title.
   await expect(page.locator('.detail-title', { hasText: name }).first()).toBeVisible();
 }
+
+// The flat sidebar now exposes a single "Settings" link. On desktop /settings
+// redirects straight to the categorized account-settings page (/settings/account)
+// with its Appearance / Session timeout / Master Password / Two-step login / Keys
+// tabs.
+export async function openAccountSettings(page: Page): Promise<void> {
+  await page.getByRole('link', { name: 'Settings', exact: true }).first().click();
+  await expect(page).toHaveURL(/\/settings\/account/);
+}
+
+// Domain Rules is no longer a flat side link. Switching the sidebar to the
+// grouped layout exposes the Settings group's Domain Rules sub-link.
+export async function openDomainRules(page: Page): Promise<void> {
+  await page.locator('.nav-layout-trigger').click();
+  await page.locator('.nav-layout-option', { hasText: /^Grouped$/ }).click();
+  await page.getByRole('link', { name: 'Domain Rules' }).first().click();
+  await expect(page).toHaveURL(/\/settings\/domain-rules/);
+}
+
+// Open one of the categorized settings tabs by its visible label.
+export async function openSettingsTab(page: Page, label: string): Promise<void> {
+  await page.locator('.settings-category-tab', { hasText: label }).click();
+}

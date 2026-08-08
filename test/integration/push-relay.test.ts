@@ -127,7 +127,10 @@ describe('mobile push relay', () => {
 
   it('unregisters a device push token with the relay', async () => {
     expect(await unregisterMobilePushDevice(env, 'push-uuid-7')).toBe(true);
-    expect(calls.some((c) => c.path === '/push/delete/push-uuid-7')).toBe(true);
+    const del = calls.find((c) => c.path === '/push/delete');
+    expect(del).toBeTruthy();
+    expect(del!.method).toBe('POST');
+    expect(JSON.parse(del!.body!)).toEqual({ id: 'push-uuid-7' });
   });
 
   it('sends only non-secret metadata when notifying a user who has a push device', async () => {

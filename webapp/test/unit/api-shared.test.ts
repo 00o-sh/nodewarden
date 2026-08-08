@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   BULK_API_CHUNK_SIZE,
   chunkArray,
@@ -6,6 +6,9 @@ import {
   parseContentDispositionFileName,
   parseErrorMessage,
   parseJson,
+  requiredError,
+  uploadDirectEncryptedPayload,
+  uploadWithProgress,
 } from '@/lib/api/shared';
 
 describe('chunkArray', () => {
@@ -75,5 +78,62 @@ describe('parseErrorMessage', () => {
 
   it('returns the fallback when no error field exists', async () => {
     expect(await parseErrorMessage(new Response('{}', { status: 500 }), 'fallback')).toBe('fallback');
+  });
+});
+
+describe('requiredError', () => {
+  it('always throws (never returns)', () => {
+    expect(() => requiredError('txt_missing_field')).toThrow();
+  });
+});
+
+describe('uploadDirectEncryptedPayload', () => {
+  it('rejects an unsupported file upload type', async () => {
+    await expect(
+      uploadDirectEncryptedPayload({
+        accessToken: 'tok',
+        uploadUrl: 'https://blob/x',
+        payload: new ArrayBuffer(4),
+        fileUploadType: 0,
+        unsupportedMessage: 'nope not supported',
+      })
+    ).rejects.toThrow('nope not supported');
+  });
+
+  it('delegates a direct (type 1) upload to uploadWithProgress via fetch fallback', async () => {
+    // With XMLHttpRequest unavailable, uploadWithProgress uses fetch directly,
+    // letting us assert the PUT + azure blob headers + auth token.
+    vi.stubGlobal('XMLHttpRequest', undefined);
+    const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    const resp = await uploadDirectEncryptedPayload({
+      accessToken: 'my-token',
+      uploadUrl: 'https://blob/x',
+      payload: new ArrayBuffer(8),
+      fileUploadType: 1,
+      unsupportedMessage: 'unused',
+    });
+    expect(resp.ok).toBe(true);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://blob/x');
+    expect(init.method).toBe('PUT');
+    const headers = init.headers as Headers;
+    expect(headers.get('Authorization')).toBe('Bearer my-token');
+    expect(headers.get('x-ms-blob-type')).toBe('BlockBlob');
+    expect(headers.get('Content-Type')).toBe('application/octet-stream');
+  });
+});
+
+describe('uploadWithProgress (fetch fallback)', () => {
+  it('defaults to POST and forwards the access token as a bearer header', async () => {
+    vi.stubGlobal('XMLHttpRequest', undefined);
+    const fetchMock = vi.fn(() => Promise.resolve(new Response('ok', { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    await uploadWithProgress('/upload', { accessToken: 'abc', body: 'data' });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/upload');
+    expect(init.method).toBe('POST');
+    expect((init.headers as Headers).get('Authorization')).toBe('Bearer abc');
+    expect(init.body).toBe('data');
   });
 });

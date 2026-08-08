@@ -2,10 +2,10 @@ import { SELF } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import { url } from './helpers';
 
-// Once an IP is locked out by repeated failed password logins, the webauthn and
-// client_credentials grants short-circuit with a 429 before doing any work.
-// Driven through the real worker and its real D1-backed login lockout (10
-// attempts), no mocks.
+// The grant-level login lockout is keyed per (grantType, subject): repeated
+// failed attempts against the SAME webauthn token or client_credentials user id
+// short-circuit that subject with a 429 before doing any work. Driven through the
+// real worker and its real D1-backed login lockout (10 attempts), no mocks.
 function form(params: Record<string, string>, ip: string): Promise<Response> {
   return SELF.fetch(url('/identity/connect/token'), {
     method: 'POST',
@@ -14,26 +14,28 @@ function form(params: Record<string, string>, ip: string): Promise<Response> {
   });
 }
 
-async function lockOut(ip: string): Promise<void> {
-  // 10 failed password logins (loginMaxAttempts) lock the IP for the lockout window.
-  for (let i = 0; i < 11; i++) {
-    await form({ grant_type: 'password', username: `nobody-${i}@vault.test`, password: 'wrong', scope: 'api offline_access', client_id: 'web', deviceIdentifier: crypto.randomUUID(), deviceType: '10', deviceName: 't' }, ip);
-  }
-}
-
 describe('grant rate-limit lockout', () => {
-  it('429s a webauthn grant from a locked-out IP', async () => {
+  it('429s a webauthn grant once its token is locked out', async () => {
     const ip = '198.51.107.1';
-    await lockOut(ip);
-    const res = await form({ grant_type: 'webauthn', token: 'x', deviceResponse: '{}' }, ip);
-    expect(res.status).toBe(429);
+    const attempt = () => form({ grant_type: 'webauthn', token: 'locked-token', deviceResponse: '{}' }, ip);
+    // Before the threshold the (unverifiable) assertion fails with a 4xx, not a 429.
+    const first = await attempt();
+    expect(first.status).not.toBe(429);
+    // 10 failed attempts (loginMaxAttempts) lock this token's bucket.
+    for (let i = 0; i < 9; i++) await attempt();
+    const locked = await attempt();
+    expect(locked.status).toBe(429);
   });
 
-  it('429s a client_credentials grant from a locked-out IP', async () => {
+  it('429s a client_credentials grant once its user id is locked out', async () => {
     const ip = '198.51.107.2';
-    await lockOut(ip);
-    const res = await form({ grant_type: 'client_credentials', client_id: `user.${crypto.randomUUID()}`, client_secret: 's', scope: 'api' }, ip);
-    expect(res.status).toBe(429);
+    const clientId = `user.${crypto.randomUUID()}`;
+    const attempt = () => form({ grant_type: 'client_credentials', client_id: clientId, client_secret: 's', scope: 'api' }, ip);
+    const first = await attempt();
+    expect(first.status).not.toBe(429);
+    for (let i = 0; i < 9; i++) await attempt();
+    const locked = await attempt();
+    expect(locked.status).toBe(429);
   });
 
   // NOTE: the per-minute public (send_access) and refresh_token budgets use a

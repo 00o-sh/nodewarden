@@ -129,6 +129,41 @@ describe('<SendsPage>', () => {
     await waitFor(() => expect(onRefresh).toHaveBeenCalledTimes(1));
   });
 
+  it('shows a lock icon in the list row for a password-protected send', () => {
+    setup({ sends: [makeSend({ password: 'secret' })] });
+    // The list-sub line renders an inline lock icon only when send.password is set.
+    const lockIcon = document.querySelector('.list-sub .inline-icon');
+    expect(lockIcon).toBeTruthy();
+  });
+
+  it('edits a password-protected send: shows the masked field + Remove, then reveals a fresh password input', async () => {
+    setup({ sends: [makeSend({ password: 'secret' })] });
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(t('txt_edit')) }));
+    expect(screen.getByText(t('txt_edit_send'))).toBeInTheDocument();
+
+    // hasPassword branch: a disabled masked input plus a Remove button.
+    const removeBtn = screen.getByRole('button', { name: t('txt_remove') });
+    const maskedInput = document.querySelector('.password-wrap input[disabled]') as HTMLInputElement;
+    expect(maskedInput).toBeTruthy();
+    expect(maskedInput.value).toContain('•');
+
+    // Removing the password flips to the editable input (else branch).
+    fireEvent.click(removeBtn);
+    const editable = document.querySelector('.password-wrap input:not([disabled])') as HTMLInputElement;
+    expect(editable).toBeTruthy();
+    expect(editable.type).toBe('password');
+
+    // Typing updates the draft password via the onInput handler.
+    fireEvent.input(editable, { target: { value: 'new-pass' } });
+    expect((document.querySelector('.password-wrap input:not([disabled])') as HTMLInputElement).value).toBe('new-pass');
+
+    // Toggling visibility exercises the showPassword branch (type -> text).
+    const toggle = document.querySelector('.password-wrap .password-toggle') as HTMLButtonElement;
+    fireEvent.click(toggle);
+    const revealed = document.querySelector('.password-wrap input:not([disabled])') as HTMLInputElement;
+    expect(revealed.type).toBe('text');
+  });
+
   it('fires onBulkDelete after selecting all and clicking delete selected', async () => {
     const { onBulkDelete } = setup({
       sends: [makeSend(), makeSend({ id: 'send-2', decName: 'Second' })],

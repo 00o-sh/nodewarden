@@ -105,8 +105,8 @@ describe('normalizeBitwardenImport', () => {
     expect(login.login.totp).toBe('JBSWY3DPEHPK3PXP');
     expect(login.login.fido2Credentials).toEqual([{ credentialId: 'abc', userName: 'octocat' }]);
     expect(login.login.uris).toEqual([
-      { uri: 'https://github.com', match: 0 },
-      { uri: 'https://gist.github.com', match: null },
+      { uri: 'https://github.com', match: 0, uriChecksum: null },
+      { uri: 'https://gist.github.com', match: null, uriChecksum: null },
     ]);
 
     expect(login.fields).toEqual([
@@ -207,6 +207,27 @@ describe('normalizeBitwardenImport', () => {
     expect(cipher.login.uris).toBeNull();
     expect(cipher.login.fido2Credentials).toBeNull();
     expect(cipher.login.username).toBe('u');
+  });
+
+  it('normalizes a non-object item entry into a default cipher', () => {
+    // A primitive/null item cannot be spread, so the mapper falls back to {} and
+    // applies defaults for every field.
+    const payload = normalizeBitwardenImport({ items: ['nope' as never, null as never] });
+    expect(payload.ciphers).toHaveLength(2);
+    const cipher = payload.ciphers[0] as any;
+    expect(cipher.id).toBeNull();
+    expect(cipher.type).toBe(1);
+    expect(cipher.name).toBe('Untitled');
+    expect(cipher.login).toBeNull();
+  });
+
+  it('normalizes a null uri entry to an all-null uri record', () => {
+    const payload = normalizeBitwardenImport({
+      items: [{ type: 1, name: 'X', login: { username: 'u', uris: [null as never, { uri: 'https://ok' }] } }],
+    });
+    const cipher = payload.ciphers[0] as any;
+    expect(cipher.login.uris[0]).toEqual({ uri: null, uriChecksum: null, match: null });
+    expect(cipher.login.uris[1]).toEqual({ uri: 'https://ok', uriChecksum: null, match: null });
   });
 
   it('tolerates missing folders/items arrays', () => {

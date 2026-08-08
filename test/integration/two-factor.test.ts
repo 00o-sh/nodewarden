@@ -30,9 +30,9 @@ function base32ToBytes(secret: string): Uint8Array {
   return new Uint8Array(out);
 }
 
-async function totp(secret: string): Promise<string> {
+async function totp(secret: string, nowMs: number = Date.now()): Promise<string> {
   const key = await crypto.subtle.importKey('raw', base32ToBytes(secret), { name: 'HMAC', hash: 'SHA-1' }, false, ['sign']);
-  const counter = Math.floor(Date.now() / 1000 / 30);
+  const counter = Math.floor(nowMs / 1000 / 30);
   const buf = new Uint8Array(8);
   let c = counter;
   for (let i = 7; i >= 0; i--) {
@@ -88,8 +88,10 @@ describe('TOTP two-factor lifecycle', () => {
     const challenged = (await (await loginForm({})).json()) as any;
     expect(challenged.access_token).toBeUndefined();
 
-    // With a valid authenticator code (provider 0), login succeeds.
-    const ok = await loginForm({ twoFactorProvider: '0', twoFactorToken: await totp(secret) });
+    // With a valid authenticator code (provider 0), login succeeds. Enrollment
+    // consumed the current-step counter (Bitwarden-compatible replay protection at
+    // enrollment), so use the next step's code — still inside the ±1 window, unconsumed.
+    const ok = await loginForm({ twoFactorProvider: '0', twoFactorToken: await totp(secret, Date.now() + 30_000) });
     expect(ok.status).toBe(200);
     expect(typeof ((await ok.json()) as any).access_token).toBe('string');
   });

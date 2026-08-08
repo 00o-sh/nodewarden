@@ -70,14 +70,14 @@ describe('admin backup missing-destination and bad-path branches', () => {
     const ghost = crypto.randomUUID();
     expect((await api('GET', `/api/admin/backup/remote?destinationId=${ghost}`, adminToken)).status).toBe(409);
     expect((await api('POST', '/api/admin/backup/remote/download', adminToken, { path: 'a.zip', destinationId: ghost, masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(409);
-    expect((await api('GET', `/api/admin/backup/remote/integrity?path=a.zip&destinationId=${ghost}`, adminToken)).status).toBe(409);
-    expect((await api('DELETE', `/api/admin/backup/remote/file?path=a.zip&destinationId=${ghost}`, adminToken)).status).toBe(409);
+    expect((await api('POST', '/api/admin/backup/remote/integrity', adminToken, { path: 'a.zip', destinationId: ghost, masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(409);
+    expect((await api('DELETE', '/api/admin/backup/remote/file', adminToken, { path: 'a.zip', destinationId: ghost, masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(409);
   });
 
   it('409s download/integrity/delete for a non-zip path before touching the remote', async () => {
     expect((await api('POST', '/api/admin/backup/remote/download', adminToken, { path: 'notes.txt', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(409);
-    expect((await api('GET', '/api/admin/backup/remote/integrity?path=notes.txt', adminToken)).status).toBe(409);
-    expect((await api('DELETE', '/api/admin/backup/remote/file?path=notes.txt', adminToken)).status).toBe(409);
+    expect((await api('POST', '/api/admin/backup/remote/integrity', adminToken, { path: 'notes.txt', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(409);
+    expect((await api('DELETE', '/api/admin/backup/remote/file', adminToken, { path: 'notes.txt', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(409);
   });
 
   it('fails a configured run against an unknown destination (500)', async () => {

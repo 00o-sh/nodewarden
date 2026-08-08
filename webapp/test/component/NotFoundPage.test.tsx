@@ -25,8 +25,11 @@ describe('<NotFoundPage>', () => {
     expect(screen.getByRole('link', { name: /Back To Home/i })).toHaveAttribute('href', '/dashboard');
   });
 
-  it('renders the decorative star boxes (4)', () => {
+  it('renders the decorative brand block (logo + wordmark)', () => {
     const { container } = render(<NotFoundPage />);
-    expect(container.querySelectorAll('.not-found-star-box')).toHaveLength(4);
+    const logo = container.querySelector('.not-found-brand .not-found-logo');
+    expect(logo).toBeInTheDocument();
+    expect(logo).toHaveAttribute('src', '/nodewarden-logo.svg');
+    expect(container.querySelector('.not-found-brand .not-found-wordmark')).toBeInTheDocument();
   });
 });

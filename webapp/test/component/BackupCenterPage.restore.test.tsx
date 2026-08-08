@@ -264,12 +264,20 @@ describe('<BackupCenterPage> restore flows', () => {
     const row = screen.getByText('backup.zip').closest('.backup-browser-row') as HTMLElement;
     fireEvent.click(within(row).getByRole('button', { name: 'Restore' }));
 
-    // The component inspects integrity first; matching => straight to the gate.
-    await waitFor(() => expect(onInspectRemoteBackup).toHaveBeenCalled());
+    // The integrity inspect now requires the master password, so the gate opens
+    // first; neither inspect nor restore runs until the password is submitted.
     await findPasswordPrompt();
+    expect(onInspectRemoteBackup).not.toHaveBeenCalled();
     expect(onRestoreRemoteBackup).not.toHaveBeenCalled();
 
     await submitPasswordPrompt('remote-restore-pw');
+
+    // Password submitted => inspect runs (with the password) => matching => restore.
+    await waitFor(() => expect(onInspectRemoteBackup).toHaveBeenCalledTimes(1));
+    expect(onInspectRemoteBackup.mock.calls[0][0]).toBe('remote-restore-pw');
+    expect(onInspectRemoteBackup.mock.calls[0][1]).toBe(DESTINATION_ID);
+    expect(onInspectRemoteBackup.mock.calls[0][2]).toBe('backup.zip');
+
     await waitFor(() => expect(onRestoreRemoteBackup).toHaveBeenCalledTimes(1));
     expect(onRestoreRemoteBackup.mock.calls[0][0]).toBe('remote-restore-pw');
     expect(onRestoreRemoteBackup.mock.calls[0][1]).toBe(DESTINATION_ID);
@@ -292,12 +300,22 @@ describe('<BackupCenterPage> restore flows', () => {
     const row = screen.getByText('backup.zip').closest('.backup-browser-row') as HTMLElement;
     fireEvent.click(within(row).getByRole('button', { name: 'Restore' }));
 
+    // Inspect needs the password, so the gate opens first; submitting it runs the
+    // (mismatching) integrity check, which then surfaces the warning dialog.
+    await submitPasswordPrompt('inspect-pw');
+    await waitFor(() => expect(onInspectRemoteBackup).toHaveBeenCalledTimes(1));
+    expect(onInspectRemoteBackup.mock.calls[0][0]).toBe('inspect-pw');
+    expect(onRestoreRemoteBackupAllowingChecksumMismatch).not.toHaveBeenCalled();
+
     const warningDialog = await findDialogByText(t('txt_backup_restore_checksum_warning_title'));
+    // Proceeding re-opens the gate; the second password is the one used to restore.
     fireEvent.click(within(warningDialog).getByRole('button', { name: t('txt_backup_restore_checksum_warning_confirm') }));
     await submitPasswordPrompt('remote-mismatch-pw');
 
     await waitFor(() => expect(onRestoreRemoteBackupAllowingChecksumMismatch).toHaveBeenCalledTimes(1));
     expect(onRestoreRemoteBackupAllowingChecksumMismatch.mock.calls[0][0]).toBe('remote-mismatch-pw');
+    expect(onRestoreRemoteBackupAllowingChecksumMismatch.mock.calls[0][1]).toBe(DESTINATION_ID);
+    expect(onRestoreRemoteBackupAllowingChecksumMismatch.mock.calls[0][2]).toBe('backup.zip');
   });
 
   it('runs the remote replace-required flow then restores with replace=true', async () => {
@@ -333,9 +351,15 @@ describe('<BackupCenterPage> restore flows', () => {
     // The delete confirm dialog has a "Delete" confirm button.
     fireEvent.click(within(deleteDialog).getByRole('button', { name: t('txt_delete') }));
 
+    // Delete now runs through the master-password gate; nothing fires until submit.
+    await findPasswordPrompt();
+    expect(onDeleteRemoteBackup).not.toHaveBeenCalled();
+
+    await submitPasswordPrompt('delete-pw');
     await waitFor(() => expect(onDeleteRemoteBackup).toHaveBeenCalledTimes(1));
-    expect(onDeleteRemoteBackup.mock.calls[0][0]).toBe(DESTINATION_ID);
-    expect(onDeleteRemoteBackup.mock.calls[0][1]).toBe('backup.zip');
+    expect(onDeleteRemoteBackup.mock.calls[0][0]).toBe('delete-pw');
+    expect(onDeleteRemoteBackup.mock.calls[0][1]).toBe(DESTINATION_ID);
+    expect(onDeleteRemoteBackup.mock.calls[0][2]).toBe('backup.zip');
     await waitFor(() => expect(onNotify).toHaveBeenCalledWith('success', t('txt_backup_remote_delete_success')));
   });
 

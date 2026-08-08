@@ -35,6 +35,7 @@ vi.mock('@/components/vault/VaultListPanel', () => ({
             <button type="button" data-testid={`select-${cipher.id}`} onClick={() => props.onSelectCipher(cipher.id)}>
               {cipher.decName}
             </button>
+            <span data-testid={`subtitle-${cipher.id}`}>{props.listSubtitle(cipher)}</span>
             <button
               type="button"
               data-testid={`check-${cipher.id}`}
@@ -407,5 +408,36 @@ describe('<VaultPage> extra coverage', () => {
   it('passes the error string into the list panel', () => {
     setup({ error: 'boom' });
     expect(screen.getByTestId('list-error')).toHaveTextContent('boom');
+  });
+
+  it('computes list subtitles for bank / license / passport ciphers (types 6/7/8)', () => {
+    setup({
+      ciphers: [
+        makeCipher({
+          id: 'bk',
+          decName: 'Chase',
+          type: 6,
+          login: undefined,
+          bankAccount: { decBankName: 'Chase', decAccountType: 'Checking', decAccountNumber: '000123456789' },
+        } as unknown as Partial<Cipher>),
+        makeCipher({
+          id: 'dl',
+          decName: 'License',
+          type: 7,
+          login: undefined,
+          driversLicense: { decLicenseNumber: 'D1234567' },
+        } as unknown as Partial<Cipher>),
+        makeCipher({
+          id: 'pp',
+          decName: 'Passport',
+          type: 8,
+          login: undefined,
+          passport: { decPassportNumber: 'X1234567' },
+        } as unknown as Partial<Cipher>),
+      ],
+    });
+    expect(screen.getByTestId('subtitle-bk')).toHaveTextContent('Chase, Checking, *6789');
+    expect(screen.getByTestId('subtitle-dl')).toHaveTextContent('D1234567');
+    expect(screen.getByTestId('subtitle-pp')).toHaveTextContent('X1234567');
   });
 });

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { login } from './helpers';
+import { login, openAccountSettings } from './helpers';
 
 // Import and Settings journeys: the Import/Export page renders and a format can
 // be chosen from the source list; the Settings page renders and the language
@@ -28,13 +28,12 @@ test('Import page renders and a source format can be selected', async ({ page })
 });
 
 test('Settings renders the language selector with multiple locales', async ({ page }) => {
-  await page.getByRole('link', { name: 'Account Settings' }).click();
-  await expect(page).toHaveURL(/\/settings\/account/);
-  await expect(page.getByRole('heading', { name: 'Language' })).toBeVisible();
+  await openAccountSettings(page);
 
-  // The language module exposes a select with more than one locale option.
+  // The Appearance tab (active by default) exposes the display-language select
+  // with more than one locale option.
   const languageSelect = page
-    .locator('.settings-module', { hasText: 'Language' })
+    .locator('.settings-submodule', { hasText: 'Display language' })
     .getByRole('combobox');
   await expect(languageSelect).toBeVisible();
   const localeCount = await languageSelect.locator('option').count();

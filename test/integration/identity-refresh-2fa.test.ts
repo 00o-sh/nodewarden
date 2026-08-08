@@ -81,9 +81,12 @@ describe('password grant — 2FA remember device', () => {
 
   it('issues a remember token and accepts it on a later login from the same device', async () => {
     // Authenticator login with remember=true returns a trusted-device token.
+    // Enrollment consumed the current-step counter (Bitwarden-compatible replay
+    // protection at enrollment), so log in with the next step's code — still inside
+    // the ±1 verification window, but not yet consumed.
     const first = await passwordLogin({
       twoFactorProvider: '0',
-      twoFactorToken: await totpToken(secret),
+      twoFactorToken: await totpToken(secret, Date.now() + 30_000),
       twoFactorRemember: '1',
     });
     expect(first.status).toBe(200);

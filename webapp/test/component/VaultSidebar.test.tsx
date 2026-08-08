@@ -67,6 +67,16 @@ describe('<VaultSidebar>', () => {
     expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'type', value: 'login' });
   });
 
+  it('fires onChangeFilter for the bank / license / passport type buttons', () => {
+    const { onChangeFilter } = setup();
+    fireEvent.click(screen.getByRole('button', { name: /Bank Account/i }));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'type', value: 'bank' });
+    fireEvent.click(screen.getByRole('button', { name: /Driver License/i }));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'type', value: 'license' });
+    fireEvent.click(screen.getByRole('button', { name: /Passport/i }));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'type', value: 'passport' });
+  });
+
   it('fires onChangeFilter with a folder filter when a folder button clicked', () => {
     const { onChangeFilter } = setup();
     fireEvent.click(screen.getByText('Work'));

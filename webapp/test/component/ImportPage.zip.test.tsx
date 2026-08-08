@@ -299,6 +299,109 @@ describe('<ImportPage> zip / encrypted branches', () => {
     expect(onImport).toHaveBeenCalledTimes(1);
   });
 
+  // --- validateBitwardenZipEntries size/shape guards ---------------------
+  // These entries carry an `uncompressedSize` so the size assertions (which the
+  // pass-through useZip helper's entries don't populate) run for real.
+  const MiB = 1024 * 1024;
+  type SizedEntry = {
+    filename: string;
+    directory?: boolean;
+    uncompressedSize?: number;
+    getData: (writer: unknown, options?: { password?: string }) => Promise<Uint8Array>;
+  };
+  function useSizedEntries(entries: SizedEntry[]) {
+    zipBehavior = {
+      getEntries: async () => entries.map((e) => ({ directory: false, ...e })) as unknown as ZipEntry[],
+    };
+  }
+
+  async function runBitwardenZip() {
+    selectImportSource('bitwarden_zip');
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    setFiles(fileInput, [makeZipFile()]);
+    await waitFor(() => expect(fileInput.files?.[0]?.name).toBe('backup.zip'));
+    fireEvent.click(getImportButton());
+  }
+
+  it('rejects a bitwarden_zip whose data.json exceeds the text-entry size limit', async () => {
+    const { onNotify, onImport } = setup();
+    useSizedEntries([
+      { filename: 'data.json', uncompressedSize: 40 * MiB, getData: async () => strToU8(VALID_DATA_JSON) },
+    ]);
+    await runBitwardenZip();
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_import_zip_entry_too_large', { size: '32' })));
+    expect(onImport).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bitwarden_zip whose attachments expand beyond the total attachment budget', async () => {
+    const { onNotify, onImport } = setup();
+    // Six 90 MiB attachments (each under the 100 MiB per-file cap) sum to 540 MiB,
+    // tripping the 512 MiB total-attachment guard during pre-validation.
+    const entries: SizedEntry[] = Array.from({ length: 6 }, (_, i) => ({
+      filename: `attachments/cipher-1/file-${i}.bin`,
+      uncompressedSize: 90 * MiB,
+      getData: async () => new Uint8Array(),
+    }));
+    useSizedEntries(entries);
+    await runBitwardenZip();
+    await waitFor(() =>
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_import_zip_expands_too_large', { size: '512' }))
+    );
+    expect(onImport).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bitwarden_zip containing too many entries', async () => {
+    const { onNotify, onImport } = setup();
+    const entries: SizedEntry[] = Array.from({ length: 10001 }, (_, i) => ({
+      filename: `f-${i}.txt`,
+      getData: async () => new Uint8Array(),
+    }));
+    useSizedEntries(entries);
+    await runBitwardenZip();
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_import_zip_too_many_files')));
+    expect(onImport).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bitwarden_zip entry whose name is blank', async () => {
+    const { onNotify, onImport } = setup();
+    // A blank filename normalizes to '' and is rejected as unsafe (also exercising
+    // zipEntryName's empty-name fallback).
+    useSizedEntries([
+      { filename: '', getData: async () => new Uint8Array() },
+    ]);
+    await runBitwardenZip();
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_import_zip_unsafe_file_name')));
+    expect(onImport).not.toHaveBeenCalled();
+  });
+
+  it('skips directory entries and imports the data.json payload', async () => {
+    const { onImport } = setup();
+    useSizedEntries([
+      { filename: 'attachments/', directory: true, getData: async () => new Uint8Array() },
+      { filename: 'data.json', getData: async () => strToU8(VALID_DATA_JSON) },
+    ]);
+    await runBitwardenZip();
+    await screen.findByText(t('txt_import_success'));
+    expect(onImport).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a bitwarden_zip when the extracted attachment bytes exceed the total budget', async () => {
+    const { onNotify, onImport } = setup();
+    // Pre-validation passes (no uncompressedSize), but the extracted byte lengths
+    // reported by getData sum past the 512 MiB total during the real read loop.
+    const bigBytes = { byteLength: 100 * MiB } as unknown as Uint8Array;
+    const entries: SizedEntry[] = Array.from({ length: 6 }, (_, i) => ({
+      filename: `attachments/cipher-1/big-${i}.bin`,
+      getData: async () => bigBytes,
+    }));
+    useSizedEntries(entries);
+    await runBitwardenZip();
+    await waitFor(() =>
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_import_zip_expands_too_large', { size: '512' }))
+    );
+    expect(onImport).not.toHaveBeenCalled();
+  });
+
   it('notifies the empty-zip-archive error when the archive has no entries', async () => {
     const { onNotify, onImport } = setup();
     zipBehavior = { getEntries: async () => [] };

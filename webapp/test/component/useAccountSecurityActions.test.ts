@@ -83,7 +83,7 @@ function makeOptions(overrides: Partial<Deps> = {}): Deps {
     onNotify: vi.fn(),
     onProfileUpdated: vi.fn(),
     onSetConfirm: vi.fn(),
-    refetchTotpStatus: vi.fn().mockResolvedValue(undefined),
+    refetchTwoFactorStatus: vi.fn().mockResolvedValue(undefined),
     refetchAuthorizedDevices: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
@@ -258,7 +258,7 @@ describe('useAccountSecurityActions', () => {
         masterPasswordHash: 'derived-hash',
       });
       expect(options.clearDisableTotpDialog).toHaveBeenCalled();
-      expect(options.refetchTotpStatus).toHaveBeenCalled();
+      expect(options.refetchTwoFactorStatus).toHaveBeenCalled();
       expect(options.onNotify).toHaveBeenCalledWith('success', t('txt_totp_disabled'));
     });
 

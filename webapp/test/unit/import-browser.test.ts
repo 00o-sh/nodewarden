@@ -216,6 +216,46 @@ describe('parseBitwardenCsv (extra branches)', () => {
     expect(cipher.login.username).toBe('alice');
   });
 
+  it('restores a NodeWarden card item stored as a note with nodewardenType metadata', () => {
+    const fields = 'nodewardenType: card\ncard.cardholderName: Jane\ncard.number: 4111111111111111\nPIN: 1234';
+    const csv = ['type,name,notes,fields', `note,My Card,card note,"${fields}"`].join('\n');
+    const cipher = parseBitwardenCsv(csv).ciphers[0] as any;
+    expect(cipher.type).toBe(3);
+    expect(cipher.name).toBe('My Card');
+    expect(cipher.card).toMatchObject({ cardholderName: 'Jane', number: '4111111111111111' });
+    expect(cipher.identity).toBeNull();
+    expect(cipher.sshKey).toBeNull();
+    // The metadata lines are excluded; only the genuine custom field survives.
+    expect(cipher.fields).toEqual([{ type: 0, name: 'PIN', value: '1234', linkedId: null }]);
+  });
+
+  it('restores a NodeWarden identity item and ignores fields outside the allow-list', () => {
+    const fields = 'nodewardenType: identity\nidentity.firstName: Ada\nidentity.lastName: Lovelace\nidentity.bogus: nope';
+    const csv = ['type,name,fields', `note,Me,"${fields}"`].join('\n');
+    const cipher = parseBitwardenCsv(csv).ciphers[0] as any;
+    expect(cipher.type).toBe(4);
+    expect(cipher.identity).toMatchObject({ firstName: 'Ada', lastName: 'Lovelace' });
+    // Unknown identity.* keys are dropped.
+    expect('bogus' in cipher.identity).toBe(false);
+  });
+
+  it('restores a NodeWarden sshKey item preserving multiline private keys', () => {
+    const fields = 'nodewardenType: sshKey\nsshKey.privateKey: LINE1\nLINE2\nsshKey.publicKey: ssh-ed25519 AAAA';
+    const csv = ['type,name,fields', `note,Key,"${fields}"`].join('\n');
+    const cipher = parseBitwardenCsv(csv).ciphers[0] as any;
+    expect(cipher.type).toBe(5);
+    expect(cipher.sshKey.privateKey).toBe('LINE1\nLINE2');
+    expect(cipher.sshKey.publicKey).toBe('ssh-ed25519 AAAA');
+  });
+
+  it('keeps a note as a plain secure note when the nodewardenType prefix lines are missing', () => {
+    // nodewardenType says card but there are no card.* lines -> stays a note.
+    const csv = ['type,name,fields', 'note,Plain,"nodewardenType: card"'].join('\n');
+    const cipher = parseBitwardenCsv(csv).ciphers[0] as any;
+    expect(cipher.type).toBe(2);
+    expect(cipher.secureNote).toEqual({ type: 0 });
+  });
+
   it('handles secure note rows including custom fields and folders', () => {
     const csv = [
       'folder,type,name,notes,fields',

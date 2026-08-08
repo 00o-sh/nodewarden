@@ -10,7 +10,7 @@ import {
   getPasswordHint,
   getProfile,
   getTotpRecoveryCode,
-  getTotpStatus,
+  getTwoFactorProviderStatus,
   listAccountPasskeys,
   loginWithPassword,
   recoverTwoFactor,
@@ -170,8 +170,8 @@ describe('getApiKey / rotateApiKey contract', () => {
 
 describe('TOTP status / enable-guard / recovery-code contract', () => {
   it('reports TOTP disabled for a fresh account', async () => {
-    const status = await getTotpStatus(ctx.authedFetch);
-    expect(status.enabled).toBe(false);
+    const status = await getTwoFactorProviderStatus(ctx.authedFetch);
+    expect(status.totpEnabled).toBe(false);
   });
 
   it('rejects enabling TOTP with an invalid secret (reachable enable guard)', async () => {
@@ -187,8 +187,8 @@ describe('TOTP status / enable-guard / recovery-code contract', () => {
     ).rejects.toThrow();
 
     // Guard rejection must not have flipped the stored status.
-    const status = await getTotpStatus(ctx.authedFetch);
-    expect(status.enabled).toBe(false);
+    const status = await getTwoFactorProviderStatus(ctx.authedFetch);
+    expect(status.totpEnabled).toBe(false);
   });
 
   it('returns a recovery code for the correct master password hash, and rejects a wrong one', async () => {

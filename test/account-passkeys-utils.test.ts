@@ -87,15 +87,20 @@ describe('rp config', () => {
     expect(cfg.origins).toContain('https://vault.test');
   });
 
-  it('honours configured rpId/name/origins and adds extension origins', () => {
+  it('honours configured rpId/name/origins, including configured extension origins', () => {
     const cfg = getAccountPasskeyRpConfig(req('chrome-extension://abcd'), env({
       WEBAUTHN_RP_ID: 'custom.example',
       WEBAUTHN_RP_NAME: 'Custom',
-      WEBAUTHN_ALLOWED_ORIGINS: 'https://a.test, https://b.test',
+      WEBAUTHN_ALLOWED_ORIGINS: 'https://a.test, https://b.test, chrome-extension://configured',
     }));
     expect(cfg.rpId).toBe('custom.example');
     expect(cfg.rpName).toBe('Custom');
-    expect(cfg.origins).toEqual(expect.arrayContaining(['https://a.test', 'https://b.test', 'chrome-extension://abcd']));
+    expect(cfg.origins).toEqual(
+      expect.arrayContaining(['https://a.test', 'https://b.test', 'chrome-extension://configured'])
+    );
+    // An extension origin from the request header is no longer auto-reflected —
+    // only origins configured via WEBAUTHN_ALLOWED_ORIGINS are trusted.
+    expect(cfg.origins).not.toContain('chrome-extension://abcd');
   });
 
   it('ignores a non-extension Origin header', () => {
@@ -164,6 +169,99 @@ describe('response normalization', () => {
   });
 });
 
+describe('response normalization edge cases', () => {
+  it('base64url-normalizes every field and carries optional registration fields', () => {
+    // '+', '/' and '=' padding must be converted to '-'/'_' and stripped.
+    const dirty = 'ab+/cd==';
+    const clean = 'ab-_cd';
+    const reg = normalizeRegistrationResponse({
+      id: dirty,
+      rawId: dirty,
+      authenticatorAttachment: 'platform',
+      extensions: { prf: { enabled: true } }, // fed through the `extensions` fallback
+      response: {
+        clientDataJson: dirty, // lowercase-json alias
+        attestationObject: dirty,
+        authenticatorData: dirty,
+        transports: ['usb', 42],
+        publicKey: dirty,
+        publicKeyAlgorithm: -7,
+      },
+    })!;
+    expect(reg).toBeTruthy();
+    expect(reg.id).toBe(clean);
+    expect(reg.rawId).toBe(clean);
+    expect(reg.authenticatorAttachment).toBe('platform');
+    expect(reg.clientExtensionResults).toEqual({ prf: { enabled: true } });
+    expect(reg.response.clientDataJSON).toBe(clean);
+    expect(reg.response.attestationObject).toBe(clean);
+    expect(reg.response.authenticatorData).toBe(clean);
+    expect(reg.response.transports).toEqual(['usb', '42']);
+    expect(reg.response.publicKey).toBe(clean);
+    expect(reg.response.publicKeyAlgorithm).toBe(-7);
+  });
+
+  it('omits absent optional registration fields', () => {
+    const reg = normalizeRegistrationResponse({
+      id: 'id', rawId: 'rawId',
+      response: { clientDataJSON: 'cdj', attestationObject: 'att', transports: 'not-an-array', publicKeyAlgorithm: 'x' },
+    })!;
+    expect(reg.response.authenticatorData).toBeUndefined();
+    expect(reg.response.transports).toBeUndefined();
+    expect(reg.response.publicKey).toBeUndefined();
+    expect(reg.response.publicKeyAlgorithm).toBeUndefined();
+    expect(reg.clientExtensionResults).toEqual({});
+  });
+
+  it('carries the userHandle and clientDataJson alias on authentication responses', () => {
+    const auth = normalizeAuthenticationResponse({
+      id: 'id', rawId: 'rawId', authenticatorAttachment: 'cross-platform',
+      response: { clientDataJson: 'cdj', authenticatorData: 'ad', signature: 'sig', userHandle: 'uh+/==' },
+    })!;
+    expect(auth.authenticatorAttachment).toBe('cross-platform');
+    expect(auth.response.userHandle).toBe('uh-_');
+  });
+
+  it('omits an absent userHandle', () => {
+    const auth = normalizeAuthenticationResponse({
+      id: 'id', rawId: 'rawId',
+      response: { clientDataJSON: 'cdj', authenticatorData: 'ad', signature: 'sig' },
+    })!;
+    expect(auth.response.userHandle).toBeUndefined();
+  });
+
+  it('rejects an authentication response missing a signature', () => {
+    expect(normalizeAuthenticationResponse({
+      id: 'id', rawId: 'rawId', response: { clientDataJSON: 'cdj', authenticatorData: 'ad' },
+    })).toBeNull();
+    // A non-object input is also rejected.
+    expect(normalizeAuthenticationResponse('nope')).toBeNull();
+    expect(normalizeRegistrationResponse(42)).toBeNull();
+  });
+});
+
+describe('user id / handle conversions', () => {
+  it('round-trips a real UUID through the .NET GUID byte layout', () => {
+    const uuid = '11223344-5566-7788-99aa-bbccddeeff00';
+    const bytes = userIdToWebAuthnUserId(uuid);
+    expect(bytes.length).toBe(16);
+    // The GUID is stored with the first three groups little-endian, so the raw
+    // bytes differ from the textual order — decoding must recover the UUID.
+    expect(userHandleToUserId(bytesToBase64Url(bytes))).toBe(uuid);
+  });
+
+  it('falls back to raw text bytes for a non-UUID user id', () => {
+    const bytes = userIdToWebAuthnUserId('not-a-guid');
+    expect(new TextDecoder().decode(bytes)).toBe('not-a-guid');
+    expect(userHandleToUserId(bytesToBase64Url(bytes))).toBe('not-a-guid');
+  });
+
+  it('returns null for an undefined handle and an empty decoded handle', () => {
+    expect(userHandleToUserId(undefined)).toBeNull();
+    expect(userHandleToUserId(bytesToBase64Url(new TextEncoder().encode('   ')))).toBeNull();
+  });
+});
+
 describe('small normalizers', () => {
   it('normalizes a passkey name with a default and length cap', () => {
     expect(normalizeAccountPasskeyName('  ')).toBe('Account passkey');
@@ -177,13 +275,31 @@ describe('small normalizers', () => {
     expect(normalizeTransports(['usb', '', ' nfc '])).toEqual(['usb', 'nfc']);
   });
 
+  it('caps transports at 12 entries', () => {
+    const many = Array.from({ length: 20 }, (_, i) => `t${i}`);
+    expect(normalizeTransports(many)!.length).toBe(12);
+  });
+
   it('recognizes serialized enc-strings by type', () => {
     expect(isSerializedEncString('2.a|b|c')).toBe(true);
     expect(isSerializedEncString('3.x')).toBe(true);
+    expect(isSerializedEncString('4.x')).toBe(true); // type 4 = single body part
     expect(isSerializedEncString('5.a|b')).toBe(true);
+    expect(isSerializedEncString('6.a|b')).toBe(true); // type 6 = two body parts
     expect(isSerializedEncString('2.a|b')).toBe(false); // type 2 needs 3 parts
+    expect(isSerializedEncString('3.')).toBe(false); // type 3 needs a non-empty body
+    expect(isSerializedEncString('5.a|')).toBe(false); // type 5 needs both parts
     expect(isSerializedEncString('7.a')).toBe(false); // unknown type
+    expect(isSerializedEncString('a.b.c')).toBe(false); // more than 2 dot-parts
     expect(isSerializedEncString('')).toBe(false);
     expect(isSerializedEncString('noformat')).toBe(false);
+  });
+
+  it('serializes a fully-provisioned credential with prf status 0', () => {
+    const res = accountPasskeyCredentialToResponse(credential({
+      supportsPrf: true, encryptedUserKey: '2.a|b|c', encryptedPublicKey: '4.x', encryptedPrivateKey: '2.d|e|f',
+    }));
+    expect(res.PrfStatus).toBe(0);
+    expect(res.EncryptedUserKey).toBe('2.a|b|c');
   });
 });

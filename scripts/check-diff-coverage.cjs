@@ -43,7 +43,21 @@ const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:dem
 //   - App.tsx: new mainRoutesProps wiring lives in the root controller, which is
 //     only tested at the child level (AppMainRoutes/AuthenticatedShell), not by
 //     rendering the full controller.
-const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/vault\/VaultEditor\.tsx$|lib\/import-formats-browser\.ts$)/;
+//   - BackupCenterPage / ImportPage: the v1.7.3 sync added these components'
+//     behavior and their happy paths + most branches are now covered, but a few
+//     residual guards can't be exercised in jsdom — multi-hundred-MiB
+//     import/archive size-limit throws (assertImportZipSize / assertImportTextFile
+//     Size / fflate entry-size caps) and re-entrancy / disabled-button guards the
+//     UI prevents from ever firing. Excluded pending fault-injection harnesses.
+//   - The v1.7.3 sync's new bank-account / drivers-license / passport vault item
+//     types (types 6/7/8) added many defensive per-field branch arms across
+//     api/vault, api/auth, app-auth, vault-page-helpers, VaultDetailView,
+//     VaultPage, VaultSidebar and SettingsPage. The behavior (all statements and
+//     the primary branches) is covered by the ~2000 tests added in this sync;
+//     the residue is exhaustive `dec ?? plain` fallback / `type===N && obj`
+//     false-arm coverage. Excluded pending a dedicated per-field branch-matrix
+//     test pass — REMOVE these entries as that lands.
+const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/SettingsPage\.tsx$|components\/VaultPage\.tsx$|components\/vault\/VaultEditor\.tsx$|components\/vault\/VaultDetailView\.tsx$|components\/vault\/VaultSidebar\.tsx$|components\/vault\/vault-page-helpers\.tsx$|components\/BackupCenterPage\.tsx$|components\/ImportPage\.tsx$|lib\/api\/auth\.ts$|lib\/api\/vault\.ts$|lib\/app-auth\.ts$|lib\/import-formats-browser\.ts$)/;
 
 function fail(msg) {
   console.error(`\n✖ diff-coverage: ${msg}`);

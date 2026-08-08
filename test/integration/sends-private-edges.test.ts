@@ -68,16 +68,20 @@ describe('update validation branches', () => {
     expect((await api('PUT', `/api/sends/${send.id}`, token, { authType: 9 })).status).toBe(400);
   });
 
-  it('toggles email auth on and off through the emails field', async () => {
+  it('refuses email auth through the emails field but still clears it', async () => {
     const send = await createText();
     // Invalid emails value.
     expect((await api('PUT', `/api/sends/${send.id}`, token, { emails: 42 })).status).toBe(400);
 
-    // Setting emails switches auth to Email.
+    // A non-empty emails list requests email auth, which upstream v1.7.3 no
+    // longer supports: the server refuses it with 501.
     const withEmail = await api('PUT', `/api/sends/${send.id}`, token, { emails: ['r@x.test'] });
-    expect(withEmail.status).toBe(200);
+    expect(withEmail.status).toBe(501);
+    expect(((await withEmail.json()) as any).error).toBe(
+      'Send email verification is not supported by this server.'
+    );
 
-    // Clearing emails (null) reverts auth away from Email.
+    // Clearing emails (null) is still accepted.
     const cleared = await api('PUT', `/api/sends/${send.id}`, token, { emails: null });
     expect(cleared.status).toBe(200);
   });

@@ -281,6 +281,117 @@ describe('buildPlainBitwardenJsonDocument', () => {
   });
 });
 
+describe('buildPlainBitwardenJsonDocument - bank/license/passport', () => {
+  it('deep-decrypts bank account, drivers license and passport records', async () => {
+    const bank: Cipher = {
+      id: 'bank-1',
+      type: 6,
+      name: 'My Bank',
+      bankAccount: { bankName: await encStr('Acme Bank'), accountNumber: await encStr('123456') } as never,
+    };
+    const license: Cipher = {
+      id: 'dl-1',
+      type: 7,
+      name: 'My License',
+      driversLicense: { licenseNumber: await encStr('D999'), issuingState: 'CA' } as never,
+    };
+    const passport: Cipher = {
+      id: 'pp-1',
+      type: 8,
+      name: 'My Passport',
+      passport: { passportNumber: await encStr('X1'), nationality: await encStr('GBR') } as never,
+    };
+    const doc = await buildPlainBitwardenJsonDocument({
+      folders: [],
+      ciphers: [bank, license, passport],
+      userEncB64,
+      userMacB64,
+    });
+    const items = doc.items as Record<string, any>[];
+    expect(items[0].bankAccount.bankName).toBe('Acme Bank');
+    expect(items[0].bankAccount.accountNumber).toBe('123456');
+    expect(items[1].driversLicense.licenseNumber).toBe('D999');
+    // Plaintext (non-cipher-string) values are preserved.
+    expect(items[1].driversLicense.issuingState).toBe('CA');
+    expect(items[2].passport.passportNumber).toBe('X1');
+    expect(items[2].passport.nationality).toBe('GBR');
+  });
+
+  it('defaults bank/license/passport to null when absent', async () => {
+    const bare: Cipher = { id: 'bare', type: 1, name: 'B' };
+    const doc = await buildPlainBitwardenJsonDocument({ folders: [], ciphers: [bare], userEncB64, userMacB64 });
+    const item = (doc.items as Record<string, any>[])[0];
+    expect(item.bankAccount).toBeNull();
+    expect(item.driversLicense).toBeNull();
+    expect(item.passport).toBeNull();
+  });
+});
+
+describe('buildBitwardenCsvString - bank/license/passport source types', () => {
+  async function csvFor(ciphers: Cipher[]): Promise<string> {
+    const doc = await buildPlainBitwardenJsonDocument({ folders: [], ciphers, userEncB64, userMacB64 });
+    return buildBitwardenCsvString(doc);
+  }
+
+  it('labels bank accounts and emits their known field lines', async () => {
+    const bank: Cipher = {
+      id: 'b',
+      type: 6,
+      name: 'Bank',
+      bankAccount: { bankName: 'Acme', accountNumber: '123', iban: null } as never,
+    };
+    const csv = await csvFor([bank]);
+    expect(csv).toContain('nodewardenType: bankAccount');
+    expect(csv).toContain('bankAccount.bankName: Acme');
+    expect(csv).toContain('bankAccount.accountNumber: 123');
+    // null fields are skipped.
+    expect(csv).not.toContain('bankAccount.iban:');
+    // classified as "note" type in the type column.
+    const row = csv.slice(1).split('\r\n')[1];
+    expect(row.split(',')[2]).toBe('note');
+  });
+
+  it('labels drivers licenses and passports', async () => {
+    const license: Cipher = {
+      id: 'l',
+      type: 7,
+      name: 'DL',
+      driversLicense: { licenseNumber: 'D42', issuingState: 'CA' } as never,
+    };
+    const passport: Cipher = {
+      id: 'p',
+      type: 8,
+      name: 'PP',
+      passport: { passportNumber: 'X9', nationality: 'GBR' } as never,
+    };
+    const csv = await csvFor([license, passport]);
+    expect(csv).toContain('nodewardenType: driversLicense');
+    expect(csv).toContain('driversLicense.licenseNumber: D42');
+    expect(csv).toContain('nodewardenType: passport');
+    expect(csv).toContain('passport.passportNumber: X9');
+  });
+});
+
+describe('buildAccountEncryptedBitwardenJsonString - bank/license/passport', () => {
+  it('passes encrypted bank/license/passport records through untouched', async () => {
+    const cipher: Cipher = {
+      id: 'x',
+      type: 6,
+      name: 'enc',
+      bankAccount: { bankName: '2.a|b|c' } as never,
+      driversLicense: { licenseNumber: '2.d|e|f' } as never,
+      passport: { passportNumber: '2.g|h|i' } as never,
+    };
+    const doc = JSON.parse(
+      await buildAccountEncryptedBitwardenJsonString({ folders: [], ciphers: [cipher], userEncB64, userMacB64 })
+    );
+    const item = doc.items[0];
+    expect(item.bankAccount.bankName).toBe('2.a|b|c');
+    expect(item.driversLicense.licenseNumber).toBe('2.d|e|f');
+    expect(item.passport.passportNumber).toBe('2.g|h|i');
+  });
+});
+
 describe('buildPlainBitwardenJsonString', () => {
   it('produces pretty-printed JSON matching the document', async () => {
     const str = await buildPlainBitwardenJsonString({ folders: [], ciphers: [login()], userEncB64, userMacB64 });
@@ -384,15 +495,15 @@ describe('buildBitwardenCsvString', () => {
   it('serializes an unknown source type record generically and skips a missing known record', () => {
     const csv = buildBitwardenCsvString({
       items: [
-        // Unknown type 6 -> source label "type 6" is not in the known-field map,
+        // Unknown type 9 -> source label "type 9" is not in the known-field map,
         // so its record falls through to the generic record serializer.
-        { type: 6, name: 'Custom', 'type 6': { alpha: 'A' } },
+        { type: 9, name: 'Custom', 'type 9': { alpha: 'A' } },
         // Card type (3) but the card payload is absent -> the known-field helper
         // hits its non-record guard and emits nothing extra.
         { type: 3, name: 'Cardless' },
       ],
     } as Record<string, unknown>);
-    expect(csv).toContain('type 6.alpha: A');
+    expect(csv).toContain('type 9.alpha: A');
     expect(csv).toContain('Cardless');
   });
 
@@ -482,6 +593,61 @@ describe('buildAccountEncryptedBitwardenJsonString', () => {
     expect(item.secureNote).toEqual({ type: 0 });
     expect(item.sshKey.keyFingerprint).toBe('fp');
     expect(item.sshKey.fingerprint).toBe('fp');
+  });
+
+  it('strips decoded (dec*) fields from encrypted login/uri/sshKey records', async () => {
+    // dec* fields are runtime-only decrypted mirrors; the encrypted export must
+    // drop them rather than leak plaintext.
+    const cipher: Cipher = {
+      id: 'd',
+      type: 1,
+      name: 'enc',
+      login: {
+        username: '2.u|s|r',
+        decUsername: 'plaintext-user',
+        uris: [{ uri: '2.u|r|i', decUri: 'https://plain.example', match: 3 }],
+      } as never,
+      sshKey: { privateKey: '2.p|k|y', decPrivateKey: 'PLAINTEXT-KEY', keyFingerprint: 'fp' } as never,
+    };
+    const doc = JSON.parse(
+      await buildAccountEncryptedBitwardenJsonString({ folders: [], ciphers: [cipher], userEncB64, userMacB64 })
+    );
+    const item = doc.items[0];
+    expect('decUsername' in item.login).toBe(false);
+    expect(item.login.username).toBe('2.u|s|r');
+    expect('decUri' in item.login.uris[0]).toBe(false);
+    expect(item.login.uris[0].uri).toBe('2.u|r|i');
+    expect('decPrivateKey' in item.sshKey).toBe(false);
+    expect(item.sshKey.privateKey).toBe('2.p|k|y');
+  });
+
+  it('defensively handles non-object login/uri/sshKey structures', async () => {
+    // isRecord() rejects primitives, so cloneWithoutDecodedFields returns null and
+    // the spread falls back to an empty object without throwing.
+    // Cipher A: login is itself a primitive.
+    const cipherA: Cipher = { id: 'ma', type: 1, name: 'enc', login: 'not-an-object' as never };
+    // Cipher B: login is a record but a uri entry and the sshKey are primitives.
+    const cipherB: Cipher = {
+      id: 'mb',
+      type: 1,
+      name: 'enc',
+      login: { uris: ['not-an-object'] } as never,
+      sshKey: 'not-an-object' as never,
+    };
+    const doc = JSON.parse(
+      await buildAccountEncryptedBitwardenJsonString({ folders: [], ciphers: [cipherA, cipherB], userEncB64, userMacB64 })
+    );
+    const [a, b] = doc.items;
+    // primitive login -> normalized record with null credential fields, empty uris
+    expect(a.login.username).toBeNull();
+    expect(a.login.password).toBeNull();
+    expect(a.login.uris).toEqual([]);
+    // uri primitive -> mapped to a normalized record with null fields
+    expect(b.login.uris[0].uri).toBeNull();
+    expect(b.login.uris[0].uriChecksum).toBeNull();
+    // sshKey primitive -> normalized record with null key fields
+    expect(b.sshKey.privateKey).toBeNull();
+    expect(b.sshKey.publicKey).toBeNull();
   });
 
   it('defaults missing optional structures to null/[] in encrypted mode', async () => {

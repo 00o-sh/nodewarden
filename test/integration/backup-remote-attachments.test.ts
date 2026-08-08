@@ -178,8 +178,10 @@ describe('remote backup with attachments', () => {
   it('inspects integrity and downloads the remote archive', async () => {
     const path = latestArchiveRelPath();
 
-    const integrity = await SELF.fetch(url(`/api/admin/backup/remote/integrity?path=${encodeURIComponent(path)}`), {
-      headers: baseHeaders({ Authorization: `Bearer ${token}` }),
+    const integrity = await SELF.fetch(url('/api/admin/backup/remote/integrity'), {
+      method: 'POST',
+      headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ path, masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(integrity.status).toBe(200);
     const integrityBody = (await integrity.json()) as any;
@@ -219,9 +221,10 @@ describe('remote backup with attachments', () => {
 
   it('deletes a remote backup file', async () => {
     const path = latestArchiveRelPath();
-    const del = await SELF.fetch(url(`/api/admin/backup/remote/file?path=${encodeURIComponent(path)}`), {
+    const del = await SELF.fetch(url('/api/admin/backup/remote/file'), {
       method: 'DELETE',
-      headers: baseHeaders({ Authorization: `Bearer ${token}` }),
+      headers: baseHeaders({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ path, masterPasswordHash: session.account.masterPasswordHash }),
     });
     expect(del.status).toBe(200);
     expect(store.has(`${REMOTE_ROOT}/${path}`)).toBe(false);

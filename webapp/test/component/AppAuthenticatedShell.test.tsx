@@ -93,8 +93,12 @@ describe('AppAuthenticatedShell', () => {
     // These nav items are visible to everyone.
     expect(screen.getAllByText('Vault').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Sends').length).toBeGreaterThan(0);
-    expect(screen.getByText('Account Settings')).toBeInTheDocument();
-    expect(screen.getByText('Domain Rules')).toBeInTheDocument();
+    // Flat layout now exposes a single "Settings" side-link; Account Settings and
+    // Domain Rules were folded into the grouped-layout Settings group and are no
+    // longer standalone flat links.
+    expect(screen.getAllByText('Settings').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Account Settings')).not.toBeInTheDocument();
+    expect(screen.queryByText('Domain Rules')).not.toBeInTheDocument();
     expect(screen.getByText('Import & Export')).toBeInTheDocument();
     expect(screen.getByText('Device Management')).toBeInTheDocument();
     // Admin-only links are hidden for a user.
@@ -183,6 +187,39 @@ describe('AppAuthenticatedShell', () => {
     expect(document.querySelector('.side-nav-group')).not.toBeNull();
     // Choice persisted to localStorage.
     expect(window.localStorage.getItem(NAV_KEY)).toBe('grouped-expanded');
+  });
+
+  it('marks the flat Settings link active on the settings route (not device-management)', () => {
+    // location === '/settings' makes settingsActive true, forcing the
+    // `settingsActive && !deviceManagementActive` right operand to evaluate.
+    render(<AppAuthenticatedShell {...buildProps({ location: '/settings' })} />);
+    const settingsLink = screen
+      .getAllByText('Settings')
+      .map((s) => s.closest('a'))
+      .find((a) => a?.className.includes('side-link'));
+    expect(settingsLink?.className).toContain('active');
+    // The Device Management link stays inactive since we are not on its route.
+    const deviceLink = screen
+      .getAllByText('Device Management')
+      .map((s) => s.closest('a'))
+      .find((a) => a?.className.includes('side-link'));
+    expect(deviceLink?.className).not.toContain('active');
+  });
+
+  it('marks Device Management (not flat Settings) active on the device-management route', () => {
+    render(<AppAuthenticatedShell {...buildProps({ location: '/settings/security/device-management' })} />);
+    const deviceLink = screen
+      .getAllByText('Device Management')
+      .map((s) => s.closest('a'))
+      .find((a) => a?.className.includes('side-link'));
+    expect(deviceLink?.className).toContain('active');
+    // deviceManagementActive => flatSettingsActive is false, so the Settings
+    // flat link must NOT carry the active class.
+    const settingsLink = screen
+      .getAllByText('Settings')
+      .map((s) => s.closest('a'))
+      .find((a) => a?.className.includes('side-link'));
+    expect(settingsLink?.className).not.toContain('active');
   });
 
   it('honours a persisted grouped-smart nav layout on mount and toggles groups', () => {
