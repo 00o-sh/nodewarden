@@ -149,6 +149,15 @@ describe('summarizeImportResult', () => {
     expect(summary.typeCounts).toEqual([{ label: 'Login', count: 3 }]);
   });
 
+  it('labels the bank/license/passport standard types', () => {
+    const summary = summarizeImportResult([{ type: 6 }, { type: 7 }, { type: 8 }], 0);
+    expect(summary.typeCounts).toEqual([
+      { label: 'Bank Account', count: 1 },
+      { label: 'Driver License', count: 1 },
+      { label: 'Passport', count: 1 },
+    ]);
+  });
+
   it('appends unknown types after the standard ones, labelled Other', () => {
     const summary = summarizeImportResult([{ type: 1 }, { type: 99 }, { type: 99 }], 0);
     expect(summary.typeCounts).toEqual([
@@ -370,6 +379,116 @@ describe('importCipherToDraft', () => {
       null
     );
     expect(withFingerprint.sshFingerprint).toBe('fp2');
+  });
+
+  it('maps a bank account cipher', () => {
+    const draft = importCipherToDraft(
+      {
+        type: 6,
+        bankAccount: {
+          bankName: 'Acme Bank',
+          nameOnAccount: 'Jane Doe',
+          accountType: 'Checking',
+          accountNumber: '123456789',
+          routingNumber: '021000021',
+          branchNumber: '007',
+          pin: '4321',
+          swiftCode: 'ACMEUS33',
+          iban: 'GB33BUKB20201555555555',
+          bankContactPhone: '+1-555-0100',
+        },
+      },
+      null
+    );
+    expect(draft).toMatchObject({
+      type: 6,
+      bankName: 'Acme Bank',
+      bankNameOnAccount: 'Jane Doe',
+      bankAccountType: 'Checking',
+      bankAccountNumber: '123456789',
+      bankRoutingNumber: '021000021',
+      bankBranchNumber: '007',
+      bankPin: '4321',
+      bankSwiftCode: 'ACMEUS33',
+      bankIban: 'GB33BUKB20201555555555',
+      bankContactPhone: '+1-555-0100',
+    });
+  });
+
+  it('maps a drivers license cipher', () => {
+    const draft = importCipherToDraft(
+      {
+        type: 7,
+        driversLicense: {
+          firstName: 'John',
+          middleName: 'Q',
+          lastName: 'Public',
+          dateOfBirth: '1990-01-01',
+          licenseNumber: 'D1234567',
+          issuingCountry: 'US',
+          issuingState: 'CA',
+          issueDate: '2020-01-01',
+          expirationDate: '2028-01-01',
+          issuingAuthority: 'DMV',
+          licenseClass: 'C',
+        },
+      },
+      null
+    );
+    expect(draft).toMatchObject({
+      type: 7,
+      licenseFirstName: 'John',
+      licenseMiddleName: 'Q',
+      licenseLastName: 'Public',
+      licenseDateOfBirth: '1990-01-01',
+      licenseNumber: 'D1234567',
+      licenseIssuingCountry: 'US',
+      licenseIssuingState: 'CA',
+      licenseIssueDate: '2020-01-01',
+      licenseExpirationDate: '2028-01-01',
+      licenseIssuingAuthority: 'DMV',
+      licenseClass: 'C',
+    });
+  });
+
+  it('maps a passport cipher', () => {
+    const draft = importCipherToDraft(
+      {
+        type: 8,
+        passport: {
+          surname: 'Public',
+          givenName: 'John',
+          dateOfBirth: '1990-01-01',
+          sex: 'M',
+          birthPlace: 'Springfield',
+          nationality: 'USA',
+          issuingCountry: 'US',
+          passportNumber: 'X1234567',
+          passportType: 'P',
+          nationalIdentificationNumber: '999-99-9999',
+          issuingAuthority: 'State Dept',
+          issueDate: '2019-05-01',
+          expirationDate: '2029-05-01',
+        },
+      },
+      null
+    );
+    expect(draft).toMatchObject({
+      type: 8,
+      passportSurname: 'Public',
+      passportGivenName: 'John',
+      passportDateOfBirth: '1990-01-01',
+      passportSex: 'M',
+      passportBirthPlace: 'Springfield',
+      passportNationality: 'USA',
+      passportIssuingCountry: 'US',
+      passportNumber: 'X1234567',
+      passportType: 'P',
+      passportNationalIdentificationNumber: '999-99-9999',
+      passportIssuingAuthority: 'State Dept',
+      passportIssueDate: '2019-05-01',
+      passportExpirationDate: '2029-05-01',
+    });
   });
 
   it('handles a minimal/empty cipher object', () => {

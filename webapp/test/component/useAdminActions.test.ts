@@ -350,4 +350,116 @@ describe('useAdminActions', () => {
       expect(onNotify).toHaveBeenCalledWith('error', 'del user fail');
     });
   });
+
+  // withMasterPasswordHash rejects before any api call when the profile email or
+  // the typed master password is missing; the catch surfaces the thrown message.
+  describe('withMasterPasswordHash guards', () => {
+    it('notifies a profile-unavailable error and skips the api when email is missing', async () => {
+      const authedFetch = vi.fn();
+      const onNotify = vi.fn();
+      const onSetConfirm = vi.fn();
+      const refetchUsers = vi.fn().mockResolvedValue(undefined);
+      const refetchInvites = vi.fn().mockResolvedValue(undefined);
+      const { result } = renderHook(() =>
+        useAdminActions({
+          authedFetch,
+          email: '',
+          defaultKdfIterations: KDF,
+          onNotify,
+          onSetConfirm,
+          refetchUsers,
+          refetchInvites,
+        })
+      );
+      await act(async () => {
+        await result.current.createInvite(24);
+      });
+      await confirmWith(onSetConfirm, 'master-pass');
+      expect(mockedDeriveLoginHash).not.toHaveBeenCalled();
+      expect(mockedCreateInvite).not.toHaveBeenCalled();
+      expect(refetchInvites).not.toHaveBeenCalled();
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_profile_unavailable'));
+    });
+
+    it('notifies a master-password-required error and skips the api when the typed password is blank', async () => {
+      const { actions, onSetConfirm, refetchInvites, onNotify } = setup();
+      await act(async () => {
+        await actions.createInvite(24);
+      });
+      await confirmWith(onSetConfirm, '');
+      expect(mockedDeriveLoginHash).not.toHaveBeenCalled();
+      expect(mockedCreateInvite).not.toHaveBeenCalled();
+      expect(refetchInvites).not.toHaveBeenCalled();
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_master_password_is_required'));
+    });
+  });
+
+  // The catch handlers fall back to a generic i18n message when the rejection
+  // value is not an Error instance (exercises the `instanceof Error` false arm).
+  describe('non-Error rejection fallbacks', () => {
+    it('refreshAdmin uses a generic message when a refetch rejects with a non-Error', async () => {
+      const authedFetch = vi.fn();
+      const onNotify = vi.fn();
+      const onSetConfirm = vi.fn();
+      const refetchUsers = vi.fn().mockRejectedValue('boom');
+      const refetchInvites = vi.fn().mockResolvedValue(undefined);
+      const { result } = renderHook(() =>
+        useAdminActions({
+          authedFetch,
+          email: EMAIL,
+          defaultKdfIterations: KDF,
+          onNotify,
+          onSetConfirm,
+          refetchUsers,
+          refetchInvites,
+        })
+      );
+      await act(async () => {
+        result.current.refreshAdmin();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_load_admin_data_failed'));
+    });
+
+    it('createInvite uses a generic message when the api rejects with a non-Error', async () => {
+      mockedCreateInvite.mockRejectedValue('boom');
+      const { actions, onSetConfirm, onNotify } = setup();
+      await act(async () => {
+        await actions.createInvite(1);
+      });
+      await confirmWith(onSetConfirm);
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_create_invite_failed'));
+    });
+
+    it('toggleUserStatus uses a generic message when the api rejects with a non-Error', async () => {
+      mockedSetUserStatus.mockRejectedValue('boom');
+      const { actions, onSetConfirm, onNotify } = setup();
+      await act(async () => {
+        await actions.toggleUserStatus('u1', 'active');
+      });
+      await confirmWith(onSetConfirm);
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_update_user_status_failed'));
+    });
+
+    it('deleteAllInvites uses a generic message when the api rejects with a non-Error', async () => {
+      mockedDeleteAllInvites.mockRejectedValue('boom');
+      const { actions, onSetConfirm, onNotify } = setup();
+      await act(async () => {
+        await actions.deleteAllInvites();
+      });
+      await confirmWith(onSetConfirm);
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_delete_all_invites_failed'));
+    });
+
+    it('deleteUser uses a generic message when the api rejects with a non-Error', async () => {
+      mockedDeleteUser.mockRejectedValue('boom');
+      const { actions, onSetConfirm, onNotify } = setup();
+      await act(async () => {
+        await actions.deleteUser('u9');
+      });
+      await confirmWith(onSetConfirm);
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_delete_user_failed'));
+    });
+  });
 });

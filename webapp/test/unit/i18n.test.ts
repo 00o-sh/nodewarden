@@ -70,6 +70,18 @@ describe('i18n', () => {
       expect(mod.getLocale()).toBe('ru');
     });
 
+    it.each([
+      ['fi-FI', 'fi'],
+      ['de-DE', 'de'],
+      ['fr-FR', 'fr'],
+      ['it-IT', 'it'],
+      ['sv-SE', 'sv'],
+    ] as const)('detects %s as %s', async (tag, expected) => {
+      setNavigatorLanguages([tag]);
+      const mod = await freshModule();
+      expect(mod.getLocale()).toBe(expected);
+    });
+
     it('falls back to en for an unsupported language', async () => {
       setNavigatorLanguages(['ja-JP']);
       const mod = await freshModule();
@@ -172,6 +184,22 @@ describe('i18n', () => {
       expect(mod.getLocale()).toBe('en');
       expect(document.documentElement.lang).toBe('en');
     });
+
+    it('falls back to English (and logs) when the saved locale fails to load', async () => {
+      localStorage.setItem(LOCALE_STORAGE_KEY, 'de');
+      vi.resetModules();
+      vi.doMock('@/lib/i18n/locales/de', () => {
+        throw new Error('mock load failure');
+      });
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const mod = await import('@/lib/i18n');
+      expect(mod.getLocale()).toBe('de');
+      await mod.initI18n();
+      expect(mod.getLocale()).toBe('en');
+      expect(document.documentElement.lang).toBe('en');
+      expect(errorSpy).toHaveBeenCalled();
+      vi.doUnmock('@/lib/i18n/locales/de');
+    });
   });
 
   describe('setLocale', () => {
@@ -200,6 +228,29 @@ describe('i18n', () => {
       // Instead, assert that re-selecting an already-loaded locale stays valid.
       await mod.setLocale('en');
       expect(mod.getLocale()).toBe('en');
+    });
+
+    it('lazily loads each locale bundle and switches to it', async () => {
+      const mod = await freshModule();
+      for (const target of ['zh-CN', 'zh-TW', 'fi', 'de', 'fr', 'it', 'sv'] as const) {
+        await mod.setLocale(target);
+        expect(mod.getLocale()).toBe(target);
+        expect(document.documentElement.lang).toBe(target);
+      }
+    });
+
+    it('falls back to English (and logs) when a locale loader rejects', async () => {
+      vi.resetModules();
+      vi.doMock('@/lib/i18n/locales/de', () => {
+        throw new Error('mock load failure');
+      });
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const mod = await import('@/lib/i18n');
+      await mod.setLocale('de');
+      expect(mod.getLocale()).toBe('en');
+      expect(document.documentElement.lang).toBe('en');
+      expect(errorSpy).toHaveBeenCalled();
+      vi.doUnmock('@/lib/i18n/locales/de');
     });
 
     it('still updates the active locale when localStorage.setItem throws', async () => {
