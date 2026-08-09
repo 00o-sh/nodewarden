@@ -6,6 +6,7 @@ import {
   baseHeaders,
   createCipher,
   createFolder,
+  enc,
   login,
   newAccount,
   register,
@@ -240,6 +241,78 @@ describe('contract: folder object envelope', () => {
     expect(typeof folder.name).toBe('string');
     expect(typeof folder.revisionDate).toBe('string');
     expect(typeof folder.creationDate).toBe('string');
+  });
+});
+
+describe('contract: send envelope', () => {
+  it('POST /api/sends returns object:send with an accessId and text data', async () => {
+    const res = await api('POST', '/api/sends', accessToken, {
+      type: 0, // Text
+      name: enc('send'),
+      key: ENC_STRING,
+      deletionDate: new Date(Date.now() + 7 * 86_400_000).toISOString(),
+      text: { text: enc('secret'), hidden: false },
+    });
+    expect(res.status).toBe(200);
+    const send = (await res.json()) as Record<string, any>;
+    expect(send.object).toBe('send');
+    expect(typeof send.accessId).toBe('string');
+    expect(send.type).toBe(0);
+    // A text send carries `text` data and a null `file` (clients switch on this).
+    expect(send.text).toBeTruthy();
+    expect(send.file).toBeNull();
+  });
+});
+
+describe('contract: attachment envelope', () => {
+  it('exposes size as a string and a non-null url (the "Android requires" contract)', async () => {
+    const cipher = await createCipher(accessToken);
+    const bytes = new TextEncoder().encode('encrypted-attachment-content');
+
+    // v2 reserve: JSON body -> { object, attachmentId, url, fileUploadType, cipherResponse }.
+    const reserve = await api('POST', `/api/ciphers/${cipher.id}/attachment/v2`, accessToken, {
+      fileName: ENC_STRING,
+      key: ENC_STRING,
+      fileSize: bytes.byteLength,
+    });
+    expect(reserve.status).toBe(200);
+    const reserved = (await reserve.json()) as Record<string, any>;
+    expect(reserved.object).toBe('attachment-fileUpload');
+    expect(reserved.fileUploadType).toBe(1);
+    expect(typeof reserved.attachmentId).toBe('string');
+    expect(typeof reserved.url).toBe('string');
+
+    // The attachment embedded in the cipher response: size is a STRING and the
+    // url is RELATIVE (`/api/ciphers/{id}/attachment/{aid}`) — mobile clients
+    // reject a null url and mis-handle a numeric size.
+    const embedded = (reserved.cipherResponse.attachments as any[]).find(
+      (a) => a.id === reserved.attachmentId
+    );
+    expect(embedded).toBeTruthy();
+    expect(typeof embedded.size).toBe('string');
+    expect(embedded.url).toBe(`/api/ciphers/${cipher.id}/attachment/${reserved.attachmentId}`);
+    expect(embedded.object).toBe('attachment');
+
+    // Upload the bytes to the direct-upload URL (raw body, Bearer auth).
+    const upload = await SELF.fetch(reserved.url, {
+      method: 'POST',
+      headers: baseHeaders({ Authorization: `Bearer ${accessToken}` }),
+      body: bytes,
+    });
+    expect([200, 201]).toContain(upload.status);
+
+    // The standalone GET returns an ABSOLUTE, tokenized download url + string size.
+    const meta = await api(
+      'GET',
+      `/api/ciphers/${cipher.id}/attachment/${reserved.attachmentId}`,
+      accessToken
+    );
+    expect(meta.status).toBe(200);
+    const m = (await meta.json()) as Record<string, any>;
+    expect(m.object).toBe('attachment');
+    expect(typeof m.size).toBe('string');
+    expect(typeof m.sizeName).toBe('string');
+    expect(m.url).toContain('token=');
   });
 });
 

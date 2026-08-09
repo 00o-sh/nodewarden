@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "_comment": "Mutation testing for the security-critical crypto modules. Validates that the tests would CATCH a bug, not just execute the line. Runs in CI (.github/workflows/mutation.yml) only when these modules or their tests change. `break` is a RATCHET FLOOR, not the target: the current overall score is ~75% (crypto.ts ~83%, decrypt-cipher.ts ~91%, vault-decrypt.ts ~57% — the remaining drag), so break is set just below that to block regressions while the suite's assertions are strengthened. Raise `break` toward `low`/`high` as survivors are killed — same discipline as the coverage ratchet; vault-decrypt.ts per-field assertions are the next tranche. Run locally: npm run mutation:crypto (see reports/mutation/crypto.html).",
+  "_comment": "Mutation testing for the security-critical crypto modules. Validates that the tests would CATCH a bug, not just execute the line. Runs in CI (.github/workflows/mutation.yml) only when these modules or their tests change. `break` is a RATCHET FLOOR, not the target: the current overall score is ~81% (crypto.ts ~83%, decrypt-cipher.ts ~91%, vault-decrypt.ts ~77%), so break is set just below that to block regressions while the suite's assertions are strengthened. Raise `break` toward `low`/`high` as survivors are killed — same discipline as the coverage ratchet. Run locally: npm run mutation:crypto (see reports/mutation/crypto.html).",
   "testRunner": "vitest",
   "vitest": { "configFile": "vitest.mutation.config.ts" },
   "mutate": [
@@ -13,5 +13,5 @@
   "htmlReporter": { "fileName": "reports/mutation/crypto.html" },
   "concurrency": 4,
   "timeoutMS": 30000,
-  "thresholds": { "high": 90, "low": 75, "break": 72 }
+  "thresholds": { "high": 90, "low": 75, "break": 78 }
 }
