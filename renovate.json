@@ -3,8 +3,11 @@
   "extends": [
     "config:recommended",
     ":pinAllExceptPeerDependencies",
+    ":semanticCommitScope(deps)",
     "security:openssf-scorecard",
-    "helpers:pinGitHubActionDigests"
+    "helpers:pinGitHubActionDigests",
+    "mergeConfidence:all-badges",
+    "replacements:all"
   ],
   "rangeStrategy": "pin",
   "dependencyDashboard": true,
