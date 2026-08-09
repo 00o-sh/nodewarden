@@ -30,9 +30,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      # CodeQL analysis is owned by codeql.yml (the authoritative, gating run).
-      # It used to be duplicated here as a non-gating continue-on-error copy,
-      # which just doubled the slowest scan on every push/PR for no added signal.
+      # CodeQL analysis. This registers the `security.yml:scan` code-scanning
+      # configuration that main's branch protection requires, so it must stay
+      # here (codeql.yml publishes DIFFERENT /language:* configurations and can't
+      # substitute for it). Fully de-duplicating CodeQL would need an admin to
+      # drop the stale configuration and update the required-checks list first.
+      - name: Initialize CodeQL
+        if: env.ACT != 'true'
+        continue-on-error: true
+        uses: github/codeql-action/init@d1ba80a13dd99fba24a470575428917156a28b43 # v4.37.5
+        with:
+          languages: javascript-typescript, actions
+          build-mode: none
+          queries: security-extended,security-and-quality
+
+      - name: Perform CodeQL Analysis
+        if: env.ACT != 'true'
+        continue-on-error: true
+        uses: github/codeql-action/analyze@d1ba80a13dd99fba24a470575428917156a28b43 # v4.37.5
+        with:
+          upload: true
+          output: sarif-results
 
       - name: Install Gitleaks
         if: env.ACT != 'true'
@@ -132,6 +150,7 @@ jobs:
             trivy_deps.sarif
             trivy_result.json
             results.sarif
+            sarif-results/*.sarif
 
   supply-chain:
     # Verifies the integrity of the dependency tree against the registry and
