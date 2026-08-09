@@ -18,7 +18,10 @@ export default defineConfig({
       // including them makes istanbul's uncovered-file pass try to parse JSON as
       // JavaScript, which throws a SyntaxError.
       include: ['src/**/*.ts', 'shared/**/*.ts'],
-      reporter: ['text-summary', 'json-summary', 'html'],
+      // 'json' emits coverage-final.json (per-line data) consumed by the
+      // changed-line (diff) coverage gate in scripts/check-diff-coverage.cjs,
+      // the fail-closed complement to the ratcheting floor (mirrors the webapp).
+      reporter: ['text-summary', 'json-summary', 'json', 'html'],
       reportsDirectory: 'coverage',
       // Ratcheting floor: CI fails if coverage drops below these. Raise them as
       // new tests land so coverage can only move up. Coverage now includes the

@@ -30,6 +30,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      # CodeQL analysis. This registers the `security.yml:scan` code-scanning
+      # configuration that main's branch protection requires, so it must stay
+      # here (codeql.yml publishes DIFFERENT /language:* configurations and can't
+      # substitute for it). Fully de-duplicating CodeQL would need an admin to
+      # drop the stale configuration and update the required-checks list first.
       - name: Initialize CodeQL
         if: env.ACT != 'true'
         continue-on-error: true

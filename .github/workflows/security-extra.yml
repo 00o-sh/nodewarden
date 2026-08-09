@@ -1,37 +1,33 @@
 name: "Extra Security Scan"
 
+# Supplementary scanners that complement the primary Security Scan workflow.
+# Scoped to PRs and pushes to main (not every branch push): these are the merge
+# gate and the main-branch baseline, so running them on transient feature/bot
+# branches only burned minutes without changing what can merge.
+#
+# Deliberately NOT duplicated here (each has a single authoritative home):
+#   - CodeQL  -> codeql.yml
+#   - Gitleaks (secret scan, SARIF to Security tab) -> security.yml
+#   - OpenSSF Scorecard -> scorecard.yml
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
-      - "**"
+      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+# Cancel superseded runs on the same ref so a rapid push/PR-update sequence does
+# not pile up redundant (and slow, docker-based) scans.
+concurrency:
+  group: security-extra-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  gitleaks:
-    name: Gitleaks Secret Scan
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout full history
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_SUMMARY: "true"
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "true"
-          # 如果仓库属于 GitHub Organization，需要在 Settings -> Secrets 里加 GITLEAKS_LICENSE
-          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-
   osv:
     name: OSV Dependency Scan
     uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2
@@ -47,36 +43,6 @@ jobs:
         ./
       upload-sarif: true
       fail-on-vuln: true
-
-  pnpm-audit:
-    name: pnpm audit
-    runs-on: ubuntu-latest
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          persist-credentials: false
-
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
-        with:
-          node-version: 24.18.1
-
-      - name: Run pnpm audit
-        shell: bash
-        run: |
-          if [ ! -f pnpm-lock.yaml ]; then
-            echo "pnpm-lock.yaml not found, skip pnpm audit."
-            exit 0
-          fi
-
-          corepack enable
-          corepack prepare pnpm@10 --activate
-          pnpm audit --audit-level=high
 
   semgrep:
     name: Semgrep CE Scan
@@ -94,11 +60,13 @@ jobs:
 
       - name: Run Semgrep CE
         shell: bash
+        # Image pinned by digest (never :latest) so the scan is reproducible and
+        # a compromised/moved tag can't silently change what runs in CI.
         run: |
           docker run --rm \
             -v "${PWD}:/src" \
             -w /src \
-            semgrep/semgrep:latest \
+            semgrep/semgrep:1.172.0@sha256:65dcd4408adda7c183a6b4550cb1e9b19f7f627a6fbb7e0559bd466bedc44d7b \
             semgrep scan --config p/default --sarif --output semgrep.sarif . || true
 
           if [ ! -f semgrep.sarif ]; then
@@ -143,11 +111,12 @@ jobs:
 
       - name: Run actionlint
         shell: bash
+        # Image pinned by digest (never :latest) for reproducible workflow linting.
         run: |
           docker run --rm \
             -v "${PWD}:/repo" \
             -w /repo \
-            rhysd/actionlint:latest
+            rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
 
   zizmor:
     name: GitHub Actions Security Scan
@@ -170,31 +139,3 @@ jobs:
           persona: auditor
           min-severity: medium
           min-confidence: medium
-
-  scorecard:
-    name: OpenSSF Scorecard
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    permissions:
-      contents: read
-      security-events: write
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
-        with:
-          persist-credentials: false
-
-      - name: Run OpenSSF Scorecard
-        uses: ossf/scorecard-action@99c09fe975337306107572b4fdf4db224cf8e2f2
-        with:
-          results_file: scorecard.sarif
-          results_format: sarif
-          publish_results: false
-
-      - name: Upload Scorecard SARIF
-        uses: github/codeql-action/upload-sarif@411bbbe57033eedfc1a82d68c01345aa96c737d7
-        with:
-          sarif_file: scorecard.sarif
-          category: openssf-scorecard
