@@ -41,6 +41,7 @@
     "test:e2e:real": "playwright test --config playwright.realbackend.config.ts",
     "coverage:diff": "node scripts/check-diff-coverage.cjs",
     "coverage:diff:api": "node scripts/check-diff-coverage-api.cjs",
+    "overrides:audit": "node scripts/check-stale-overrides.cjs",
     "typecheck:webapp": "tsc -p webapp/tsconfig.json --noEmit",
     "lint": "eslint .",
     "mutation:crypto": "stryker run stryker.crypto.config.json"
