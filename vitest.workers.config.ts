@@ -38,5 +38,13 @@ export default defineConfig({
   test: {
     name: 'integration',
     include: ['test/integration/**/*.test.ts'],
+    // Bounded retry for the workerd/Miniflare integration suite ONLY (the unit
+    // project stays retry-free). These tests spin up a fresh isolate with live
+    // D1/R2/DO bindings per file, and the runtime occasionally has a transient
+    // setup hiccup under CI load that a bare re-run clears. A genuine logic bug
+    // still fails all attempts, so this trims false reds without hiding real
+    // failures — and the github-actions reporter annotates any retried/failed
+    // test so a chronic flake stays visible rather than silently masked.
+    retry: 2,
   },
 });

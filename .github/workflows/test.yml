@@ -82,7 +82,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --fund=false
 
       - name: Type check (API)
         # Vitest transpiles via esbuild (types are stripped, not checked), so the
@@ -104,10 +104,17 @@ jobs:
         # exercises a slice, so it would always fail the global floor. The `test`
         # job re-applies the real thresholds (vitest.config.ts) to the MERGED
         # total. Coverage data is still collected into the blob regardless.
+        #
+        # The github-actions reporter runs ALONGSIDE blob so a failing test
+        # surfaces as an inline annotation (file, line, assertion) in this job's
+        # log — otherwise the blob reporter swallows all per-test output and a
+        # shard failure is an undiagnosable bare "exit 1" (--outputFile only
+        # applies to blob; the annotation reporter writes no file).
         run: >-
           npx vitest run --coverage
           --reporter=blob
           --outputFile=.vitest-reports/blob-${{ matrix.shard }}.json
+          --reporter=github-actions
           --shard=${{ matrix.shard }}/4
           --coverage.thresholds.lines=0
           --coverage.thresholds.statements=0
@@ -166,7 +173,7 @@ jobs:
 
       - name: Install dependencies
         if: needs.changes.outputs.backend == 'true'
-        run: npm ci
+        run: npm ci --no-audit --fund=false
 
       - name: Download coverage blobs
         if: needs.changes.outputs.backend == 'true'
@@ -223,7 +230,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --fund=false
 
       - name: Lint (frontend)
         run: npm run lint
@@ -254,6 +261,28 @@ jobs:
           path: coverage/webapp/coverage-summary.json
           retention-days: 1
           if-no-files-found: error
+
+  # Playwright E2E, split into its own job so it runs IN PARALLEL with the
+  # frontend coverage/lint/typecheck work instead of serially after it on the
+  # same runner. Both the demo-build smoke suite and the real-backend lifecycle
+  # (real worker + in-memory D1/R2) run here off a fresh build. It carries its
+  # own install + build (a small fixed cost) in exchange for taking the long
+  # E2E leg off the critical path.
+  e2e:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --fund=false
 
       - name: Build (production + demo)
         run: |
@@ -296,7 +325,10 @@ jobs:
   # coverage suite just to read one number, and stays read-only. Runs only on
   # pushes to main, after both coverage numbers are available.
   badges:
-    needs: [test, frontend]
+    # Includes e2e so the badge only publishes on a fully-green run — e2e used to
+    # live inside the frontend job, so this preserves that implicit dependency
+    # now that it is split out.
+    needs: [test, frontend, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:

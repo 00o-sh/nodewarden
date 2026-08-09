@@ -46,7 +46,8 @@
     "overrides:audit": "node scripts/check-stale-overrides.cjs",
     "typecheck:webapp": "tsc -p webapp/tsconfig.json --noEmit",
     "lint": "eslint .",
-    "mutation:crypto": "stryker run stryker.crypto.config.json"
+    "mutation:crypto": "stryker run stryker.crypto.config.json",
+    "mutation:auth": "stryker run stryker.auth.config.json"
   },
   "keywords": [
     "bitwarden",
