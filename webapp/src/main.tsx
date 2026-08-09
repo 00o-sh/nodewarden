@@ -28,7 +28,13 @@ function renderApp(): void {
   );
 }
 
-void initI18n().finally(() => {
-  renderApp();
-  registerNodeWardenServiceWorker();
-});
+void initI18n()
+  .catch((error) => {
+    // A failed locale load must not become an unhandled rejection; the app still
+    // renders with the built-in (English) defaults.
+    console.error('i18n initialization failed; continuing with defaults', error);
+  })
+  .finally(() => {
+    renderApp();
+    registerNodeWardenServiceWorker();
+  });

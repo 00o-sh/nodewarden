@@ -52,8 +52,17 @@ describe('main entry point', () => {
     await vi.waitFor(() => expect(registerNodeWardenServiceWorker).toHaveBeenCalledTimes(1));
   });
 
-  // NOTE: main.tsx uses `void initI18n().finally(...)` with no `.catch`, so a
-  // failed i18n load rejects unhandled (the app still renders via `finally`).
-  // Not exercised here to avoid an unhandled rejection in the suite; flagged in
-  // the PR as a minor source follow-up.
+  it('still renders (and logs) when i18n initialization rejects', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    initI18n.mockRejectedValue(new Error('locale load failed'));
+
+    await import('@/main');
+
+    // The .catch swallows the rejection (no unhandled rejection) and logs it,
+    // and the app still renders + registers the SW via .finally.
+    await vi.waitFor(() => expect(render).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(registerNodeWardenServiceWorker).toHaveBeenCalledTimes(1));
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
 });
