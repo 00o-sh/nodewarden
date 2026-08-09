@@ -22,13 +22,15 @@ export default defineConfig({
       // Generated/entry/asset-only modules carry no testable logic; excluding
       // them keeps the ratchet meaningful instead of penalising untestable code.
       exclude: [
-        'webapp/src/main.tsx',
+        // Non-executable: type declarations carry no coverable statements.
         'webapp/src/vite-env.d.ts',
         'webapp/src/**/*.d.ts',
-        'webapp/src/workers/**',
+        // Demo-build-only: aliased out of the production bundle (demo.empty +
+        // IS_DEMO_MODE=false), so they never run in the app under test.
         'webapp/src/lib/demo.ts',
         'webapp/src/lib/demo.empty.ts',
         'webapp/src/lib/demo-brand-icons.ts',
+        // Pure translation data, not logic.
         'webapp/src/lib/i18n/locales/**',
       ],
       // 'json' emits coverage-final.json (per-line data) used by the

@@ -35,7 +35,12 @@ const FILE_RE = /^webapp\/src\/.*\.(ts|tsx)$/;
 // data, and the pure-type lib/types.ts), so they can never appear in the
 // coverage report. Without matching the exclusion here the gate would flag any
 // changed line in them as "untested" — a state no test could ever clear.
-const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:demo\.ts$|demo\.empty\.ts$|demo-brand-icons\.ts$|eff-word-list\.ts$|types\.ts$|i18n\/locales\/))/;
+// Only non-executable or demo-build-only files remain excluded: type
+// declarations (no coverable statements), lib/types.ts (pure types), the
+// diceware word list and i18n locale data (data, not logic), and the demo-mode
+// shims (aliased out of the production bundle). main.tsx and workers/ are now
+// tested and gated.
+const EXCLUDE_RE = /^webapp\/src\/(?:.*\.d\.ts$|lib\/(?:demo\.ts$|demo\.empty\.ts$|demo-brand-icons\.ts$|eff-word-list\.ts$|types\.ts$|i18n\/locales\/))/;
 // Upstream-owned code pulled in by the sync that the fork's jsdom suite can't
 // meaningfully exercise yet, excluded from the changed-line gate pending
 // dedicated tests. Remove entries here as those tests land:
