@@ -112,7 +112,7 @@
   },
   "overrides": {
     "qs": "6.15.3",
-    "undici": "7.29.0",
+    "undici": "8.10.0",
     "@babel/core": "8.0.1",
     "@vitest/coverage-istanbul": {
       "@babel/core": "7.29.7"
