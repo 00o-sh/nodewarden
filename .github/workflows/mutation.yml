@@ -71,7 +71,21 @@ jobs:
 
       - name: Install dependencies
         if: steps.changes.outputs.run == 'true'
-        run: npm ci
+        run: npm ci --no-audit --fund=false
+
+      - name: Restore Stryker incremental cache
+        # Stryker's incremental mode reuses per-mutant results for unchanged code,
+        # so a run only re-tests what changed. The key embeds the commit sha so
+        # each run saves a fresh cache; restore-keys pulls the most recent prior
+        # one. This turns repeat runs (and PRs touching only a slice of crypto)
+        # from full ~3-4min sweeps into partial re-tests.
+        if: steps.changes.outputs.run == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: reports/stryker-incremental
+          key: stryker-crypto-incremental-${{ github.sha }}
+          restore-keys: |
+            stryker-crypto-incremental-
 
       - name: Mutation test (crypto core)
         # Blocking: stryker.crypto.config.json sets a `break` threshold, so a drop
@@ -132,6 +146,17 @@ jobs:
       - name: Install dependencies
         if: steps.changes.outputs.run == 'true'
         run: npm ci --no-audit --fund=false
+
+      - name: Restore Stryker incremental cache
+        # See the crypto job: incremental mode only re-tests changed mutants; the
+        # sha-keyed cache with a prefix restore-key keeps the latest baseline warm.
+        if: steps.changes.outputs.run == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: reports/stryker-incremental
+          key: stryker-auth-incremental-${{ github.sha }}
+          restore-keys: |
+            stryker-auth-incremental-
 
       - name: Mutation test (auth orchestration)
         # Blocking: stryker.auth.config.json sets a `break` threshold, so a drop

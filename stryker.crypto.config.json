@@ -13,5 +13,7 @@
   "htmlReporter": { "fileName": "reports/mutation/crypto.html" },
   "concurrency": 4,
   "timeoutMS": 30000,
+  "incremental": true,
+  "incrementalFile": "reports/stryker-incremental/crypto.json",
   "thresholds": { "high": 90, "low": 75, "break": 78 }
 }
