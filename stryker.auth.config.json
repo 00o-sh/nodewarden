@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_comment": "Mutation testing for the security-critical auth orchestration module (lib/app-auth.ts: password/passkey/TOTP login, unlock, KDF-preloaded registration). Validates that the tests would CATCH a bug, not just execute the line. Runs in CI (.github/workflows/mutation.yml) only when this module or its tests change. `break` is a RATCHET FLOOR, not the target: the current score is ~60% (363 killed / 193 survived / 47 no-coverage of 603 mutants) because the fast killer set (app-auth + offline-auth unit tests) under-exercises the passkey / TOTP / recover-2FA / registration flows — break is set just below that to block regressions while assertions are strengthened. Raise `break` toward `low`/`high` as survivors are killed (start by adding flow tests that drive those un-covered branches). Same discipline as the coverage ratchet. Run locally: npm run mutation:auth (see reports/mutation/auth.html).",
+  "testRunner": "vitest",
+  "vitest": { "configFile": "vitest.mutation-auth.config.ts" },
+  "mutate": [
+    "webapp/src/lib/app-auth.ts"
+  ],
+  "coverageAnalysis": "perTest",
+  "reporters": ["clear-text", "progress", "html"],
+  "htmlReporter": { "fileName": "reports/mutation/auth.html" },
+  "concurrency": 4,
+  "timeoutMS": 30000,
+  "thresholds": { "high": 90, "low": 70, "break": 57 }
+}

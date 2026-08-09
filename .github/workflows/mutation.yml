@@ -1,11 +1,13 @@
-name: Mutation (crypto)
+name: Mutation
 
 # Mutation testing proves the tests would CATCH a regression, not merely execute
 # the line — the guarantee line-coverage cannot give. It is scoped to the
-# security-critical crypto modules (see stryker.crypto.config.json) and only does
-# real work when those modules (or their tests) change, so it does not slow down
-# unrelated PRs. On PRs that don't touch crypto it reports success immediately,
-# which keeps it safe to add as a required status check.
+# security-critical modules — the crypto core (stryker.crypto.config.json) and
+# the auth orchestration (stryker.auth.config.json) — as two independent jobs,
+# each of which only does real work when its own modules (or their tests) change,
+# so it does not slow down unrelated PRs. On PRs that don't touch a target the
+# corresponding job reports success immediately, which keeps both safe to add as
+# required status checks.
 on:
   pull_request:
     branches:
@@ -84,5 +86,65 @@ jobs:
         with:
           name: mutation-crypto-report
           path: reports/mutation/crypto.html
+          if-no-files-found: warn
+          retention-days: 14
+
+  mutation-auth:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Need both PR endpoints present locally to diff changed files.
+          fetch-depth: 0
+
+      - name: Detect auth-relevant changes
+        id: changes
+        # Run mutation only when the mutated module or its tests change (PRs);
+        # always run on push/schedule/dispatch. When a PR touches nothing
+        # auth-related we skip the (slow) run but still report success, so this
+        # can be a required check without ever blocking an unrelated PR.
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}")
+          echo "Changed files:"; echo "$changed"
+          if printf '%s\n' "$changed" | grep -qE '^(webapp/src/lib/app-auth\.ts|webapp/test/unit/(app-auth|offline-auth)\.test\.ts|stryker\.auth\.config\.json|vitest\.mutation-auth\.config\.ts|\.github/workflows/mutation\.yml)$'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "Auth-relevant changes detected; running mutation testing."
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No auth-relevant changes; skipping mutation run."
+          fi
+
+      - name: Setup Node.js
+        if: steps.changes.outputs.run == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.changes.outputs.run == 'true'
+        run: npm ci --no-audit --fund=false
+
+      - name: Mutation test (auth orchestration)
+        # Blocking: stryker.auth.config.json sets a `break` threshold, so a drop
+        # in mutation score (a weakened/removed assertion that lets a mutant
+        # survive) fails the run.
+        if: steps.changes.outputs.run == 'true'
+        run: npm run mutation:auth
+
+      - name: Upload mutation report
+        if: steps.changes.outputs.run == 'true' && always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-auth-report
+          path: reports/mutation/auth.html
           if-no-files-found: warn
           retention-days: 14
