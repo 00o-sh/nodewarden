@@ -9,24 +9,28 @@ on:
       - main
   workflow_dispatch:
 
-# Minimal default token: read-only at the top level. The test job escalates
-# to contents: write only where it needs to (badge publishing on main).
+# Minimal default token: read-only at the top level. Only the badge-publishing
+# job escalates to contents: write, and only on pushes to main.
 permissions:
   contents: read
 
-# Cancel superseded runs on the same ref so a rapid push sequence does not
-# pile up redundant jobs (and racing badge pushes on main).
+# Cancel superseded runs on the same ref so a rapid push sequence does not pile
+# up redundant jobs (and racing badge pushes on main).
 concurrency:
   group: tests-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
+  # Cheap standalone change-detection so the expensive backend shards only spin
+  # up when a PR touches something that can affect the backend suite. Non-PR
+  # events (push to main, manual dispatch) always run the full suite so the
+  # coverage badge stays honest.
+  changes:
     runs-on: ubuntu-latest
     permissions:
-      # `write` is required only to publish the coverage badge to the `badges`
-      # branch on pushes to main. The badge step is skipped on pull requests.
-      contents: write
+      contents: read
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -34,15 +38,10 @@ jobs:
           fetch-depth: 0
 
       - name: Detect backend-relevant changes
-        id: changes
-        # The `test` check is required by branch protection, so the job must
-        # always run and report. We only skip the expensive install + coverage
-        # steps when a PR touches nothing that can affect the backend suite
-        # (e.g. docs- or webapp-only changes). Non-PR events (push to main,
-        # manual dispatch) always run the full suite so the badge stays honest.
+        id: filter
         run: |
           if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "backend=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           changed=$(git diff --name-only \
@@ -51,62 +50,141 @@ jobs:
           echo "Changed files:"
           echo "$changed"
           if printf '%s\n' "$changed" | grep -qE '^(src/|shared/|test/|vitest\.|wrangler|package\.json|package-lock\.json|\.nvmrc|tsconfig|\.github/workflows/test\.yml)'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
+            echo "backend=true" >> "$GITHUB_OUTPUT"
             echo "Backend-relevant changes detected; running the full suite."
           else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "No backend-relevant changes; skipping the coverage run."
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+            echo "No backend-relevant changes; skipping the backend suite."
           fi
 
+  # The backend suite (242 workerd/Miniflare integration tests) is embarrassingly
+  # parallel, so we shard it across runners. Each shard emits a vitest "blob"
+  # report (results + coverage data); the `test` job merges them and enforces the
+  # ratchet once. This turns a ~7min serial coverage run into ~4 parallel ~2min
+  # runs. See vitest.config.ts.
+  backend-shard:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Setup Node.js
-        if: steps.changes.outputs.run == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: '.nvmrc'
           cache: npm
 
       - name: Install dependencies
-        if: steps.changes.outputs.run == 'true'
         run: npm ci
 
       - name: Type check (API)
-        if: steps.changes.outputs.run == 'true'
         # Vitest transpiles via esbuild (types are stripped, not checked), so the
-        # strict backend type check runs separately. Fails fast before the suite.
+        # strict backend type check runs separately. Only on shard 1 (identical
+        # across shards); fails fast before spending time on the suite.
+        if: matrix.shard == 1
         run: npm run typecheck
 
       - name: Lint (API)
-        if: steps.changes.outputs.run == 'true'
-        # oxlint over the backend sources. --deny-warnings (in the script) makes any
-        # finding fail CI, so the lint stays clean as new code lands. Named lint:api
-        # to stay distinct from the frontend `lint` (eslint over webapp/).
+        # oxlint over the backend sources; --deny-warnings makes any finding fail
+        # CI. Only on shard 1 (identical across shards).
+        if: matrix.shard == 1
         run: npm run lint:api
 
-      - name: Run tests with coverage
-        if: steps.changes.outputs.run == 'true'
-        # Runs the full suite and enforces the coverage thresholds in
-        # vitest.config.ts (the ratcheting floor).
-        run: npm run coverage
+      - name: Run test shard with coverage
+        # Blob reporter stores this shard's results AND coverage data for the
+        # merge step. Thresholds are intentionally NOT enforced per-shard (each
+        # shard only exercises a slice); the `test` job enforces them on the
+        # merged total.
+        run: >-
+          npx vitest run --coverage
+          --reporter=blob
+          --outputFile=.vitest-reports/blob-${{ matrix.shard }}.json
+          --shard=${{ matrix.shard }}/4
 
-      - name: Frontend coverage (for badge)
-        # Produces coverage/webapp/coverage-summary.json so publish-badges.sh can
-        # emit the separate "Web coverage" badge. The frontend job is what gates
-        # the webapp ratchet on PRs; here we only need the number, on main.
-        if: steps.changes.outputs.run == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: npm run coverage:webapp
+      - name: Upload coverage blob
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-blob-${{ matrix.shard }}
+          path: .vitest-reports/blob-${{ matrix.shard }}.json
+          retention-days: 1
+          if-no-files-found: error
 
-      - name: Publish badges
-        # Self-contained auto-updating badges (API + web coverage + i18n): only on pushes to main.
-        if: steps.changes.outputs.run == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash scripts/publish-badges.sh
+  # Aggregator + gate. KEEPS THE JOB NAME `test` so the existing branch-protection
+  # required status check continues to resolve. It merges every shard's blob into
+  # one report and enforces the coverage ratchet (vitest.config.ts thresholds)
+  # exactly once, then publishes the backend coverage number for the badge job.
+  test:
+    needs: [changes, backend-shard]
+    # always() so this required check still runs (and passes) on docs-only PRs
+    # where the shards were skipped.
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Gate on change-detection and shard results
+        run: |
+          if [ "${{ needs.changes.outputs.backend }}" != "true" ]; then
+            echo "No backend-relevant changes; nothing to merge. ✓"
+            exit 0
+          fi
+          if [ "${{ needs.backend-shard.result }}" != "success" ]; then
+            echo "One or more backend shards failed (result=${{ needs.backend-shard.result }})."
+            exit 1
+          fi
+          echo "All shards succeeded; proceeding to merge + ratchet."
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: needs.changes.outputs.backend == 'true'
+
+      - name: Setup Node.js
+        if: needs.changes.outputs.backend == 'true'
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies
+        if: needs.changes.outputs.backend == 'true'
+        run: npm ci
+
+      - name: Download coverage blobs
+        if: needs.changes.outputs.backend == 'true'
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          pattern: backend-blob-*
+          path: .vitest-reports
+          merge-multiple: true
+
+      - name: Merge reports and enforce coverage ratchet
+        # Reconstitutes the full-suite coverage from the shard blobs and enforces
+        # the vitest.config.ts thresholds on the merged total, and writes
+        # coverage/coverage-summary.json for the badge.
+        if: needs.changes.outputs.backend == 'true'
+        run: npx vitest run --merge-reports --coverage
+
+      - name: Upload backend coverage summary
+        # Consumed by the `badges` job so the badge no longer requires re-running
+        # the whole suite in this job.
+        if: needs.changes.outputs.backend == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: backend-coverage-summary
+          path: coverage/coverage-summary.json
+          retention-days: 1
+          if-no-files-found: error
 
   frontend:
-    # Frontend (webapp/) testing pyramid. Kept as its own job so a frontend
-    # failure is attributable on its own and runs in parallel with the backend
-    # `test` job. Every blocking step below must be green for a PR to be
-    # considered mergeable. See docs/frontend-testing.md.
+    # Frontend (webapp/) testing pyramid. Runs in parallel with the backend
+    # shards. Every blocking step below must be green for a PR to be mergeable.
+    # See docs/frontend-testing.md.
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -127,51 +205,53 @@ jobs:
         run: npm ci
 
       - name: Lint (frontend)
-        # Blocking: ESLint over webapp/ (see eslint.config.js).
         run: npm run lint
 
       - name: Typecheck (frontend)
-        # Blocking: tsc --noEmit over webapp/. The pre-existing errors this gate
-        # originally surfaced (a real onSaveSettings arity bug plus two TS
-        # strictness issues) are now fixed, so a type regression fails CI.
         run: npm run typecheck:webapp
 
       - name: Frontend tests with coverage (unit + component + contract)
-        # Blocking: enforces the ratcheting coverage floor in
-        # vitest.webapp.config.ts. This orchestrator runs BOTH the jsdom project
-        # (unit + component) AND the contract project — the webapp api client
-        # driven against the real Workers runtime (Miniflare), catching
-        # request/response shape drift between frontend and backend — under one
-        # istanbul report, so api/ coverage counts toward the floor.
         run: npm run coverage:webapp
 
       - name: Changed-line coverage gate (frontend)
-        # Fail-closed: every executable line this PR adds/changes under webapp/src
-        # must be covered by the run above. The ratchet only blocks regressions;
-        # this blocks NEW untested code. See scripts/check-diff-coverage.cjs.
         run: npm run coverage:diff
 
+      - name: Upload webapp coverage summary
+        # Consumed by the `badges` job (main only) so the backend `test` job no
+        # longer has to re-run the whole frontend suite just to read this number.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: webapp-coverage-summary
+          path: coverage/webapp/coverage-summary.json
+          retention-days: 1
+          if-no-files-found: error
+
       - name: Build (production + demo)
-        # Blocking: a green build is the only thing that exercises the generated
-        # service worker and the full Vite/Rollup pipeline.
         run: |
           npm run build
           npm run build:demo
 
+      - name: Cache Playwright browser
+        id: playwright-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          # Key on the installed Playwright version so a dependency bump busts the
+          # cache and re-provisions the matching browser build.
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Playwright browser
+        # With a warm cache this only installs the OS deps (fast); the browser
+        # binary is restored from cache.
         run: npx playwright install --with-deps chromium
 
       - name: E2E smoke tests (demo build)
-        # Blocking: drives critical user journeys in a real browser against the
-        # demo build (network-free, deterministic).
         run: npm run test:e2e
 
       - name: E2E real-backend lifecycle (real worker + D1/R2)
-        # Blocking and highest-confidence: drives the production stack — the real
-        # worker serving the built webapp + API on one origin, backed by a real
-        # local D1/R2 — through register/login/CRUD with genuine client-side
-        # crypto, asserting PERSISTENCE across reloads and a fresh login session.
-        # This is what demo-mode E2E cannot prove. See playwright.realbackend.config.ts.
         run: npm run test:e2e:real
 
       - name: Upload Playwright report
@@ -182,3 +262,40 @@ jobs:
           if-no-files-found: ignore
           path: playwright-report/
           retention-days: 7
+
+  # Self-contained auto-updating badges (API + web coverage + i18n). Split out of
+  # the backend `test` job so that job no longer re-runs the entire frontend
+  # coverage suite just to read one number, and stays read-only. Runs only on
+  # pushes to main, after both coverage numbers are available.
+  badges:
+    needs: [test, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      # write is required only to publish the coverage badge to the `badges`
+      # branch.
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Download backend coverage summary
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: backend-coverage-summary
+          path: coverage
+
+      - name: Download webapp coverage summary
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: webapp-coverage-summary
+          path: coverage/webapp
+
+      - name: Publish badges
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/publish-badges.sh

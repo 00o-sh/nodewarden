@@ -69,6 +69,9 @@ opencode.jsonc
 # Test coverage reports
 coverage/
 
+# Vitest sharded blob reports (merged in CI; never committed)
+.vitest-reports/
+
 # Playwright E2E artifacts
 playwright-report/
 test-results/
