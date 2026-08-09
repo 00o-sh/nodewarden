@@ -237,6 +237,13 @@ jobs:
       - name: Changed-line coverage gate (frontend)
         run: npm run coverage:diff
 
+      - name: Demo-build coverage gate
+        # lib/demo.ts (~1600 lines) and lib/demo-brand-icons.ts are aliased out of
+        # the production bundle, so the main webapp suite never runs them. This
+        # gates the demo build's own wiring under its own istanbul thresholds so it
+        # can't ship as a large untested blob.
+        run: npm run coverage:demo
+
       - name: Upload webapp coverage summary
         # Consumed by the `badges` job (main only) so the backend `test` job no
         # longer has to re-run the whole frontend suite just to read this number.
