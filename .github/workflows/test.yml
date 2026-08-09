@@ -128,9 +128,12 @@ jobs:
   # exactly once, then publishes the backend coverage number for the badge job.
   test:
     needs: [changes, backend-shard]
-    # always() so this required check still runs (and passes) on docs-only PRs
-    # where the shards were skipped.
-    if: always()
+    # !cancelled() (not always()) so this required check still runs on docs-only
+    # PRs where the shards were skipped AND still fails on a real shard failure —
+    # but is itself cancelled cleanly when the run is superseded by a newer push.
+    # always() would instead run the gate during cancellation, see the shards'
+    # `cancelled` result, and report a phantom failure on every superseded run.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

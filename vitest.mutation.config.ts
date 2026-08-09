@@ -27,6 +27,12 @@ export default defineConfig({
     include: [
       'webapp/test/unit/crypto.test.ts',
       'webapp/test/unit/crypto-hardening.test.ts',
+      // The TOTP / otpauth / Steam / Google-Authenticator-migration parsers in
+      // crypto.ts are covered by this suite; without it those mutants show as
+      // survived/no-coverage even though killing assertions exist, artificially
+      // depressing crypto.ts's mutation score.
+      'webapp/test/unit/crypto-totp.test.ts',
+      'webapp/test/unit/crypto-guards.test.ts',
       'webapp/test/unit/decrypt-cipher.test.ts',
       'webapp/test/unit/vault-decrypt.test.ts',
     ],
