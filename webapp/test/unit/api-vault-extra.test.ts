@@ -706,7 +706,10 @@ describe('api/vault downloadCipherAttachmentDecrypted', () => {
     vi.stubGlobal('XMLHttpRequest', undefined); // uploadRepairedAttachmentBlob -> fetch fallback
     const globalFetch = vi.fn((input: any) => {
       const url = String(input);
-      if (url.startsWith('https://blob.example')) {
+      // Exact-origin match (not a substring check) so the download mock only
+      // fires for the attachment host and CodeQL doesn't flag it. A base handles
+      // any relative same-origin PUT url without throwing.
+      if (new URL(url, 'http://same-origin.local').origin === 'https://blob.example') {
         return Promise.resolve(new Response(encryptedBytes, { status: 200 }));
       }
       // the repaired ciphertext PUT to the same-origin attachment endpoint
