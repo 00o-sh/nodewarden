@@ -149,6 +149,10 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: needs.changes.outputs.backend == 'true'
+        with:
+          # Full history so the changed-line coverage gate can diff against the
+          # PR base (origin/main).
+          fetch-depth: 0
 
       - name: Setup Node.js
         if: needs.changes.outputs.backend == 'true'
@@ -175,6 +179,14 @@ jobs:
         # coverage/coverage-summary.json for the badge.
         if: needs.changes.outputs.backend == 'true'
         run: npx vitest run --merge-reports --coverage
+
+      - name: Changed-line coverage gate (backend)
+        # Fail-closed: every executable line this PR adds/changes under src/ or
+        # shared/ must be covered by the merged suite above. The ratchet only
+        # blocks regressions; this blocks NEW untested code. See
+        # scripts/check-diff-coverage-api.cjs.
+        if: needs.changes.outputs.backend == 'true'
+        run: npm run coverage:diff:api
 
       - name: Upload backend coverage summary
         # Consumed by the `badges` job so the badge no longer requires re-running
