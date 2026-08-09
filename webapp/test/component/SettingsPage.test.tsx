@@ -15,7 +15,7 @@ vi.mock('@/lib/i18n', async () => {
 });
 
 import SettingsPage from '@/components/SettingsPage';
-import { setLocale } from '@/lib/i18n';
+import { setLocale, t } from '@/lib/i18n';
 
 const profile: Profile = {
   id: 'user-1',
@@ -705,5 +705,441 @@ describe('<SettingsPage>', () => {
       .closest('[role="dialog"]') as HTMLElement;
     fireEvent.click(within(dialog).getByRole('button', { name: 'Register' }));
     await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', 'register failed'));
+  });
+
+  // ---- Non-Error rejection fallbacks (the `instanceof Error ? … : fallback` else) ----
+
+  it('uses the fallback message when loading account passkeys rejects with a non-Error', async () => {
+    const { onNotify } = buildProps({
+      onListAccountPasskeys: vi.fn(() => Promise.reject('list boom')),
+    });
+    await waitFor(() =>
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_account_passkeys_load_failed')),
+    );
+  });
+
+  it('surfaces the Error message when loading account passkeys rejects with an Error', async () => {
+    const { onNotify } = buildProps({
+      onListAccountPasskeys: vi.fn(async () => {
+        throw new Error('list exploded');
+      }),
+    });
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', 'list exploded'));
+  });
+
+  it('surfaces the Error message when a gated action rejects, and a fallback for a non-Error', async () => {
+    // Error path: recovery-code retrieval throws an Error.
+    const onGetRecoveryCode = vi.fn(async () => {
+      throw new Error('recovery exploded');
+    });
+    const { onNotify } = buildProps({ onGetRecoveryCode });
+    openTab('Two-step login');
+    fireEvent.click(screen.getByRole('button', { name: 'View Recovery Code' }));
+    let dialog = await screen.findByRole('dialog');
+    fireEvent.input(dialog.querySelector('input[type="password"]') as HTMLInputElement, {
+      target: { value: 'master-pw' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', 'recovery exploded'));
+
+    cleanup();
+    vi.clearAllMocks();
+
+    // Non-Error path: API-key retrieval rejects with a bare string.
+    const { onNotify: onNotify2 } = buildProps({
+      onGetApiKey: vi.fn(() => Promise.reject('nope')),
+    });
+    openTab('Keys');
+    fireEvent.click(screen.getByRole('button', { name: 'View API Key' }));
+    dialog = await screen.findByRole('dialog');
+    fireEvent.input(dialog.querySelector('input[type="password"]') as HTMLInputElement, {
+      target: { value: 'master-pw' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    await waitFor(() =>
+      expect(onNotify2).toHaveBeenCalledWith('error', t('txt_master_password_is_required_2')),
+    );
+  });
+
+  it('uses the fallback message when saving YubiKey settings rejects with a non-Error', async () => {
+    const onGetYubiKeySettings = vi.fn(async () =>
+      yubiSettings({ enabled: true, yubicoConfigured: true, yubicoCanManage: true, yubicoClientId: 'cid-1', keys: ['', '', '', '', ''] }),
+    );
+    const onSaveYubiKeySettings = vi.fn(() => Promise.reject('bad'));
+    const { onNotify } = buildProps({ onGetYubiKeySettings, onSaveYubiKeySettings });
+    openProviderManage('Yubico OTP security key');
+    const dialog = (await screen.findByText('Yubico validation credentials')).closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_yubikey_update_failed')));
+  });
+
+  it('reports Error and fallback messages when auto-configuring Yubico credentials fails', async () => {
+    // Error path.
+    const onGetYubiKeySettings = vi.fn(async () => yubiSettings({ yubicoConfigured: false }));
+    const onBootstrapErr = vi.fn(async () => {
+      throw new Error('bootstrap exploded');
+    });
+    const first = buildProps({ onGetYubiKeySettings, onBootstrapYubiKeyApiCredentials: onBootstrapErr });
+    openProviderManage('Yubico OTP security key');
+    let otpField = (await screen.findByText('Yubico validation is not configured'))
+      .closest('.yubikey-config-panel')!
+      .querySelector('input[type="password"]') as HTMLInputElement;
+    fireEvent.input(otpField, { target: { value: 'ccccotp' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Get and save automatically' }));
+    await waitFor(() => expect(first.onNotify).toHaveBeenCalledWith('error', 'bootstrap exploded'));
+
+    cleanup();
+    vi.clearAllMocks();
+
+    // Non-Error path.
+    const onBootstrapStr = vi.fn(() => Promise.reject('x'));
+    const second = buildProps({
+      onGetYubiKeySettings: vi.fn(async () => yubiSettings({ yubicoConfigured: false })),
+      onBootstrapYubiKeyApiCredentials: onBootstrapStr,
+    });
+    openProviderManage('Yubico OTP security key');
+    otpField = (await screen.findByText('Yubico validation is not configured'))
+      .closest('.yubikey-config-panel')!
+      .querySelector('input[type="password"]') as HTMLInputElement;
+    fireEvent.input(otpField, { target: { value: 'ccccotp' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Get and save automatically' }));
+    await waitFor(() =>
+      expect(second.onNotify).toHaveBeenCalledWith('error', t('txt_yubikey_auto_config_failed')),
+    );
+  });
+
+  it('does not auto-configure when the bootstrap OTP field is empty', async () => {
+    const onGetYubiKeySettings = vi.fn(async () => yubiSettings({ yubicoConfigured: false }));
+    const onBootstrapYubiKeyApiCredentials = vi.fn(async () => yubiSettings({ yubicoConfigured: true }));
+    buildProps({ onGetYubiKeySettings, onBootstrapYubiKeyApiCredentials });
+    openProviderManage('Yubico OTP security key');
+    await screen.findByText('Yubico validation is not configured');
+    // Clicking with no OTP typed hits the early-return guard.
+    fireEvent.click(screen.getByRole('button', { name: 'Get and save automatically' }));
+    await Promise.resolve();
+    expect(onBootstrapYubiKeyApiCredentials).not.toHaveBeenCalled();
+  });
+
+  it('reports Error and fallback messages when saving Yubico credentials fails', async () => {
+    const baseSettings = () =>
+      yubiSettings({
+        enabled: true,
+        yubicoConfigured: true,
+        yubicoCanManage: true,
+        yubicoClientId: 'cid-1',
+        yubicoSecretKey: 'secret-1',
+        keys: ['', '', '', '', ''],
+      });
+    const errProps = buildProps({
+      onGetYubiKeySettings: vi.fn(baseSettings),
+      onSaveYubiKeyApiCredentials: vi.fn(async () => {
+        throw new Error('cfg exploded');
+      }),
+    });
+    openProviderManage('Yubico OTP security key');
+    let dialog = (await screen.findByText('Yubico validation credentials')).closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'View' }));
+    let panel = within(dialog).getByText('Client ID').closest('.settings-vertical-fields') as HTMLElement;
+    // Also drive the secret-key field onInput while the panel is open.
+    const secretInput = within(panel).getByDisplayValue('secret-1') as HTMLInputElement;
+    fireEvent.input(secretInput, { target: { value: 'secret-2' } });
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(errProps.onNotify).toHaveBeenCalledWith('error', 'cfg exploded'));
+
+    cleanup();
+    vi.clearAllMocks();
+
+    const strProps = buildProps({
+      onGetYubiKeySettings: vi.fn(baseSettings),
+      onSaveYubiKeyApiCredentials: vi.fn(() => Promise.reject('x')),
+    });
+    openProviderManage('Yubico OTP security key');
+    dialog = (await screen.findByText('Yubico validation credentials')).closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'View' }));
+    panel = within(dialog).getByText('Client ID').closest('.settings-vertical-fields') as HTMLElement;
+    fireEvent.click(within(panel).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(strProps.onNotify).toHaveBeenCalledWith('error', t('txt_yubikey_config_update_failed')),
+    );
+  });
+
+  it('reports Error and fallback messages when disabling all YubiKeys fails', async () => {
+    const baseSettings = () =>
+      yubiSettings({ enabled: true, yubicoConfigured: true, yubicoCanManage: true, yubicoClientId: 'cid-1', keys: ['', '', '', '', ''] });
+    const errProps = buildProps({
+      onGetYubiKeySettings: vi.fn(baseSettings),
+      onDisableYubiKey: vi.fn(async () => {
+        throw new Error('disable exploded');
+      }),
+    });
+    openProviderManage('Yubico OTP security key');
+    let dialog = (await screen.findByText('Yubico validation credentials')).closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Disable all keys' }));
+    await waitFor(() => expect(errProps.onNotify).toHaveBeenCalledWith('error', 'disable exploded'));
+
+    cleanup();
+    vi.clearAllMocks();
+
+    const strProps = buildProps({
+      onGetYubiKeySettings: vi.fn(baseSettings),
+      onDisableYubiKey: vi.fn(() => Promise.reject('x')),
+    });
+    openProviderManage('Yubico OTP security key');
+    dialog = (await screen.findByText('Yubico validation credentials')).closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Disable all keys' }));
+    await waitFor(() => expect(strProps.onNotify).toHaveBeenCalledWith('error', t('txt_disable_yubikey_failed')));
+  });
+
+  it('saves Yubico credentials via the dialog form submit when already configured', async () => {
+    const onGetYubiKeySettings = vi.fn(async () =>
+      yubiSettings({ enabled: true, yubicoConfigured: true, yubicoCanManage: true, yubicoClientId: 'cid-1', keys: ['', '', '', '', ''] }),
+    );
+    const onSaveYubiKeySettings = vi.fn(async (keys: string[], nfc: boolean) =>
+      yubiSettings({ enabled: true, yubicoConfigured: true, keys: keys as any, nfc }),
+    );
+    buildProps({ onGetYubiKeySettings, onSaveYubiKeySettings });
+    openProviderManage('Yubico OTP security key');
+    const dialog = (await screen.findByText('Yubico validation credentials')).closest('[role="dialog"]') as HTMLElement;
+    // Submitting the configured dialog routes onConfirm -> saveYubiKeyDialog.
+    fireEvent.submit(dialog);
+    await waitFor(() => expect(onSaveYubiKeySettings).toHaveBeenCalledTimes(1));
+  });
+
+  it('reconfigures Yubico credentials from the config panel via the OTP field', async () => {
+    const onGetYubiKeySettings = vi.fn(async () =>
+      yubiSettings({ enabled: true, yubicoConfigured: true, yubicoCanManage: true, yubicoClientId: 'cid-1', yubicoSecretKey: 'secret-1', keys: ['', '', '', '', ''] }),
+    );
+    const onBootstrapYubiKeyApiCredentials = vi.fn(async () =>
+      yubiSettings({ enabled: true, yubicoConfigured: true, yubicoCanManage: true, yubicoClientId: 'cid-9', keys: ['', '', '', '', ''] }),
+    );
+    buildProps({ onGetYubiKeySettings, onBootstrapYubiKeyApiCredentials });
+    openProviderManage('Yubico OTP security key');
+    const dialog = (await screen.findByText('Yubico validation credentials')).closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'View' }));
+    const panel = within(dialog).getByText('Client ID').closest('.settings-vertical-fields') as HTMLElement;
+    const otpField = within(panel).getByText('OTP from YubiKey').closest('label')!.querySelector('input') as HTMLInputElement;
+    fireEvent.input(otpField, { target: { value: 'CCCC REconfig' } });
+    // Normalised to lowercase, no spaces.
+    expect(otpField.value).toBe('ccccreconfig');
+    fireEvent.click(within(panel).getByRole('button', { name: 'Get again automatically' }));
+    await waitFor(() =>
+      expect(onBootstrapYubiKeyApiCredentials).toHaveBeenCalledWith('ccccreconfig', 'master-pw'),
+    );
+  });
+
+  it('reports Error and fallback messages when registering a two-step passkey fails (non-Error)', async () => {
+    const onGetTwoFactorPasskeySettings = vi.fn(async () => passkeySettings({ enabled: false, keys: [] }));
+    const onCreateTwoFactorPasskey = vi.fn(() => Promise.reject('x'));
+    const { onNotify } = buildProps({ onGetTwoFactorPasskeySettings, onCreateTwoFactorPasskey });
+    openProviderManage('Passkeys');
+    const dialog = (await screen.findByText('Manage passkeys used only for two-step login.')).closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Register' }));
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_passkey_setup_failed')));
+  });
+
+  it('reports Error and fallback messages when deleting a two-step passkey fails', async () => {
+    const twoKeys = () =>
+      passkeySettings({ enabled: true, keys: [{ id: 1, name: 'Key A' }, { id: 2, name: 'Key B' }] });
+    const errProps = buildProps({
+      onGetTwoFactorPasskeySettings: vi.fn(twoKeys),
+      onDeleteTwoFactorPasskey: vi.fn(async () => {
+        throw new Error('del exploded');
+      }),
+    });
+    openProviderManage('Passkeys');
+    let dialog = (await screen.findByText('Manage passkeys used only for two-step login.')).closest('[role="dialog"]') as HTMLElement;
+    let row = within(dialog).getByText('Key A').closest('.account-passkey-row') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(errProps.onNotify).toHaveBeenCalledWith('error', 'del exploded'));
+
+    cleanup();
+    vi.clearAllMocks();
+
+    const strProps = buildProps({
+      onGetTwoFactorPasskeySettings: vi.fn(twoKeys),
+      onDeleteTwoFactorPasskey: vi.fn(() => Promise.reject('x')),
+    });
+    openProviderManage('Passkeys');
+    dialog = (await screen.findByText('Manage passkeys used only for two-step login.')).closest('[role="dialog"]') as HTMLElement;
+    row = within(dialog).getByText('Key A').closest('.account-passkey-row') as HTMLElement;
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(strProps.onNotify).toHaveBeenCalledWith('error', t('txt_delete_item_failed')));
+  });
+
+  it('does not delete the last remaining two-step passkey', async () => {
+    const onDeleteTwoFactorPasskey = vi.fn(async () => passkeySettings());
+    buildProps({
+      onGetTwoFactorPasskeySettings: vi.fn(async () => passkeySettings({ enabled: true, keys: [{ id: 1, name: 'Only Key' }] })),
+      onDeleteTwoFactorPasskey,
+    });
+    openProviderManage('Passkeys');
+    const dialog = (await screen.findByText('Manage passkeys used only for two-step login.')).closest('[role="dialog"]') as HTMLElement;
+    const row = within(dialog).getByText('Only Key').closest('.account-passkey-row') as HTMLElement;
+    // The delete button is disabled for a single key; clicking hits the guard.
+    fireEvent.click(within(row).getByRole('button', { name: 'Delete' }));
+    await Promise.resolve();
+    expect(onDeleteTwoFactorPasskey).not.toHaveBeenCalled();
+  });
+
+  it('reports Error and fallback messages when disabling all two-step passkeys fails', async () => {
+    const enabledKeys = () =>
+      passkeySettings({ enabled: true, keys: [{ id: 1, name: 'Key A' }, { id: 2, name: 'Key B' }] });
+    const errProps = buildProps({
+      onGetTwoFactorPasskeySettings: vi.fn(enabledKeys),
+      onDisableTwoFactorPasskeys: vi.fn(async () => {
+        throw new Error('disable2fa exploded');
+      }),
+    });
+    openProviderManage('Passkeys');
+    let dialog = (await screen.findByText('Manage passkeys used only for two-step login.')).closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Disable all keys' }));
+    await waitFor(() => expect(errProps.onNotify).toHaveBeenCalledWith('error', 'disable2fa exploded'));
+
+    cleanup();
+    vi.clearAllMocks();
+
+    const strProps = buildProps({
+      onGetTwoFactorPasskeySettings: vi.fn(enabledKeys),
+      onDisableTwoFactorPasskeys: vi.fn(() => Promise.reject('x')),
+    });
+    openProviderManage('Passkeys');
+    dialog = (await screen.findByText('Manage passkeys used only for two-step login.')).closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Disable all keys' }));
+    await waitFor(() =>
+      expect(strProps.onNotify).toHaveBeenCalledWith('error', t('txt_disable_passkey_two_step_failed')),
+    );
+  });
+
+  it('uses the fallback message when refreshing two-factor status rejects with a non-Error', async () => {
+    const { onNotify } = buildProps({ onRefreshTwoFactorStatus: vi.fn(() => Promise.reject('x')) });
+    openTab('Two-step login');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_load_failed')));
+  });
+
+  it('uses the fallback message when enabling TOTP from the manage dialog rejects with a non-Error', async () => {
+    const { onNotify } = buildProps({ onEnableTotp: vi.fn(() => Promise.reject('x')) });
+    await openTotpManageDialog();
+    const codeInput = screen.getByText('Verification Code').closest('label')!.querySelector('input')!;
+    fireEvent.input(codeInput, { target: { value: '111111' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enable TOTP' }));
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_enable_totp_failed')));
+  });
+
+  it('uses the fallback message when creating an account passkey rejects with a non-Error', async () => {
+    const { onNotify } = buildProps({ onCreateAccountPasskey: vi.fn(() => Promise.reject('x')) });
+    openTab('Master Password');
+    fireEvent.click(screen.getByRole('button', { name: 'Add account passkey' }));
+    const prompt = await screen.findByRole('dialog');
+    fireEvent.input(prompt.querySelector('input[type="password"]') as HTMLInputElement, {
+      target: { value: 'master-pw' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    const nameDialog = (await screen.findByText('Passkey created. Name it to help you recognize it.'))
+      .closest('[role="dialog"]') as HTMLElement;
+    fireEvent.click(within(nameDialog).getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_account_passkeys_load_failed')),
+    );
+  });
+
+  // ---- Misc guard / render branches ----
+
+  it('does not reload when the selected locale matches the current one', async () => {
+    const reloadSpy = vi.fn();
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, reload: reloadSpy },
+    });
+    buildProps();
+    const select = screen.getByDisplayValue('English') as HTMLSelectElement;
+    // Selecting the already-active locale is a no-op.
+    fireEvent.input(select, { target: { value: 'en' } });
+    await Promise.resolve();
+    expect(setLocale).not.toHaveBeenCalled();
+    expect(reloadSpy).not.toHaveBeenCalled();
+  });
+
+  it('clears legacy TOTP setup secrets from localStorage on mount', () => {
+    window.localStorage.setItem('nodewarden.totp.secret.abc', 'legacy');
+    window.localStorage.setItem('unrelated.key', 'keep');
+    buildProps();
+    expect(window.localStorage.getItem('nodewarden.totp.secret.abc')).toBeNull();
+    expect(window.localStorage.getItem('unrelated.key')).toBe('keep');
+  });
+
+  it('starts with an empty hint when the profile has no master-password hint', () => {
+    buildProps({ profile: { ...profile, masterPasswordHint: undefined } });
+    openTab('Master Password');
+    const hintInput = screen
+      .getByText(t('txt_password_hint_optional'))
+      .closest('label')!
+      .querySelector('input') as HTMLInputElement;
+    expect(hintInput.value).toBe('');
+  });
+
+  it('renders direct-unlock and prf-not-supported passkey statuses and dash dates', async () => {
+    const passkeys: AccountPasskeyCredential[] = [
+      { id: 'pk-direct', name: 'Direct Key', prfStatus: 0, creationDate: null as unknown as string },
+      { id: 'pk-none', name: 'Legacy Key', prfStatus: 2, creationDate: 'not-a-real-date' },
+    ];
+    buildProps({ onListAccountPasskeys: vi.fn(async () => passkeys) });
+    openTab('Master Password');
+    expect(await screen.findByText('Direct Key')).toBeInTheDocument();
+    // prfStatus 0 -> direct-unlock label; prfStatus 2 -> not-supported label.
+    expect(screen.getByText(t('txt_direct_unlock'))).toBeInTheDocument();
+    expect(screen.getByText(t('txt_prf_not_supported'))).toBeInTheDocument();
+    // Both an absent and an invalid creation date render as the dash placeholder
+    // inside the "Created: -" line.
+    const createdDash = t('txt_created_value', { value: t('txt_dash') });
+    expect(screen.getAllByText(createdDash).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('regenerates and edits the TOTP secret from the manage dialog', async () => {
+    buildProps();
+    await openTotpManageDialog();
+    const secretInput = screen
+      .getByText('Authenticator Key')
+      .closest('label')!
+      .querySelector('input') as HTMLInputElement;
+    // Editing lower-cases input to upper-case.
+    fireEvent.input(secretInput, { target: { value: 'abcдef'.replace('д', 'd') } });
+    expect(secretInput.value).toBe('ABCDEF');
+
+    const before = secretInput.value;
+    fireEvent.click(screen.getByRole('button', { name: t('txt_regenerate') }));
+    const after = (screen
+      .getByText('Authenticator Key')
+      .closest('label')!
+      .querySelector('input') as HTMLInputElement).value;
+    // Regenerate replaces the secret with a fresh 32-char base32 value.
+    expect(after).toHaveLength(32);
+    expect(after).not.toBe(before);
+
+    // The copy-secret control is present and clickable.
+    fireEvent.click(screen.getByRole('button', { name: t('txt_copy_secret') }));
+  });
+
+  it('opens the API key dialog and supports copy, focus-select and close', async () => {
+    buildProps();
+    openTab('Keys');
+    fireEvent.click(screen.getByRole('button', { name: 'View API Key' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.input(dialog.querySelector('input[type="password"]') as HTMLInputElement, {
+      target: { value: 'master-pw' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+    // The credentials dialog opens with the client-secret value visible.
+    const keyDialog = (await screen.findByText(t('txt_oauth_client_credentials'))).closest('[role="dialog"]') as HTMLElement;
+    const secretRow = within(keyDialog).getByDisplayValue('api-secret-key') as HTMLInputElement;
+    fireEvent.focus(secretRow);
+    // Copy one of the credential values.
+    fireEvent.click(within(keyDialog).getAllByRole('button', { name: 'Copy' })[1]);
+    // Close via the confirm ("Close") button.
+    fireEvent.click(within(keyDialog).getByRole('button', { name: 'Close' }));
+    await waitFor(() =>
+      expect(screen.queryByText(t('txt_oauth_client_credentials'))).not.toBeInTheDocument(),
+    );
   });
 });

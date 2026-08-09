@@ -326,4 +326,374 @@ describe('<ImportPage> extra', () => {
       expect(onImport.mock.calls.length + onNotify.mock.calls.length).toBeGreaterThan(0);
     });
   });
+
+  // ---- password-protected file decryption (confirming the dialog) ----
+
+  async function openPasswordProtectedDialog(payload: Record<string, unknown>, source?: string) {
+    if (source) {
+      selectComboValue(importFormatSelect(), source);
+      await waitFor(() => expect(importFormatSelect().value).toBe(source));
+    }
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    setFiles(fileInput, [makeTextFile(JSON.stringify(payload), 'pw.json', 'application/json')]);
+    await waitFor(() => expect(fileInput.files?.[0]?.name).toBe('pw.json'));
+    fireEvent.click(getImportButton());
+    return (await screen.findByText(t('txt_import_encrypted_file_title'))).closest('[role="dialog"]') as HTMLElement;
+  }
+
+  function confirmPasswordDialog(dialog: HTMLElement, password: string) {
+    const input = dialog.querySelector('input[type="password"]') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: password } });
+    fireEvent.click(within(dialog).getByRole('button', { name: new RegExp(`^${t('txt_import')}$`) }));
+  }
+
+  it('reports an invalid file password when the pbkdf2-derived key fails validation', async () => {
+    const { onNotify } = setup();
+    const dialog = await openPasswordProtectedDialog({
+      encrypted: true,
+      passwordProtected: true,
+      salt: 'c2FsdHNhbHQ=',
+      kdfType: 0,
+      kdfIterations: 100,
+      encKeyValidation_DO_NOT_EDIT: '2.YWJj|ZGVm|Z2hp',
+      data: '2.YWJj|ZGVm|Z2hp',
+    });
+    confirmPasswordDialog(dialog, 'wrong-password');
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_invalid_file_password')));
+  });
+
+  it('rejects a password-protected file with no salt', async () => {
+    const { onNotify } = setup();
+    const dialog = await openPasswordProtectedDialog({
+      encrypted: true,
+      passwordProtected: true,
+      salt: '',
+      kdfType: 0,
+      kdfIterations: 100,
+      encKeyValidation_DO_NOT_EDIT: '2.a|b|c',
+      data: '2.a|b|c',
+    });
+    confirmPasswordDialog(dialog, 'pw');
+    await waitFor(() =>
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_import_invalid_password_protected_file')),
+    );
+  });
+
+  it('rejects a password-protected file with invalid argon2id parameters', async () => {
+    const { onNotify } = setup();
+    const dialog = await openPasswordProtectedDialog({
+      encrypted: true,
+      passwordProtected: true,
+      salt: 'c2FsdA==',
+      kdfType: 1,
+      kdfIterations: 3,
+      kdfMemory: 0,
+      kdfParallelism: 0,
+      encKeyValidation_DO_NOT_EDIT: '2.a|b|c',
+      data: '2.a|b|c',
+    });
+    confirmPasswordDialog(dialog, 'pw');
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_invalid_argon2id_params')));
+  });
+
+  it('rejects a password-protected file with a non-positive iteration count', async () => {
+    const { onNotify } = setup();
+    const dialog = await openPasswordProtectedDialog({
+      encrypted: true,
+      passwordProtected: true,
+      salt: 'c2FsdA==',
+      kdfType: 0,
+      kdfIterations: 0,
+      encKeyValidation_DO_NOT_EDIT: '2.a|b|c',
+      data: '2.a|b|c',
+    });
+    confirmPasswordDialog(dialog, 'pw');
+    await waitFor(() =>
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_import_invalid_password_protected_file')),
+    );
+  });
+
+  it('rejects a password-protected file whose argon2id parallelism is non-positive', async () => {
+    const { onNotify } = setup();
+    const dialog = await openPasswordProtectedDialog({
+      encrypted: true,
+      passwordProtected: true,
+      salt: 'c2FsdA==',
+      kdfType: 1,
+      kdfIterations: 3,
+      kdfMemory: 64,
+      kdfParallelism: 0,
+      encKeyValidation_DO_NOT_EDIT: '2.a|b|c',
+      data: '2.a|b|c',
+    });
+    confirmPasswordDialog(dialog, 'pw');
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_invalid_argon2id_params')));
+  });
+
+  it('rejects a password-protected file with an unsupported KDF type', async () => {
+    const { onNotify } = setup();
+    const dialog = await openPasswordProtectedDialog({
+      encrypted: true,
+      passwordProtected: true,
+      salt: 'c2FsdA==',
+      kdfType: 2,
+      kdfIterations: 100,
+      encKeyValidation_DO_NOT_EDIT: '2.a|b|c',
+      data: '2.a|b|c',
+    });
+    confirmPasswordDialog(dialog, 'pw');
+    await waitFor(() =>
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_unsupported_kdf_type', { type: '2' })),
+    );
+  });
+
+  it('rejects a password-protected file missing the validation token', async () => {
+    const { onNotify } = setup();
+    const dialog = await openPasswordProtectedDialog({
+      encrypted: true,
+      passwordProtected: true,
+      salt: 'c2FsdA==',
+      kdfType: 0,
+      kdfIterations: 100,
+      // no encKeyValidation_DO_NOT_EDIT / data
+    });
+    confirmPasswordDialog(dialog, 'pw');
+    await waitFor(() =>
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_import_invalid_password_protected_file')),
+    );
+  });
+
+  it('requires a non-empty file password when confirming the dialog', async () => {
+    const { onNotify } = setup();
+    const dialog = await openPasswordProtectedDialog({
+      encrypted: true,
+      passwordProtected: true,
+      salt: 'c2FsdA==',
+      kdfType: 0,
+      kdfIterations: 100,
+      encKeyValidation_DO_NOT_EDIT: '2.a|b|c',
+      data: '2.a|b|c',
+    });
+    // Confirm with an empty password -> required error (also exercises the
+    // `String(password || '')` empty-fallback branch).
+    confirmPasswordDialog(dialog, '');
+    await waitFor(() =>
+      expect(onNotify).toHaveBeenCalledWith('error', t('txt_import_file_password_required')),
+    );
+  });
+
+  it('cancels the file-password dialog without importing', async () => {
+    const { onImport } = setup();
+    const dialog = await openPasswordProtectedDialog({
+      encrypted: true,
+      passwordProtected: true,
+      salt: 'c2FsdA==',
+      kdfType: 0,
+      kdfIterations: 100,
+      encKeyValidation_DO_NOT_EDIT: '2.a|b|c',
+      data: '2.a|b|c',
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: t('txt_cancel') }));
+    await waitFor(() =>
+      expect(screen.queryByText(t('txt_import_encrypted_file_title'))).not.toBeInTheDocument(),
+    );
+    expect(onImport).not.toHaveBeenCalled();
+  });
+
+  // ---- NodeWarden inline attachment parsing ----
+
+  it('imports a nodewarden_json file with a mixed inline-attachment array', async () => {
+    const { onImport } = setup();
+    selectComboValue(importFormatSelect(), 'nodewarden_json');
+    await waitFor(() => expect(importFormatSelect().value).toBe('nodewarden_json'));
+
+    const payload = {
+      items: [{ id: '1', type: 1, name: 'x' }],
+      nodewardenAttachments: [
+        null,
+        'not-an-object',
+        { fileName: '', data: '' },
+        { data: 'AAAA', cipherId: 'c1', cipherIndex: 0 },
+        { fileName: 'note.txt', data: 'AAAA' },
+      ],
+    };
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    setFiles(fileInput, [makeTextFile(JSON.stringify(payload), 'nw.json', 'application/json')]);
+    await waitFor(() => expect(fileInput.files?.[0]?.name).toBe('nw.json'));
+
+    fireEvent.click(getImportButton());
+    await waitFor(() => expect(onImport).toHaveBeenCalledTimes(1));
+    // Two valid attachment rows (the others are skipped) are forwarded.
+    const attachments = onImport.mock.calls[0][2] as unknown[];
+    expect(attachments).toHaveLength(2);
+  });
+
+  it('imports a nodewarden_json file whose top-level payload is not an object', async () => {
+    const { onImport } = setup();
+    selectComboValue(importFormatSelect(), 'nodewarden_json');
+    await waitFor(() => expect(importFormatSelect().value).toBe('nodewarden_json'));
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    setFiles(fileInput, [makeTextFile('[]', 'nw-array.json', 'application/json')]);
+    await waitFor(() => expect(fileInput.files?.[0]?.name).toBe('nw-array.json'));
+
+    fireEvent.click(getImportButton());
+    await waitFor(() => expect(onImport).toHaveBeenCalledTimes(1));
+    expect(onImport.mock.calls[0][2]).toEqual([]);
+  });
+
+  // ---- folder-mode target routing ----
+
+  it('forwards the chosen target folder id on a plain import', async () => {
+    const { onImport } = setup();
+    const folderMode = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
+    selectComboValue(folderMode, 'target');
+    await waitFor(() => expect(screen.getByText(t('txt_target_folder'))).toBeInTheDocument());
+    const targetSelect = screen.getAllByRole('combobox')[2] as HTMLSelectElement;
+    selectComboValue(targetSelect, 'f2');
+
+    const json = JSON.stringify({ items: [{ id: '1', type: 1, name: 'x' }] });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    setFiles(fileInput, [makeTextFile(json, 'export.json', 'application/json')]);
+    await waitFor(() => expect(fileInput.files?.[0]?.name).toBe('export.json'));
+
+    fireEvent.click(getImportButton());
+    await waitFor(() => expect(onImport).toHaveBeenCalledTimes(1));
+    expect(onImport.mock.calls[0][1]).toMatchObject({ folderMode: 'target', targetFolderId: 'f2' });
+  });
+
+  it('routes a CSV import with folder-mode "none"', async () => {
+    const { onImport } = setup();
+    selectComboValue(importFormatSelect(), 'lastpass');
+    await waitFor(() => expect(importFormatSelect().value).toBe('lastpass'));
+    const folderMode = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
+    selectComboValue(folderMode, 'none');
+
+    const csv = 'url,username,password,extra,name,grouping,totp\nhttps://example.com,me,pw,,Example,,';
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    setFiles(fileInput, [makeTextFile(csv, 'lp.csv', 'text/csv')]);
+    await waitFor(() => expect(fileInput.files?.[0]?.name).toBe('lp.csv'));
+
+    fireEvent.click(getImportButton());
+    await waitFor(() => expect(onImport).toHaveBeenCalledTimes(1));
+    expect(onImport.mock.calls[0][1]).toMatchObject({ folderMode: 'none', targetFolderId: null });
+  });
+
+  // ---- export error fallback ----
+
+  it('clears the selected file when the file input change carries no file', async () => {
+    setup();
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    setFiles(fileInput, [makeTextFile('{}', 'x.json', 'application/json')]);
+    await waitFor(() => expect(fileInput.files?.[0]?.name).toBe('x.json'));
+    // An empty change resets the controlled file back to null.
+    setFiles(fileInput, []);
+    await waitFor(() => expect(getImportButton().disabled).toBe(false));
+  });
+
+  it('renders target-folder options using name and id fallbacks', async () => {
+    setup({
+      folders: [
+        { id: 'zzz', name: '', decName: '' },
+        { id: 'aaa', name: 'Alpha', decName: '' },
+      ] as Folder[],
+    });
+    const folderMode = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
+    selectComboValue(folderMode, 'target');
+    await waitFor(() => expect(screen.getByText(t('txt_target_folder'))).toBeInTheDocument());
+    // decName empty -> name; name empty too -> id.
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(screen.getByText('zzz')).toBeInTheDocument();
+  });
+
+  it('routes a CSV import through the target-folder branch', async () => {
+    const { onImport } = setup();
+    selectComboValue(importFormatSelect(), 'lastpass');
+    await waitFor(() => expect(importFormatSelect().value).toBe('lastpass'));
+    const folderMode = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
+    selectComboValue(folderMode, 'target');
+    await waitFor(() => expect(screen.getByText(t('txt_target_folder'))).toBeInTheDocument());
+    const targetSelect = screen.getAllByRole('combobox')[2] as HTMLSelectElement;
+    selectComboValue(targetSelect, 'f1');
+
+    const csv = 'url,username,password,extra,name,grouping,totp\nhttps://example.com,me,pw,,Example,,';
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    setFiles(fileInput, [makeTextFile(csv, 'lp.csv', 'text/csv')]);
+    await waitFor(() => expect(fileInput.files?.[0]?.name).toBe('lp.csv'));
+
+    fireEvent.click(getImportButton());
+    await waitFor(() => expect(onImport).toHaveBeenCalledTimes(1));
+    expect(onImport.mock.calls[0][1]).toMatchObject({ folderMode: 'target', targetFolderId: 'f1' });
+  });
+
+  async function openExportAuthDialog() {
+    fireEvent.click(getExportButton());
+    return waitFor(() => {
+      const found = screen
+        .getAllByRole('dialog')
+        .find((d) => within(d).queryByText(t('txt_enter_master_password_to_view_this_item')));
+      expect(found).toBeTruthy();
+      return found as HTMLElement;
+    });
+  }
+
+  it('runs an account-mode encrypted export forwarding the encrypted mode', async () => {
+    const { onExport } = setup();
+    const combos = screen.getAllByRole('combobox');
+    selectComboValue(combos[combos.length - 1] as HTMLSelectElement, 'bitwarden_encrypted_json');
+    await waitFor(() => expect(screen.getByText(t('txt_encrypted_mode'))).toBeInTheDocument());
+
+    const dialog = await openExportAuthDialog();
+    fireEvent.input(dialog.querySelector('input[type="password"]') as HTMLInputElement, { target: { value: 'master-pw' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: new RegExp(t('txt_verify')) }));
+    await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1));
+    expect(onExport.mock.calls[0][0]).toMatchObject({ format: 'bitwarden_encrypted_json', encryptedJsonMode: 'account' });
+  });
+
+  it('runs a zip export forwarding the optional zip password', async () => {
+    const { onExport } = setup();
+    const combos = screen.getAllByRole('combobox');
+    selectComboValue(combos[combos.length - 1] as HTMLSelectElement, 'bitwarden_json_zip');
+    await waitFor(() => expect(screen.getByText(t('txt_zip_password_optional'))).toBeInTheDocument());
+    const zipField = screen.getByText(t('txt_zip_password_optional')).closest('label')!.querySelector('input') as HTMLInputElement;
+    fireEvent.input(zipField, { target: { value: 'zip-secret' } });
+
+    const dialog = await openExportAuthDialog();
+    fireEvent.input(dialog.querySelector('input[type="password"]') as HTMLInputElement, { target: { value: 'master-pw' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: new RegExp(t('txt_verify')) }));
+    await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1));
+    expect(onExport.mock.calls[0][0]).toMatchObject({ format: 'bitwarden_json_zip', zipPassword: 'zip-secret' });
+  });
+
+  it('ignores a second export confirm while an export is in flight', async () => {
+    const onExport = vi.fn(() => new Promise<void>(() => {}));
+    setup({ onExport });
+    const dialog = await openExportAuthDialog();
+    fireEvent.input(dialog.querySelector('input[type="password"]') as HTMLInputElement, { target: { value: 'master-pw' } });
+    const verifyBtn = within(dialog).getByRole('button', { name: new RegExp(t('txt_verify')) });
+    fireEvent.click(verifyBtn);
+    await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1));
+    // Clicking the (now-disabled) confirm again hits the in-flight guard.
+    fireEvent.click(verifyBtn);
+    await Promise.resolve();
+    expect(onExport).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the export fallback message when onExport rejects with a non-Error', async () => {
+    const onExport = vi.fn(() => Promise.reject('bare-export-string'));
+    const { onNotify } = setup({ onExport });
+    fireEvent.click(getExportButton());
+    const dialog = await waitFor(() => {
+      const found = screen
+        .getAllByRole('dialog')
+        .find((d) => within(d).queryByText(t('txt_enter_master_password_to_view_this_item')));
+      expect(found).toBeTruthy();
+      return found as HTMLElement;
+    });
+    const input = dialog.querySelector('input[type="password"]') as HTMLInputElement;
+    fireEvent.input(input, { target: { value: 'master-pw' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: new RegExp(t('txt_verify')) }));
+    await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onNotify).toHaveBeenCalledWith('error', t('txt_export_failed')));
+  });
 });

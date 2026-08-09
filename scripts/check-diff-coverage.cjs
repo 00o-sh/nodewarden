@@ -82,10 +82,18 @@ const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:dem
 //   - Also removed the vault components: VaultEditor.tsx (97% / 88%),
 //     VaultDetailView.tsx (100% / 93%), VaultListPanel.tsx (100% / 91%),
 //     VaultSidebar.tsx (100% / 96%) and vault-page-helpers.tsx (99% / 98%).
-//     Remaining: the page components (App, Settings/Vault/Backup/Import/Send/
-//     PasswordGenerator/PasswordSecurity pages, AppGlobalOverlays/MainRoutes,
-//     AuthViews).
-const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/SettingsPage\.tsx$|components\/VaultPage\.tsx$|components\/BackupCenterPage\.tsx$|components\/ImportPage\.tsx$|components\/PublicSendPage\.tsx$|components\/SendsPage\.tsx$|components\/PasswordGeneratorPage\.tsx$|components\/PasswordSecurityPage\.tsx$|components\/AppGlobalOverlays\.tsx$|components\/AppMainRoutes\.tsx$|components\/AuthViews\.tsx$)/;
+//   - Also removed the page components: App.tsx (90/85), SettingsPage (97/89),
+//     VaultPage (96/86), BackupCenterPage (96/83), ImportPage (89/86),
+//     PublicSendPage (83/88), SendsPage (95/91), PasswordGeneratorPage (92/98),
+//     PasswordSecurityPage (100/94), AppGlobalOverlays (100/98),
+//     AppMainRoutes (100/95), AuthViews (100/98).
+//
+// The skip-list is now EMPTY: every instrumented webapp/src module has its
+// changed lines gated. (PublicSendPage lines and BackupCenterPage branches sit
+// ~83% only because of statically-dead IS_DEMO_MODE blocks and single-threaded
+// re-entrancy guards, which real edits never touch; if one ever false-fires the
+// diff gate, add a targeted EXCLUDE_RE entry rather than re-skipping the file.)
+const FEATURE_SKIP_RE = /(?!)/; // empty — matches nothing; the gate now covers all of webapp/src
 
 function fail(msg) {
   console.error(`\n✖ diff-coverage: ${msg}`);
