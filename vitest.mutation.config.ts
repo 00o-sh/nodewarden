@@ -35,6 +35,7 @@ export default defineConfig({
       'webapp/test/unit/crypto-guards.test.ts',
       'webapp/test/unit/decrypt-cipher.test.ts',
       'webapp/test/unit/vault-decrypt.test.ts',
+      'webapp/test/unit/vault-decrypt-fields.test.ts',
     ],
     setupFiles: ['webapp/test/setup.ts'],
   },
