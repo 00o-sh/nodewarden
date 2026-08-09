@@ -72,9 +72,12 @@ const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:dem
 //     (98% lines / 95% branches), lib/account-passkeys.ts (98% / 94%),
 //     lib/app-auth.ts (93% / 83%), lib/password-generator.ts (98% / 85%),
 //     lib/ssh-key-generator.ts (100% / 85%), and lib/api/auth.ts (87% / 70%,
-//     createAuthedFetch + registerAccount now unit-tested). Keep chipping away
-//     at the rest above.
-const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/SettingsPage\.tsx$|components\/VaultPage\.tsx$|components\/vault\/VaultEditor\.tsx$|components\/vault\/VaultDetailView\.tsx$|components\/vault\/VaultSidebar\.tsx$|components\/vault\/VaultListPanel\.tsx$|components\/vault\/vault-page-helpers\.tsx$|components\/BackupCenterPage\.tsx$|components\/ImportPage\.tsx$|components\/PublicSendPage\.tsx$|components\/SendsPage\.tsx$|hooks\/useAdminActions\.ts$|hooks\/useAccountSecurityActions\.ts$|lib\/api\/vault\.ts$|lib\/app-support\.ts$|lib\/i18n\.ts$|lib\/import-formats-browser\.ts$|lib\/password-security\.ts$|lib\/password-security-cache\.ts$|components\/PasswordGeneratorPage\.tsx$|components\/PasswordSecurityPage\.tsx$|components\/AppGlobalOverlays\.tsx$|components\/AppMainRoutes\.tsx$|components\/AuthViews\.tsx$)/;
+//     createAuthedFetch + registerAccount now unit-tested).
+//   - Also removed: lib/api/vault.ts (97% / 86%), lib/import-formats-browser.ts
+//     (100% / 91%), lib/password-security.ts (100% / 89%), and
+//     lib/password-security-cache.ts (100% / 88%). Keep chipping away at the
+//     rest above (app-support / i18n next, then the vault + page components).
+const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/SettingsPage\.tsx$|components\/VaultPage\.tsx$|components\/vault\/VaultEditor\.tsx$|components\/vault\/VaultDetailView\.tsx$|components\/vault\/VaultSidebar\.tsx$|components\/vault\/VaultListPanel\.tsx$|components\/vault\/vault-page-helpers\.tsx$|components\/BackupCenterPage\.tsx$|components\/ImportPage\.tsx$|components\/PublicSendPage\.tsx$|components\/SendsPage\.tsx$|hooks\/useAdminActions\.ts$|hooks\/useAccountSecurityActions\.ts$|lib\/app-support\.ts$|lib\/i18n\.ts$|components\/PasswordGeneratorPage\.tsx$|components\/PasswordSecurityPage\.tsx$|components\/AppGlobalOverlays\.tsx$|components\/AppMainRoutes\.tsx$|components\/AuthViews\.tsx$)/;
 
 function fail(msg) {
   console.error(`\n✖ diff-coverage: ${msg}`);
