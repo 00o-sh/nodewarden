@@ -39,9 +39,19 @@ vi.mock('@/components/DomainRulesPage', () => ({
     <div data-testid="domain-rules-page" data-loading={String(p.loading)} />
   ),
 }));
+vi.mock('@/components/PasswordGeneratorPage', () => ({
+  default: () => <div data-testid="password-generator-page" />,
+}));
+vi.mock('@/components/PasswordSecurityPage', () => ({
+  default: (p: Record<string, unknown>) => (
+    <div data-testid="password-security-page" data-loading={String(p.loading)} data-count={String((p.ciphers as unknown[]).length)} />
+  ),
+}));
 vi.mock('@/components/SecurityDevicesPage', () => ({
   default: (p: Record<string, unknown>) => (
-    <div data-testid="security-devices-page" data-count={String((p.devices as unknown[]).length)} />
+    <div data-testid="security-devices-page" data-count={String((p.devices as unknown[]).length)}>
+      <button type="button" data-testid="devices-refresh" onClick={() => (p.onRefresh as () => void)()}>refresh</button>
+    </div>
   ),
 }));
 vi.mock('@/components/AdminPage', () => ({
@@ -51,7 +61,9 @@ vi.mock('@/components/AdminPage', () => ({
 }));
 vi.mock('@/components/LogCenterPage', () => ({
   default: (p: Record<string, unknown>) => (
-    <div data-testid="log-center-page" data-mobile={String(p.mobileLayout)} />
+    <div data-testid="log-center-page" data-mobile={String(p.mobileLayout)}>
+      <button type="button" data-testid="logs-mobile-back" onClick={() => (p.onMobileBack as () => void)()}>back</button>
+    </div>
   ),
 }));
 vi.mock('@/components/BackupCenterPage', () => ({
@@ -378,5 +390,102 @@ describe('AppMainRoutes', () => {
     navigate('/totally-unknown');
     const { container } = render(<AppMainRoutes {...buildProps()} />);
     expect(container.textContent).toBe('');
+  });
+
+  it('renders the password generator page at /generator', async () => {
+    navigate('/generator');
+    render(<AppMainRoutes {...buildProps()} />);
+    expect(await screen.findByTestId('password-generator-page')).toBeInTheDocument();
+  });
+
+  it('renders the password security page at /security/password-health and threads ciphers', async () => {
+    navigate('/security/password-health');
+    render(<AppMainRoutes {...buildProps({ ciphersLoading: true })} />);
+    const page = await screen.findByTestId('password-security-page');
+    expect(page).toHaveAttribute('data-count', '2');
+    expect(page).toHaveAttribute('data-loading', 'true');
+  });
+
+  it('navigates home from the password-health mobile back button', async () => {
+    const { fireEvent } = await import('@testing-library/preact');
+    navigate('/security/password-health');
+    const onNavigate = vi.fn();
+    render(<AppMainRoutes {...buildProps({ mobileLayout: true, onNavigate })} />);
+    await screen.findByTestId('password-security-page');
+    fireEvent.click(document.querySelector('.mobile-settings-back') as HTMLButtonElement);
+    expect(onNavigate).toHaveBeenCalledWith('/settings');
+  });
+
+  it('shows the mobile back subheader on the import route and navigates home from it', async () => {
+    const { fireEvent } = await import('@testing-library/preact');
+    navigate('/tools/import-export');
+    const onNavigate = vi.fn();
+    render(<AppMainRoutes {...buildProps({ mobileLayout: true, onNavigate })} />);
+    await screen.findByTestId('import-page');
+    const back = document.querySelector('.mobile-settings-back') as HTMLButtonElement;
+    expect(back).toBeTruthy();
+    fireEvent.click(back);
+    expect(onNavigate).toHaveBeenCalledWith('/settings');
+  });
+
+  it('navigates home from the account settings mobile back button', async () => {
+    const { fireEvent } = await import('@testing-library/preact');
+    navigate('/settings/account');
+    const onNavigate = vi.fn();
+    render(<AppMainRoutes {...buildProps({ mobileLayout: true, onNavigate })} />);
+    await screen.findByTestId('settings-page');
+    fireEvent.click(document.querySelector('.mobile-settings-back') as HTMLButtonElement);
+    expect(onNavigate).toHaveBeenCalledWith('/settings');
+  });
+
+  it('shows the mobile back subheader on the device-management route and wires refresh', async () => {
+    const { fireEvent } = await import('@testing-library/preact');
+    navigate('/security/devices');
+    const onRefreshAuthorizedDevices = vi.fn(asyncNoop);
+    render(<AppMainRoutes {...buildProps({ mobileLayout: true, onRefreshAuthorizedDevices })} />);
+    await screen.findByTestId('security-devices-page');
+    fireEvent.click(document.querySelector('.mobile-settings-back') as HTMLButtonElement);
+    fireEvent.click(screen.getByTestId('devices-refresh'));
+    expect(onRefreshAuthorizedDevices).toHaveBeenCalledTimes(1);
+  });
+
+  it('navigates home from the domain-rules mobile back button', async () => {
+    const { fireEvent } = await import('@testing-library/preact');
+    navigate('/settings/domain-rules');
+    const onNavigate = vi.fn();
+    render(<AppMainRoutes {...buildProps({ mobileLayout: true, onNavigate })} />);
+    await screen.findByTestId('domain-rules-page');
+    fireEvent.click(document.querySelector('.mobile-settings-back') as HTMLButtonElement);
+    expect(onNavigate).toHaveBeenCalledWith('/settings');
+  });
+
+  it('navigates home from the admin mobile back button', async () => {
+    const { fireEvent } = await import('@testing-library/preact');
+    navigate('/admin');
+    const onNavigate = vi.fn();
+    render(<AppMainRoutes {...buildProps({ profile: adminProfile, mobileLayout: true, onNavigate })} />);
+    await screen.findByTestId('admin-page');
+    fireEvent.click(document.querySelector('.mobile-settings-back') as HTMLButtonElement);
+    expect(onNavigate).toHaveBeenCalledWith('/settings');
+  });
+
+  it('wires the log center mobile-back callback to navigate home', async () => {
+    const { fireEvent } = await import('@testing-library/preact');
+    navigate('/logs');
+    const onNavigate = vi.fn();
+    render(<AppMainRoutes {...buildProps({ profile: adminProfile, mobileLayout: true, onNavigate })} />);
+    await screen.findByTestId('log-center-page');
+    fireEvent.click(screen.getByTestId('logs-mobile-back'));
+    expect(onNavigate).toHaveBeenCalledWith('/settings');
+  });
+
+  it('navigates home from the backup mobile back button for admins', async () => {
+    const { fireEvent } = await import('@testing-library/preact');
+    navigate('/backup');
+    const onNavigate = vi.fn();
+    render(<AppMainRoutes {...buildProps({ profile: adminProfile, mobileLayout: true, onNavigate })} />);
+    await screen.findByTestId('backup-center-page');
+    fireEvent.click(document.querySelector('.mobile-settings-back') as HTMLButtonElement);
+    expect(onNavigate).toHaveBeenCalledWith('/settings');
   });
 });

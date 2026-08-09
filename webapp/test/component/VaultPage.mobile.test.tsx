@@ -303,6 +303,18 @@ describe('<VaultPage> reprompt verify flow', () => {
     expect(screen.getByTestId('detail-approved')).toHaveTextContent('false');
   });
 
+  it('falls back to a generic message when verification rejects with a non-Error', async () => {
+    const onVerifyMasterPassword = vi.fn().mockRejectedValue('nope');
+    const { props } = setup({ onVerifyMasterPassword });
+    fireEvent.click(screen.getByText('open-reprompt'));
+    fireEvent.click(screen.getByTestId('reprompt-set-pw'));
+    fireEvent.click(screen.getByTestId('reprompt-confirm'));
+    await act(flush);
+    // A thrown non-Error yields the generic unlock-failed string, not a crash.
+    expect(props.onNotify).toHaveBeenCalledWith('error', expect.any(String));
+    expect(screen.getByTestId('detail-approved')).toHaveTextContent('false');
+  });
+
   it('resets the reprompt approval when a different cipher is selected', async () => {
     setup();
     fireEvent.click(screen.getByText('open-reprompt'));
@@ -413,6 +425,16 @@ describe('<VaultPage> folder dialogs', () => {
     fireEvent.click(screen.getByTestId('delete-all-folders-confirm'));
     await act(flush);
     expect(props.onBulkDeleteFolders).not.toHaveBeenCalled();
+  });
+
+  it('deletes all folders from the all filter without touching the sidebar filter', async () => {
+    const { props } = setup();
+    // Stay on the default "all" filter so the folder-reset branch is skipped.
+    fireEvent.click(screen.getByText('open-delete-all-folders'));
+    fireEvent.click(screen.getByTestId('delete-all-folders-confirm'));
+    await act(flush);
+    expect(props.onBulkDeleteFolders).toHaveBeenCalledWith(['f1']);
+    expect(screen.getByTestId('sidebar-filter')).toHaveTextContent('"all"');
   });
 });
 

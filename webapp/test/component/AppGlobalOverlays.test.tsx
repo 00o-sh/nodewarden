@@ -215,6 +215,46 @@ describe('AppGlobalOverlays', () => {
     expect(props.onCancelDisableTotp).toHaveBeenCalledTimes(1);
   });
 
+  it('gates the master-password confirm: disabled until a password is typed, then passes it to onConfirm', () => {
+    const onConfirm = vi.fn();
+    render(
+      <AppGlobalOverlays
+        {...buildProps({ confirm: makeConfirm({ confirmText: 'Confirm', requireMasterPassword: true, onConfirm }) })}
+      />,
+    );
+    const dialog = openDialog();
+
+    // The master-password field is rendered for this variant.
+    const pwd = within(dialog).getByLabelText('Master Password') as HTMLInputElement;
+    // Confirm is disabled while the password is empty; clicking it is a no-op.
+    const confirmBtn = dialog.querySelector('[data-dialog-confirm="true"]') as HTMLElement;
+    expect(confirmBtn).toBeDisabled();
+    fireEvent.click(confirmBtn);
+    expect(onConfirm).not.toHaveBeenCalled();
+
+    // Typing a password enables confirm and forwards the value to onConfirm.
+    fireEvent.input(pwd, { target: { value: 'master-pass' } });
+    expect(confirmBtn).not.toBeDisabled();
+    fireEvent.click(confirmBtn);
+    expect(onConfirm).toHaveBeenCalledWith('master-pass');
+  });
+
+  it('clears the typed master password when cancelling the confirm dialog', () => {
+    const onCancel = vi.fn();
+    render(
+      <AppGlobalOverlays
+        {...buildProps({ confirm: makeConfirm({ cancelText: 'Keep', requireMasterPassword: true, onCancel }) })}
+      />,
+    );
+    const dialog = openDialog();
+    const pwd = within(dialog).getByLabelText('Master Password') as HTMLInputElement;
+    fireEvent.input(pwd, { target: { value: 'typed-secret' } });
+    expect(pwd.value).toBe('typed-secret');
+
+    fireEvent.click(within(dialog).getByText('Keep'));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
   it('renders toasts and routes the close button to onCloseToast', () => {
     const toasts: ToastMessage[] = [
       { id: 't1', type: 'success', text: 'Saved!' },
