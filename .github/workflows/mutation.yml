@@ -52,7 +52,7 @@ jobs:
             "${{ github.event.pull_request.base.sha }}" \
             "${{ github.event.pull_request.head.sha }}")
           echo "Changed files:"; echo "$changed"
-          if printf '%s\n' "$changed" | grep -qE '^(webapp/src/lib/(crypto|decrypt-cipher|vault-decrypt)\.ts|webapp/test/unit/(crypto|crypto-hardening|decrypt-cipher|vault-decrypt)\.test\.ts|stryker\.crypto\.config\.json|vitest\.mutation\.config\.ts|\.github/workflows/mutation\.yml)$'; then
+          if printf '%s\n' "$changed" | grep -qE '^(webapp/src/lib/(crypto|decrypt-cipher|vault-decrypt)\.ts|webapp/test/unit/(crypto[a-z-]*|decrypt-cipher|vault-decrypt)\.test\.ts|stryker\.crypto\.config\.json|vitest\.mutation\.config\.ts|\.github/workflows/mutation\.yml)$'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
             echo "Crypto-relevant changes detected; running mutation testing."
           else
