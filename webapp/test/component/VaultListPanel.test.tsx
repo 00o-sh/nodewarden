@@ -146,3 +146,139 @@ describe('<VaultListPanel>', () => {
     expect(onStartCreate).toHaveBeenCalledWith(1);
   });
 });
+
+describe('<VaultListPanel> additional coverage', () => {
+  it('applies the card icon wrapper and no-name fallback for a nameless card cipher', () => {
+    const card = makeCipher({ id: 'c1', type: 3, decName: '', login: undefined });
+    setup({ filteredCiphers: [card], visibleCiphers: [card] });
+    expect(screen.getByText('(No Name)')).toBeInTheDocument();
+    expect(document.querySelector('.card-list-icon-wrap')).not.toBeNull();
+  });
+
+  it('stops propagation when the row checkbox itself is clicked', () => {
+    const { onSelectCipher } = setup();
+    const checkbox = document.querySelector('input.row-check') as HTMLInputElement;
+    fireEvent.click(checkbox);
+    // Clicking the checkbox must not select the row.
+    expect(onSelectCipher).not.toHaveBeenCalled();
+  });
+
+  it('fires onScroll when the list panel scrolls', () => {
+    const { onScroll } = setup();
+    fireEvent.scroll(document.querySelector('.list-panel') as HTMLElement);
+    expect(onScroll).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires onSearchCompositionEnd and clears search on Escape', () => {
+    const { onSearchCompositionEnd, onClearSearch } = setup({ searchInput: 'git' });
+    const input = document.querySelector('input.search-input') as HTMLInputElement;
+    fireEvent(input, new CompositionEvent('compositionend', { bubbles: true }));
+    expect(onSearchCompositionEnd).toHaveBeenCalledWith('git');
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(onClearSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores non-Escape keydowns in the search box', () => {
+    const { onClearSearch } = setup({ searchInput: 'git' });
+    const input = document.querySelector('input.search-input') as HTMLInputElement;
+    fireEvent.keyDown(input, { key: 'a' });
+    expect(onClearSearch).not.toHaveBeenCalled();
+  });
+
+  it('renders the mobile create FAB through a portal when it is visible', () => {
+    setup({ isMobileLayout: true, mobileFabVisible: true });
+    // The portal renders the FAB trigger into the document body.
+    expect(document.querySelectorAll('.mobile-fab-trigger').length).toBeGreaterThan(0);
+  });
+
+  it('toggles a mobile filter menu closed when its trigger is clicked twice', () => {
+    setup({ isMobileLayout: true });
+    const trigger = document.querySelectorAll('.mobile-vault-filter-trigger')[0] as HTMLElement;
+    fireEvent.click(trigger);
+    expect(document.querySelector('.mobile-vault-filter-menu')).not.toBeNull();
+    fireEvent.click(trigger);
+    expect(document.querySelector('.mobile-vault-filter-menu')).toBeNull();
+  });
+
+  it('closes an open mobile filter menu on outside pointerdown and Escape', () => {
+    setup({ isMobileLayout: true });
+    const trigger = document.querySelectorAll('.mobile-vault-filter-trigger')[0] as HTMLElement;
+    fireEvent.click(trigger);
+    expect(document.querySelector('.mobile-vault-filter-menu')).not.toBeNull();
+    // Pointerdown outside the toolbar closes the menu.
+    fireEvent.pointerDown(document.body);
+    expect(document.querySelector('.mobile-vault-filter-menu')).toBeNull();
+    // Re-open, then close via Escape.
+    fireEvent.click(trigger);
+    expect(document.querySelector('.mobile-vault-filter-menu')).not.toBeNull();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(document.querySelector('.mobile-vault-filter-menu')).toBeNull();
+  });
+
+  it('selects each menu filter option (archive, trash, duplicates)', () => {
+    const { onChangeFilter } = setup({ isMobileLayout: true });
+    const openMenu = () => fireEvent.click(document.querySelectorAll('.mobile-vault-filter-trigger')[0] as HTMLElement);
+    openMenu();
+    fireEvent.click(screen.getByText('Archive'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'archive' });
+    openMenu();
+    fireEvent.click(screen.getByText('Trash'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'trash' });
+    openMenu();
+    fireEvent.click(screen.getByText('Duplicates'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'duplicates' });
+    openMenu();
+    const menu = document.querySelector('.mobile-vault-filter-menu') as HTMLElement;
+    fireEvent.click(within(menu).getByText('All Items'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'all' });
+  });
+
+  it('selects a type filter option and a folder filter option', () => {
+    const folders = [{ id: 'fold1', name: 'Personal', decName: 'Personal' }] as Folder[];
+    const { onChangeFilter } = setup({ isMobileLayout: true, folders });
+    const triggers = () => document.querySelectorAll('.mobile-vault-filter-trigger');
+    const openType = () => fireEvent.click(triggers()[1] as HTMLElement);
+    // Second trigger is the type menu.
+    openType();
+    fireEvent.click(screen.getByText('Card'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'type', value: 'card' });
+    openType();
+    fireEvent.click(screen.getByText('Login'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'type', value: 'login' });
+    openType();
+    fireEvent.click(screen.getByText('Identity'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'type', value: 'identity' });
+    openType();
+    fireEvent.click(screen.getByText('Note'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'type', value: 'note' });
+    openType();
+    fireEvent.click(screen.getByText('SSH Key'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'type', value: 'ssh' });
+    // Third trigger is the folder menu.
+    fireEvent.click(triggers()[2] as HTMLElement);
+    fireEvent.click(screen.getByText('Personal'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'folder', folderId: 'fold1' });
+    fireEvent.click(triggers()[2] as HTMLElement);
+    fireEvent.click(screen.getByText('No Folder'));
+    expect(onChangeFilter).toHaveBeenCalledWith({ kind: 'folder', folderId: null });
+  });
+
+  it('renders the mobile duplicate toolbar on the duplicates filter', () => {
+    const onSelectUniqueFromDuplicates = vi.fn();
+    setup({
+      isMobileLayout: true,
+      sidebarFilter: { kind: 'duplicates' },
+      onSelectUniqueFromDuplicates,
+    });
+    expect(document.querySelector('.mobile-duplicate-toolbar')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Select Duplicates/i }));
+    expect(onSelectUniqueFromDuplicates).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the desktop select-duplicates action on the duplicates filter', () => {
+    const onSelectUniqueFromDuplicates = vi.fn();
+    setup({ sidebarFilter: { kind: 'duplicates' }, onSelectUniqueFromDuplicates });
+    fireEvent.click(screen.getByRole('button', { name: /Select Duplicates/i }));
+    expect(onSelectUniqueFromDuplicates).toHaveBeenCalledTimes(1);
+  });
+});

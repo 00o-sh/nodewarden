@@ -78,9 +78,14 @@ const EXCLUDE_RE = /^webapp\/src\/(?:main\.tsx$|.*\.d\.ts$|workers\/|lib\/(?:dem
 //     lib/password-security-cache.ts (100% / 88%).
 //   - Also removed: lib/app-support.ts (100% / 90%), lib/i18n.ts (99% / 93%),
 //     hooks/useAdminActions.ts (100% branches) and hooks/useAccountSecurityActions.ts
-//     (100% / 91%). Remaining: the vault + page components (App, Settings/Vault/
-//     Backup/Import/Send pages, VaultEditor/DetailView/Sidebar/ListPanel).
-const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/SettingsPage\.tsx$|components\/VaultPage\.tsx$|components\/vault\/VaultEditor\.tsx$|components\/vault\/VaultDetailView\.tsx$|components\/vault\/VaultSidebar\.tsx$|components\/vault\/VaultListPanel\.tsx$|components\/vault\/vault-page-helpers\.tsx$|components\/BackupCenterPage\.tsx$|components\/ImportPage\.tsx$|components\/PublicSendPage\.tsx$|components\/SendsPage\.tsx$|components\/PasswordGeneratorPage\.tsx$|components\/PasswordSecurityPage\.tsx$|components\/AppGlobalOverlays\.tsx$|components\/AppMainRoutes\.tsx$|components\/AuthViews\.tsx$)/;
+//     (100% / 91%).
+//   - Also removed the vault components: VaultEditor.tsx (97% / 88%),
+//     VaultDetailView.tsx (100% / 93%), VaultListPanel.tsx (100% / 91%),
+//     VaultSidebar.tsx (100% / 96%) and vault-page-helpers.tsx (99% / 98%).
+//     Remaining: the page components (App, Settings/Vault/Backup/Import/Send/
+//     PasswordGenerator/PasswordSecurity pages, AppGlobalOverlays/MainRoutes,
+//     AuthViews).
+const FEATURE_SKIP_RE = /^webapp\/src\/(?:App\.tsx$|components\/SettingsPage\.tsx$|components\/VaultPage\.tsx$|components\/BackupCenterPage\.tsx$|components\/ImportPage\.tsx$|components\/PublicSendPage\.tsx$|components\/SendsPage\.tsx$|components\/PasswordGeneratorPage\.tsx$|components\/PasswordSecurityPage\.tsx$|components\/AppGlobalOverlays\.tsx$|components\/AppMainRoutes\.tsx$|components\/AuthViews\.tsx$)/;
 
 function fail(msg) {
   console.error(`\n✖ diff-coverage: ${msg}`);

@@ -1,7 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/preact';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/preact';
 import VaultDetailView from '@/components/vault/VaultDetailView';
+import { checkPasswordLeaked } from '@/lib/password-security';
 import type { Cipher } from '@/lib/types';
+
+vi.mock('@/lib/password-security', () => ({
+  checkPasswordLeaked: vi.fn(),
+}));
+
+const mockedCheckPasswordLeaked = vi.mocked(checkPasswordLeaked);
 
 function makeLoginCipher(overrides: Partial<Cipher> = {}): Cipher {
   return {
@@ -233,5 +240,208 @@ describe('<VaultDetailView>', () => {
     expect(screen.getByText('John Public')).toBeInTheDocument();
     expect(screen.getByText('X1234567')).toBeInTheDocument();
     expect(screen.getByText('American')).toBeInTheDocument();
+  });
+});
+
+describe('<VaultDetailView> additional coverage', () => {
+  beforeEach(() => {
+    mockedCheckPasswordLeaked.mockReset();
+  });
+
+  it('falls back to the no-name placeholder when the cipher has no name', () => {
+    setup(makeLoginCipher({ decName: '' }));
+    expect(screen.getByText('(No Name)')).toBeInTheDocument();
+  });
+
+  it('renders empty login fields without throwing (username/password fallbacks)', () => {
+    const cipher = { id: 'c1', type: 1, decName: 'Empty', login: {} } as unknown as Cipher;
+    expect(() => setup(cipher)).not.toThrow();
+    expect(screen.getByText('Login Credentials')).toBeInTheDocument();
+  });
+
+  it('copies the password and fires the copy button in the login section', () => {
+    setup(makeLoginCipher());
+    const passwordRow = screen.getByText('Password').closest('.kv-row') as HTMLElement;
+    const copyBtn = within(passwordRow).getByRole('button', { name: 'Copy' });
+    expect(() => fireEvent.click(copyBtn)).not.toThrow();
+  });
+
+  it('renders the TOTP placeholder and zero countdown when totpLive is null', () => {
+    const cipher = makeLoginCipher({
+      login: {
+        decUsername: 'octocat',
+        decPassword: 's3cret-pass',
+        decTotp: 'otpauth://totp/x?secret=ABC',
+        uris: [],
+      },
+    } as Partial<Cipher>);
+    setup(cipher, { totpLive: null });
+    expect(screen.getByText('TOTP')).toBeInTheDocument();
+    // Countdown shows 0 while there is no live code yet.
+    const totpRow = screen.getByText('TOTP').closest('.kv-row') as HTMLElement;
+    expect(within(totpRow).getByText('0')).toBeInTheDocument();
+    // The copy button still fires without a live code.
+    expect(() => fireEvent.click(within(totpRow).getByRole('button', { name: 'Copy' }))).not.toThrow();
+  });
+
+  it('skips autofill URIs whose value is blank', () => {
+    const cipher = makeLoginCipher({
+      login: {
+        decUsername: 'octocat',
+        decPassword: 's3cret-pass',
+        uris: [{ uri: '', decUri: '' }],
+      },
+    } as Partial<Cipher>);
+    setup(cipher);
+    // The autofill card renders (uris length > 0) but the blank URI produces no row.
+    expect(screen.getByText('Autofill Options')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open' })).not.toBeInTheDocument();
+  });
+
+  it('copies an autofill URI value', () => {
+    setup(makeLoginCipher());
+    const uriRow = screen.getByText('https://github.com').closest('.kv-row') as HTMLElement;
+    expect(() => fireEvent.click(within(uriRow).getByRole('button', { name: 'Copy' }))).not.toThrow();
+  });
+
+  it('renders empty card fields without throwing (value fallbacks)', () => {
+    const card = { id: 'card1', type: 3, decName: 'Blank Card', card: {} } as unknown as Cipher;
+    expect(() => setup(card)).not.toThrow();
+    expect(screen.getByText('Card Details')).toBeInTheDocument();
+  });
+
+  it('renders empty identity fields without throwing', () => {
+    const identity = { id: 'i1', type: 4, decName: 'Blank ID', identity: {} } as unknown as Cipher;
+    expect(() => setup(identity)).not.toThrow();
+    expect(screen.getByText('Identity Details')).toBeInTheDocument();
+  });
+
+  it('renders empty ssh key fields and copies each value', () => {
+    const cipher = { id: 's1', type: 5, decName: 'Blank Key', sshKey: {} } as unknown as Cipher;
+    setup(cipher);
+    expect(screen.getByText('SSH Key')).toBeInTheDocument();
+    const copyButtons = screen.getAllByRole('button', { name: 'Copy' });
+    // Public key + fingerprint + private key copy buttons all fire safely.
+    copyButtons.forEach((btn) => expect(() => fireEvent.click(btn)).not.toThrow());
+  });
+
+  it('renders empty bank account fields without throwing', () => {
+    const bank = { id: 'b1', type: 6, decName: 'Blank Bank', bankAccount: {} } as unknown as Cipher;
+    expect(() => setup(bank)).not.toThrow();
+    expect(screen.getByText('Bank Account Details')).toBeInTheDocument();
+  });
+
+  it('renders empty drivers license fields without throwing', () => {
+    const license = { id: 'l1', type: 7, decName: 'Blank License', driversLicense: {} } as unknown as Cipher;
+    expect(() => setup(license)).not.toThrow();
+    expect(screen.getByText('Driver License Details')).toBeInTheDocument();
+  });
+
+  it('renders empty passport fields without throwing', () => {
+    const passport = { id: 'p1', type: 8, decName: 'Blank Passport', passport: {} } as unknown as Cipher;
+    expect(() => setup(passport)).not.toThrow();
+    expect(screen.getByText('Passport Details')).toBeInTheDocument();
+  });
+
+  it('copies text and boolean custom field values', () => {
+    const cipher = {
+      id: 'c1',
+      type: 1,
+      decName: 'Fields',
+      login: { decUsername: 'u', decPassword: 'p', uris: [] },
+      fields: [
+        { type: 0, decName: 'Plain', decValue: 'plain-value' },
+        { type: 2, decName: 'Flag', decValue: 'false' },
+      ],
+    } as unknown as Cipher;
+    setup(cipher);
+    const plainCard = screen.getByText('Plain').closest('.custom-field-card') as HTMLElement;
+    expect(() => fireEvent.click(within(plainCard).getByRole('button', { name: 'Copy' }))).not.toThrow();
+    // An unchecked boolean field renders the unchecked label and a copy action.
+    const flagCard = screen.getByText('Unchecked').closest('.custom-field-card') as HTMLElement;
+    expect(() => fireEvent.click(within(flagCard).getByRole('button', { name: 'Copy' }))).not.toThrow();
+  });
+
+  it('skips attachments with a blank id', () => {
+    const cipher = {
+      id: 'c1',
+      type: 1,
+      decName: 'Attach',
+      login: { decUsername: 'u', decPassword: 'p', uris: [] },
+      attachments: [
+        { id: '   ', decFileName: 'ignored.pdf', size: 10 },
+        { id: 'a2', size: 20 },
+      ],
+    } as unknown as Cipher;
+    setup(cipher);
+    expect(screen.getByText('Attachments')).toBeInTheDocument();
+    // Blank-id attachment is skipped; the a2 attachment falls back to its id as filename.
+    expect(screen.queryByText('ignored.pdf')).not.toBeInTheDocument();
+    expect(screen.getByText('a2')).toBeInTheDocument();
+  });
+
+  it('copies a password-history entry from the dialog', () => {
+    const cipher = {
+      id: 'c1',
+      type: 1,
+      decName: 'History',
+      creationDate: '2024-01-01T00:00:00Z',
+      revisionDate: '2024-02-01T00:00:00Z',
+      login: { decUsername: 'u', decPassword: 'p', uris: [] },
+      passwordHistory: [{ decPassword: 'old-pass-1', lastUsedDate: '2024-01-10T00:00:00Z' }],
+    } as unknown as Cipher;
+    setup(cipher);
+    fireEvent.click(screen.getByRole('button', { name: 'Password History' }));
+    const dialog = screen.getByRole('dialog', { name: 'Password History' });
+    const copyBtn = dialog.querySelector('.password-history-copy-btn') as HTMLElement;
+    expect(() => fireEvent.click(copyBtn)).not.toThrow();
+  });
+
+  it('shows the exposed-count breach result when the password is found in a breach', async () => {
+    mockedCheckPasswordLeaked.mockResolvedValue({ count: 5, available: true });
+    setup(makeLoginCipher());
+    fireEvent.click(screen.getByRole('button', { name: 'Check breach' }));
+    expect(await screen.findByText('Found in 5 breaches')).toBeInTheDocument();
+    expect(mockedCheckPasswordLeaked).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the safe breach result when the password is not found', async () => {
+    mockedCheckPasswordLeaked.mockResolvedValue({ count: 0, available: true });
+    setup(makeLoginCipher());
+    fireEvent.click(screen.getByRole('button', { name: 'Check breach' }));
+    expect(await screen.findByText('Not found in the breach database')).toBeInTheDocument();
+  });
+
+  it('shows the failure notice when the breach database is unavailable', async () => {
+    mockedCheckPasswordLeaked.mockResolvedValue({ count: null, available: false });
+    setup(makeLoginCipher());
+    fireEvent.click(screen.getByRole('button', { name: 'Check breach' }));
+    expect(await screen.findByText('The breach check could not be completed.')).toBeInTheDocument();
+  });
+
+  it('shows the failure notice when the breach check throws a non-abort error', async () => {
+    mockedCheckPasswordLeaked.mockRejectedValue(new Error('network down'));
+    setup(makeLoginCipher());
+    fireEvent.click(screen.getByRole('button', { name: 'Check breach' }));
+    expect(await screen.findByText('The breach check could not be completed.')).toBeInTheDocument();
+  });
+
+  it('disables the breach button and shows the checking state while a check is in flight', async () => {
+    let resolveCheck: (value: { count: number | null; available: boolean }) => void = () => {};
+    mockedCheckPasswordLeaked.mockImplementation(
+      () => new Promise((resolve) => { resolveCheck = resolve; })
+    );
+    setup(makeLoginCipher());
+    fireEvent.click(screen.getByRole('button', { name: 'Check breach' }));
+    const checkingBtn = await screen.findByRole('button', { name: 'Checking' });
+    expect(checkingBtn).toBeDisabled();
+    resolveCheck({ count: 0, available: true });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Check breach' })).toBeInTheDocument());
+  });
+
+  it('disables the breach button when there is no password to check', () => {
+    const cipher = { id: 'c1', type: 1, decName: 'NoPass', login: { decUsername: 'u', uris: [] } } as unknown as Cipher;
+    setup(cipher);
+    expect(screen.getByRole('button', { name: 'Check breach' })).toBeDisabled();
   });
 });

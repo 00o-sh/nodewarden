@@ -41,10 +41,10 @@ export default defineConfig({
       // remaining gap is the large page components and hooks. Grow toward parity
       // with the backend (95/92/95/80) as those fill in.
       thresholds: {
-        lines: 77,
-        statements: 75,
-        functions: 68,
-        branches: 67,
+        lines: 80,
+        statements: 77,
+        functions: 72,
+        branches: 71,
       },
     },
   },
