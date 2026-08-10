@@ -30,6 +30,11 @@ export default defineConfig({
       // The login / unlock / registration orchestration suite — the primary
       // killers for app-auth.ts mutants.
       'webapp/test/unit/app-auth.test.ts',
+      // Dedicated mutation-killers: black-box assertions on the observable
+      // outputs of app-auth's internal helpers (JWT-exp / session-refresh
+      // decisions, 2FA-provider parsing, transient-profile shaping) driven
+      // through the public API.
+      'webapp/test/unit/app-auth-mutation.test.ts',
       // Offline unlock drives performUnlock / hydrateLockedSession's offline path.
       'webapp/test/unit/offline-auth.test.ts',
     ],
