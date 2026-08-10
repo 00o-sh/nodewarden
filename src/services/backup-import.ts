@@ -95,6 +95,9 @@ async function getTableCreateSql(db: D1Database, table: BackupTableName): Promis
 }
 
 function buildShadowTableCreateSql(createSql: string, table: BackupTableName): string {
+  // False positive: `table` is a BackupTableName (a fixed string-union of the
+  // known backup table names), never request-controlled — no injection surface.
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
   const tablePattern = new RegExp(`^CREATE TABLE(?:\\s+IF NOT EXISTS)?\\s+(?:"${table}"|${table})(?=\\s*\\()`, 'i');
   let next = createSql.replace(tablePattern, `CREATE TABLE "${shadowTableName(table)}"`);
   if (next === createSql) {

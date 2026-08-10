@@ -93,6 +93,10 @@ function isVerifiedSameAsEnglish(locale, key) {
 }
 
 function readLocale(fileName, variableName) {
+  // False positive: this build-time i18n script only ever receives repo-local
+  // locale filenames it enumerates itself (never external input), joined under
+  // the fixed localeDir.
+  // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
   let code = fs.readFileSync(path.join(localeDir, fileName), 'utf8');
   code = code
     .replace(/const (\w+): Record<string, string> =/g, 'const $1 =')
@@ -107,6 +111,9 @@ function readLocale(fileName, variableName) {
 function writeLocale(fileName, variableName, table, header) {
   const body = JSON.stringify(table, null, 2);
   fs.writeFileSync(
+    // False positive: repo-local locale filename under the fixed localeDir,
+    // enumerated by this build script — never external input.
+    // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
     path.join(localeDir, fileName),
     `${header}\nconst ${variableName}: Record<string, string> = ${body};\n\nexport default ${variableName};\n`,
     'utf8'

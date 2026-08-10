@@ -136,6 +136,11 @@ function parseHttpDate(value: string): string | null {
 }
 
 function extractXmlBlocks(xml: string, tagName: string): string[] {
+  // False positive: `tagName` is always a hardcoded WebDAV/S3 element name from
+  // this file's own call sites ('response', 'href', 'getcontentlength',
+  // 'Contents', ...), never remote/request input. The lazy `[\s\S]*?` body is
+  // ReDoS-safe against the remote XML it matches.
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
   const pattern = new RegExp(`<(?:[^:>]+:)?${tagName}\\b[^>]*>([\\s\\S]*?)</(?:[^:>]+:)?${tagName}>`, 'gi');
   const blocks: string[] = [];
   let match: RegExpExecArray | null;
@@ -146,6 +151,9 @@ function extractXmlBlocks(xml: string, tagName: string): string[] {
 }
 
 function extractXmlFirst(xml: string, tagName: string): string | null {
+  // False positive: `tagName` is a hardcoded WebDAV/S3 element name (see
+  // extractXmlBlocks), never remote/request input.
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
   const pattern = new RegExp(`<(?:[^:>]+:)?${tagName}\\b[^>]*>([\\s\\S]*?)</(?:[^:>]+:)?${tagName}>`, 'i');
   const match = xml.match(pattern);
   return match?.[1] ? decodeXmlText(match[1].trim()) : null;

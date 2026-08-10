@@ -191,6 +191,9 @@ class SecurityReport {
         if (!fs.existsSync(sarifPath)) return;
 
         const field = (text, label) => {
+            // False positive: `label` is a hardcoded literal passed by this CI-only
+            // script (e.g. 'Package', 'Installed Version'), never external input.
+            // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
             const m = String(text || '').match(new RegExp(`${label}:\\s*(.+)`));
             return m ? m[1].trim() : '';
         };
@@ -451,6 +454,9 @@ class SecurityReport {
         let results = [];
         const list = fs.readdirSync(dir);
         for (const file of list) {
+            // False positive: `dir` is a CI-controlled scan root and `file` comes
+            // from readdirSync of that same tree — no external/untrusted path input.
+            // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
             const fullPath = path.join(dir, file);
             const stat = fs.statSync(fullPath);
             if (stat && stat.isDirectory()) {
