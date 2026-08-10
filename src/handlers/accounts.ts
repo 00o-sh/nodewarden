@@ -190,6 +190,10 @@ function readNestedString(source: unknown, path: string[]): string {
   let current = source;
   for (const key of path) {
     if (!current || typeof current !== 'object') return '';
+    // False positive: this only READS current[key] (no `current[key] = ...`
+    // assignment sink), so it cannot pollute a prototype; `path` is a hardcoded
+    // caller-supplied literal array, never request-controlled.
+    // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop
     current = (current as Record<string, unknown>)[key];
   }
   return typeof current === 'string' ? current : '';
@@ -199,6 +203,9 @@ function readNestedNumber(source: unknown, path: string[]): number | undefined {
   let current = source;
   for (const key of path) {
     if (!current || typeof current !== 'object') return undefined;
+    // False positive: read-only traversal (no assignment sink), `path` is a
+    // hardcoded caller literal — cannot pollute a prototype. See readNestedString.
+    // nosemgrep: javascript.lang.security.audit.prototype-pollution.prototype-pollution-loop.prototype-pollution-loop
     current = (current as Record<string, unknown>)[key];
   }
   return typeof current === 'number' ? current : undefined;

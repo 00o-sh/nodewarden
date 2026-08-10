@@ -23,6 +23,9 @@ import {
 } from './handlers/devices';
 
 function devicesPath(pattern: string): RegExp {
+  // False positive: `pattern` is always a hardcoded route fragment supplied by
+  // this module's own call sites (e.g. '/([^/]+)/token'), never request input.
+  // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp
   return new RegExp(`^/(?:api/)?devices${pattern}$`, 'i');
 }
 
