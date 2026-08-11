@@ -72,6 +72,17 @@
       }
     }
   },
+<<<<<<< HEAD
+=======
+  "overrides": {
+    "nanoid": "3.3.17",
+    "undici": "8.9.0",
+    "@babel/core": ">=7.29.6",
+    "esbuild": ">=0.28.1",
+    "ws": "8.21.0",
+    "sharp": "0.35.0"
+  },
+>>>>>>> b3630bdaf5d62ad42dd754777b7361d1362edae7
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.20.3",
     "@cloudflare/workers-types": "5.20260808.1",
