@@ -38,7 +38,7 @@ jobs:
       - name: Initialize CodeQL
         if: env.ACT != 'true'
         continue-on-error: true
-        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           languages: javascript-typescript, actions
           build-mode: none
@@ -47,7 +47,7 @@ jobs:
       - name: Perform CodeQL Analysis
         if: env.ACT != 'true'
         continue-on-error: true
-        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         with:
           upload: true
           output: sarif-results
@@ -125,14 +125,14 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload Gitleaks Results to GitHub Security
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         if: always()
         with:
           sarif_file: results.sarif
           category: gitleaks
 
       - name: Upload Trivy Dependency Results to GitHub Security
-        uses: github/codeql-action/upload-sarif@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
+        uses: github/codeql-action/upload-sarif@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
         if: always() && hashFiles('trivy_deps.sarif') != ''
         with:
           sarif_file: trivy_deps.sarif
