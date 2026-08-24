@@ -47,6 +47,13 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # SYNC_UPSTREAM_PAT is read here, so the job runs in a dedicated environment
+    # rather than reading the secret from the bare repository scope. That gives
+    # the PAT a single named place to be scoped, audited and (if wanted later)
+    # gated with protection rules, instead of being reachable by any job in the
+    # repo. Repository secrets stay readable from an environment, so the
+    # existing repo-level PAT keeps working with no re-configuration.
+    environment: upstream-sync
     permissions:
       contents: write
       pull-requests: write
