@@ -99,13 +99,19 @@ describe('getFingerprintPhrase (crypto)', () => {
     expect(a).toBe(b);
   });
 
+  // A phrase cannot be split back into its words: four wordlist entries contain a hyphen
+  // ("drop-down", "felt-tip", "t-shirt", "yo-yo"), so '-' is not a reliable word boundary.
+  // These inputs are fixed and the derivation is pure, so assert the words directly and pin
+  // the joined result — a known-answer test. The fingerprint is compared by humans across
+  // devices and must stay byte-stable, so drift here should fail loudly rather than silently
+  // re-derive whatever the implementation now produces.
   it('produces hyphen-separated words drawn from the EFF long wordlist', async () => {
-    const phrase = await getFingerprintPhrase(email, publicKey);
-    const words = phrase.split('-');
-    expect(words.length).toBeGreaterThan(0);
+    const words = ['entail', 'ambition', 'paralysis', 'carport', 'sixties'];
+    expect(words).toHaveLength(5); // hashPhrase() sizes the phrase for >= 64 bits of entropy
     for (const word of words) {
       expect(EFFLongWordList).toContain(word);
     }
+    expect(await getFingerprintPhrase(email, publicKey)).toBe(words.join('-'));
   });
 
   it('differs for a different email', async () => {
