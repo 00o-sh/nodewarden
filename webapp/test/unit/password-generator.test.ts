@@ -11,6 +11,7 @@ import {
   generateValue,
   normalizeGeneratorSettings,
 } from '@/lib/password-generator';
+import { EFFLongWordList } from '@/lib/eff-word-list';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -101,14 +102,48 @@ describe('generatePin', () => {
 });
 
 describe('generatePassphrase', () => {
+  // The EFF long wordlist holds four hyphenated entries ("drop-down", "felt-tip", "t-shirt",
+  // "yo-yo"), so splitting a phrase on a '-' separator over-counts whenever one is drawn. Drive
+  // the generator from a stubbed random source instead of asserting on a split.
+  const stubWordIndices = (indices: number[]) => {
+    const queue = [...indices];
+    const real = globalThis.crypto;
+    vi.stubGlobal('crypto', {
+      subtle: real.subtle,
+      randomUUID: () => real.randomUUID(),
+      getRandomValues: (buffer: Uint32Array) => {
+        buffer[0] = queue.length ? (queue.shift() as number) : 0;
+        return buffer;
+      },
+    });
+  };
+
   it('produces the requested number of words joined by the separator', () => {
+    const indices = [10, 20, 30, 40];
+    stubWordIndices(indices);
     const phrase = generatePassphrase({ words: 4, separator: '-', capitalize: false, includeNumber: false, wordList: 'eff', customWords: '' });
-    expect(phrase.split('-')).toHaveLength(4);
+    expect(phrase).toBe(indices.map((index) => EFFLongWordList[index]).join('-'));
+  });
+
+  it('joins exactly the requested number of words when one of them contains the separator', () => {
+    const indices = [EFFLongWordList.indexOf('yo-yo'), 20, 30];
+    stubWordIndices(indices);
+    const phrase = generatePassphrase({ words: 3, separator: '-', capitalize: false, includeNumber: false, wordList: 'eff', customWords: '' });
+    expect(phrase).toBe(['yo-yo', EFFLongWordList[20], EFFLongWordList[30]].join('-'));
+    expect(phrase.split('-')).toHaveLength(4); // the hyphen inside "yo-yo" is not a word boundary
+  });
+
+  it('draws every word from the wordlist using the real random source', () => {
+    const words = generatePassphrase({ words: 4, separator: ' ', capitalize: false, includeNumber: false, wordList: 'eff', customWords: '' }).split(' ');
+    expect(words).toHaveLength(4);
+    for (const word of words) expect(EFFLongWordList).toContain(word);
   });
 
   it('capitalizes each word when requested', () => {
+    stubWordIndices([EFFLongWordList.indexOf('yo-yo'), 20, 30]);
     const phrase = generatePassphrase({ words: 3, separator: '-', capitalize: true, includeNumber: false, wordList: 'eff', customWords: '' });
-    for (const word of phrase.split('-')) expect(word[0]).toBe(word[0].toUpperCase());
+    const capitalized = (word: string) => word[0].toUpperCase() + word.slice(1);
+    expect(phrase).toBe(['Yo-yo', capitalized(EFFLongWordList[20]), capitalized(EFFLongWordList[30])].join('-'));
   });
 
   it('appends a digit somewhere when includeNumber is set', () => {
