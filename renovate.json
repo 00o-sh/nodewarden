@@ -30,9 +30,9 @@
       "enabled": false
     },
     {
-      "description": "Soak non-security updates so freshly-published (possibly compromised) releases are not ingested immediately. Critical for a password-vault project.",
+      "description": "Soak non-security updates for 7 days so freshly-published (possibly compromised) releases are not ingested immediately. Critical for a password-vault project. Security fixes are exempt: vulnerabilityAlerts sets minimumReleaseAge 0 so they still land immediately.",
       "matchUpdateTypes": ["patch", "minor", "major", "pin", "digest", "lockFileMaintenance"],
-      "minimumReleaseAge": "5 days"
+      "minimumReleaseAge": "7 days"
     },
     {
       "description": "Auto-merge low-risk updates after the soak window.",

@@ -13,9 +13,11 @@ on:
       - main
   workflow_dispatch:
 
-# Scorecard's default token needs almost nothing; everything else is granted
-# per-step.
-permissions: read-all
+# No blanket workflow-level grant: the single job below declares exactly the
+# scopes it needs, and a job-level `permissions:` block replaces (not merges
+# with) the workflow-level one, so this empty default changes nothing at run
+# time while keeping any future job that forgets its own block at zero access.
+permissions: {}
 
 concurrency:
   group: scorecard-${{ github.ref }}
