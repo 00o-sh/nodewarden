@@ -115,7 +115,7 @@
     "wouter": "3.10.0"
   },
   "overrides": {
-    "qs": "6.15.3",
+    "qs": "6.16.0",
     "undici": "8.10.0",
     "@babel/core": "8.0.1",
     "@vitest/coverage-istanbul": {
