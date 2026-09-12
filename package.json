@@ -112,7 +112,7 @@
     "lucide-preact": "1.33.0",
     "preact": "10.29.8",
     "qrcode-generator": "2.0.4",
-    "wouter": "3.10.0"
+    "wouter": "3.11.0"
   },
   "overrides": {
     "qs": "6.16.0",
