@@ -117,9 +117,9 @@
   "overrides": {
     "qs": "6.16.0",
     "undici": "8.10.2",
-    "@babel/core": "8.0.1",
+    "@babel/core": "8.0.5",
     "@vitest/coverage-istanbul": {
-      "@babel/core": "7.29.7"
+      "@babel/core": "8.0.5"
     },
     "esbuild": "0.28.2",
     "ws": "8.21.3",
