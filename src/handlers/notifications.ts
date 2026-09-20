@@ -72,13 +72,32 @@ async function consumeWebSocketConnectionToken(request: Request, env: Env): Prom
   } as JWTPayload;
 }
 
+async function authenticateQueryAccessToken(request: Request, env: Env): Promise<JWTPayload | null> {
+  const queryToken = String(new URL(request.url).searchParams.get('access_token') || '').trim();
+  if (!queryToken) return null;
+
+  const auth = new AuthService(env);
+  return auth.verifyAccessToken(`Bearer ${queryToken}`);
+}
+
 async function authenticateNotificationsHub(request: Request, env: Env): Promise<JWTPayload | null> {
-  // Never accept an access JWT from the URL: URLs are routinely retained by logs,
-  // browser history, proxies, monitoring, and error tracking systems.
+  // Preferred: an Authorization header (non-browser SignalR clients, tests) or the
+  // one-time connection ticket issued by negotiate (the built-in web vault), so
+  // the long-lived access JWT never has to travel in the URL.
   if (request.headers.has('Authorization')) {
     return authenticateAccessToken(request, env);
   }
-  return consumeWebSocketConnectionToken(request, env);
+  const ticketPayload = await consumeWebSocketConnectionToken(request, env);
+  if (ticketPayload) return ticketPayload;
+
+  // Compatibility fallback, websocket upgrades only: the official Bitwarden web
+  // vault, browser extension and desktop app use the browser SignalR client,
+  // which cannot set headers on a WebSocket and therefore sends the access token
+  // as `?access_token=` (skipping negotiate). Rejecting it here would silently
+  // disable live sync for every official client, so it stays accepted on this
+  // one endpoint (the same behavior as the official server and Vaultwarden).
+  // It is never accepted for negotiate or any non-upgrade request.
+  return authenticateQueryAccessToken(request, env);
 }
 
 export async function handleNotificationsNegotiate(request: Request, env: Env): Promise<Response> {

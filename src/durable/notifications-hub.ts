@@ -21,6 +21,7 @@ const SIGNALR_UPDATE_TYPE_AUTH_REQUEST_RESPONSE = 16;
 const SIGNALR_UPDATE_TYPE_BACKUP_RESTORE_PROGRESS = 102;
 const WEBSOCKET_CONNECTION_TOKEN_PREFIX = 'ws-token:';
 const WEBSOCKET_CONNECTION_TOKEN_TTL_MS = 60 * 1000;
+const WEBSOCKET_CONNECTION_TOKEN_CLOCK_SKEW_MS = 5 * 1000;
 
 type HubProtocol = 'json' | 'messagepack';
 type HubKind = 'user' | 'anonymous-auth-request';
@@ -225,7 +226,10 @@ export class NotificationsHub extends DurableObject<Env> {
       const token = String(body?.token || '').trim();
       const userId = String(body?.userId || '').trim();
       const expiresAt = Number(body?.expiresAt || 0);
-      if (!token || !userId || expiresAt <= Date.now() || expiresAt > Date.now() + WEBSOCKET_CONNECTION_TOKEN_TTL_MS) {
+      // The worker stamps expiresAt from its own clock before calling in here, so
+      // allow a little skew between the two isolates instead of failing negotiate.
+      const latestAllowedExpiry = Date.now() + WEBSOCKET_CONNECTION_TOKEN_TTL_MS + WEBSOCKET_CONNECTION_TOKEN_CLOCK_SKEW_MS;
+      if (!token || !userId || expiresAt <= Date.now() || expiresAt > latestAllowedExpiry) {
         return new Response('Invalid websocket connection token', { status: 400 });
       }
       await this.ctx.storage.put(`${WEBSOCKET_CONNECTION_TOKEN_PREFIX}${token}`, {

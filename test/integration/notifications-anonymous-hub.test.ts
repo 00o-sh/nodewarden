@@ -3,8 +3,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { Session, authenticate, baseHeaders, url } from './helpers';
 
 // The anonymous notifications hub (used for passwordless auth-request flows)
-// and the query-string access_token path of the authenticated negotiate
-// endpoint. The websocket case is a genuine WS to the real DO — no mocks.
+// and the (now rejected) query-string access_token path of the authenticated
+// negotiate endpoint. The websocket case is a genuine WS to the real DO — no mocks.
 let session: Session;
 
 beforeAll(async () => {
@@ -79,13 +79,14 @@ describe('anonymous notifications hub', () => {
 });
 
 describe('negotiate via query access_token', () => {
-  it('accepts the token from the access_token query parameter', async () => {
+  it('no longer accepts the token from the access_token query parameter', async () => {
+    // Negotiate is a plain POST, so every client can send the Authorization
+    // header; the query form is only tolerated on the websocket upgrade itself
+    // (see notifications-connection-token.test.ts).
     const res = await SELF.fetch(
       url(`/notifications/hub/negotiate?access_token=${encodeURIComponent(session.accessToken)}`),
       { method: 'POST', headers: baseHeaders() }
     );
-    expect(res.status).toBe(200);
-    const body = (await res.json()) as any;
-    expect(typeof body.connectionId).toBe('string');
+    expect(res.status).toBe(401);
   });
 });

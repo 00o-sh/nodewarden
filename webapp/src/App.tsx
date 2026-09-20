@@ -33,6 +33,7 @@ import {
 } from '@/lib/api/auth-requests';
 import { clearAuditLogs, getAuditLogSettings, listAdminInvites, listAdminUsers, listAuditLogs, saveAuditLogSettings, type AuditLogFilters } from '@/lib/api/admin';
 import { getDomainRules, saveDomainRules } from '@/lib/api/domains';
+import { negotiateNotificationsHub } from '@/lib/api/notifications';
 import { getSendById, getSends } from '@/lib/api/send';
 import { getCipherById, getFolderById, repairCipherKeyMismatches, repairCipherUriChecksums } from '@/lib/api/vault';
 import { getCachedVaultCoreSnapshot, invalidateVaultCoreSyncSnapshot, loadVaultCoreSyncSnapshot, saveVaultCoreSyncSnapshot } from '@/lib/api/vault-sync';
@@ -1685,16 +1686,13 @@ export default function App() {
       const accessToken = session.accessToken;
       if (!accessToken) return;
       try {
-        const negotiateResponse = await fetch('/notifications/hub/negotiate?negotiateVersion=1', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        if (!negotiateResponse.ok) throw new Error('Notification negotiation failed');
-        const negotiation = (await negotiateResponse.json()) as { connectionToken?: string };
-        if (!negotiation.connectionToken || disposed) throw new Error('Notification connection token missing');
+        // Negotiate first so the websocket carries a one-time ticket instead of
+        // the long-lived access JWT in its URL.
+        const connectionToken = await negotiateNotificationsHub(accessToken);
+        if (disposed) return;
 
         const hubUrl = new URL('/notifications/hub', window.location.origin);
-        hubUrl.searchParams.set('id', negotiation.connectionToken);
+        hubUrl.searchParams.set('id', connectionToken);
         hubUrl.protocol = hubUrl.protocol === 'https:' ? 'wss:' : 'ws:';
         socket = new WebSocket(hubUrl.toString());
       } catch {

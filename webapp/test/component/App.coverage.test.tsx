@@ -236,6 +236,9 @@ vi.mock('@/lib/api/send', () => ({
   getSendById: vi.fn(async () => ({ id: 's-remote' })),
   getSends: vi.fn(async () => []),
 }));
+vi.mock('@/lib/api/notifications', () => ({
+  negotiateNotificationsHub: vi.fn(async () => 'ws-ticket'),
+}));
 vi.mock('@/lib/api/vault', () => ({
   getCipherById: vi.fn(async () => ({ id: 'c-remote', revisionDate: '2024-01-01T00:00:00Z' })),
   getFolderById: vi.fn(async () => ({ id: 'f-remote', revisionDate: '2024-01-01T00:00:00Z' })),
@@ -290,6 +293,7 @@ import * as appAuth from '@/lib/app-auth';
 import * as apiAuth from '@/lib/api/auth';
 import * as appSupport from '@/lib/app-support';
 import * as authRequests from '@/lib/api/auth-requests';
+import * as apiNotifications from '@/lib/api/notifications';
 import * as apiVault from '@/lib/api/vault';
 import * as apiVaultSync from '@/lib/api/vault-sync';
 import * as apiAdmin from '@/lib/api/admin';
@@ -1123,6 +1127,30 @@ describe('App SignalR notification handling', () => {
 
       await invoke(() => ws.emit('close', {}));
       await invoke(() => ws.emit('error', {}));
+    } finally {
+      (globalThis as unknown as { WebSocket: unknown }).WebSocket = OriginalWS;
+    }
+  });
+
+  it('does not open a socket when the app unmounts while negotiate is in flight', async () => {
+    const OriginalWS = globalThis.WebSocket;
+    (globalThis as unknown as { WebSocket: unknown }).WebSocket = FakeWebSocket;
+    FakeWebSocket.instances = [];
+    let resolveNegotiate: (token: string) => void = () => {};
+    vi.mocked(apiNotifications.negotiateNotificationsHub).mockReturnValueOnce(
+      new Promise<string>((resolve) => { resolveNegotiate = resolve; })
+    );
+    try {
+      vi.mocked(apiAuth.loadProfileSnapshot).mockReturnValue(adminProfile as never);
+      const utils = renderApp({ phase: 'app', session: appSession, profile: adminProfile, path: '/vault' });
+      await screen.findByTestId('shell');
+      await waitFor(() => expect(vi.mocked(apiNotifications.negotiateNotificationsHub)).toHaveBeenCalledWith(appSession.accessToken));
+      utils.unmount();
+      await act(async () => {
+        resolveNegotiate('late-ticket');
+        await Promise.resolve();
+      });
+      expect(FakeWebSocket.instances).toHaveLength(0);
     } finally {
       (globalThis as unknown as { WebSocket: unknown }).WebSocket = OriginalWS;
     }

@@ -108,16 +108,40 @@ async function validAccessToken(): Promise<string> {
   }, secret);
 }
 
-test('query access_token cannot authenticate a websocket', async () => {
-  const { env, forwardedHubUrls } = createTestEnv();
+test('query access_token cannot authenticate negotiate', async () => {
+  const { env, connectionTokens } = createTestEnv();
   const token = await validAccessToken();
-  const response = await handleNotificationsHub(new Request(
-    `https://vault.example.test/notifications/hub?access_token=${encodeURIComponent(token)}`,
-    { headers: { Upgrade: 'websocket' } }
+  const response = await handleNotificationsNegotiate(new Request(
+    `https://vault.example.test/notifications/hub/negotiate?access_token=${encodeURIComponent(token)}`,
+    { method: 'POST' }
   ), env);
 
   assert.equal(response.status, 401);
-  assert.deepEqual(forwardedHubUrls, []);
+  assert.equal(connectionTokens.size, 0);
+});
+
+test('query access_token is only accepted on the websocket upgrade (browser SignalR clients)', async () => {
+  const { env, forwardedHubUrls } = createTestEnv();
+  const token = await validAccessToken();
+  const upgrade = await handleNotificationsHub(new Request(
+    `https://vault.example.test/notifications/hub?access_token=${encodeURIComponent(token)}`,
+    { headers: { Upgrade: 'websocket' } }
+  ), env);
+  assert.equal(upgrade.status, 204);
+  assert.equal(new URL(forwardedHubUrls[0]).searchParams.get('nw_uid'), userId);
+
+  const plain = await handleNotificationsHub(new Request(
+    `https://vault.example.test/notifications/hub?access_token=${encodeURIComponent(token)}`
+  ), env);
+  assert.equal(plain.status, 426);
+  assert.equal(forwardedHubUrls.length, 1);
+
+  const forged = await handleNotificationsHub(new Request(
+    'https://vault.example.test/notifications/hub?access_token=not-a-jwt',
+    { headers: { Upgrade: 'websocket' } }
+  ), env);
+  assert.equal(forged.status, 401);
+  assert.equal(forwardedHubUrls.length, 1);
 });
 
 test('Authorization bearer token still authenticates notifications', async () => {
