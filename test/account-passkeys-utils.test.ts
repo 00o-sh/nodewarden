@@ -142,6 +142,13 @@ describe('prf status and responses', () => {
     const swa = toSimpleWebAuthnCredential(credential());
     expect(swa.id).toBe(credential().credentialId);
     expect(swa.counter).toBe(0);
+    expect(swa.transports).toEqual(['internal']);
+  });
+
+  it('maps null transports to undefined so SimpleWebAuthn treats them as unknown', () => {
+    const swa = toSimpleWebAuthnCredential(credential({ transports: null }));
+    expect(swa.transports).toBeUndefined();
+    expect(Array.from(swa.publicKey)).toEqual([9, 9, 9]);
   });
 });
 

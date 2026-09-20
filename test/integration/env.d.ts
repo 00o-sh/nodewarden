@@ -1,4 +1,4 @@
-/// <reference types="@cloudflare/vitest-pool-workers" />
+/// <reference types="@cloudflare/vitest-plugin" />
 
 // Types for the bindings exposed to integration tests via `cloudflare:test`.
 declare module 'cloudflare:test' {

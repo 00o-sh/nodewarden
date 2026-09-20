@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+import { cloudflareTest } from '@cloudflare/vitest-plugin';
 
 // Integration tests run inside the real Workers runtime (workerd via Miniflare)
 // with in-memory D1 and R2 bindings, exercising the actual worker `fetch`
