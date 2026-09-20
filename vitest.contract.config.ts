@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { defineConfig } from 'vitest/config';
-import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
+import { cloudflareTest } from '@cloudflare/vitest-plugin';
 
 // Full-stack CONTRACT tests: the webapp's own lib/api client code is driven
 // against the REAL worker (workerd via Miniflare, same runtime as the backend
