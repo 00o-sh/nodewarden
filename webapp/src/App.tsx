@@ -33,6 +33,7 @@ import {
 } from '@/lib/api/auth-requests';
 import { clearAuditLogs, getAuditLogSettings, listAdminInvites, listAdminUsers, listAuditLogs, saveAuditLogSettings, type AuditLogFilters } from '@/lib/api/admin';
 import { getDomainRules, saveDomainRules } from '@/lib/api/domains';
+import { negotiateNotificationsHub } from '@/lib/api/notifications';
 import { getSendById, getSends } from '@/lib/api/send';
 import { getCipherById, getFolderById, repairCipherKeyMismatches, repairCipherUriChecksums } from '@/lib/api/vault';
 import { getCachedVaultCoreSnapshot, invalidateVaultCoreSyncSnapshot, loadVaultCoreSyncSnapshot, saveVaultCoreSyncSnapshot } from '@/lib/api/vault-sync';
@@ -1676,17 +1677,22 @@ export default function App() {
       reconnectAttempts += 1;
       reconnectTimer = window.setTimeout(() => {
         reconnectTimer = null;
-        connect();
+        void connect();
       }, delay);
     };
 
-    const connect = () => {
+    const connect = async () => {
       if (disposed) return;
       const accessToken = session.accessToken;
       if (!accessToken) return;
       try {
+        // Negotiate first so the websocket carries a one-time ticket instead of
+        // the long-lived access JWT in its URL.
+        const connectionToken = await negotiateNotificationsHub(accessToken);
+        if (disposed) return;
+
         const hubUrl = new URL('/notifications/hub', window.location.origin);
-        hubUrl.searchParams.set('access_token', accessToken);
+        hubUrl.searchParams.set('id', connectionToken);
         hubUrl.protocol = hubUrl.protocol === 'https:' ? 'wss:' : 'ws:';
         socket = new WebSocket(hubUrl.toString());
       } catch {
@@ -1811,7 +1817,7 @@ export default function App() {
       });
     };
 
-    connect();
+    void connect();
 
     return () => {
       disposed = true;
