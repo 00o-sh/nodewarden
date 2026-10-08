@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+import { useMemo } from 'preact/hooks';
+import { cipherFieldMetadata } from '@/lib/cipher-fields';
+>>>>>>> e92c91e771fac13c54042902d64d015514daa9ad
 import {
   BookUser,
   CreditCard,
@@ -557,6 +562,7 @@ export function createEmptyDraft(type: number): VaultDraft {
 export function draftFromCipher(cipher: Cipher): VaultDraft {
   const draft = createEmptyDraft(Number(cipher.type || 1));
   draft.id = cipher.id;
+  draft.revisionDate = cipher.revisionDate;
   draft.favorite = !!cipher.favorite;
   draft.name = cipher.decName || '';
   draft.folderId = cipher.folderId || '';
@@ -654,6 +660,7 @@ export function draftFromCipher(cipher: Cipher): VaultDraft {
     draft.passportExpirationDate = cipher.passport.decExpirationDate || '';
   }
   draft.customFields = (cipher.fields || []).map((field) => ({
+    ...cipherFieldMetadata(field),
     type: parseFieldType(field.type),
     label: field.decName || '',
     value: field.decValue || '',
