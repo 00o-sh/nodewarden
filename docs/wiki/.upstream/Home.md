@@ -1,1 +1,1 @@
-[nodewarden.app](https://nodewarden.app)
+ [NodeWarden Wiki](https://nodewarden.app)
