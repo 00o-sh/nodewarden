@@ -27,17 +27,20 @@ beforeAll(async () => {
 });
 
 describe('password hashing', () => {
-  it('produces a deterministic, prefixed server hash bound to the email', async () => {
-    const h1 = await auth.hashPasswordServer('client-hash', 'User@Example.test');
-    const h2 = await auth.hashPasswordServer('client-hash', 'user@example.test');
-    expect(h1.startsWith('$s$')).toBe(true);
-    expect(h1).toBe(h2); // email is lower-cased into the salt
-    const other = await auth.hashPasswordServer('client-hash', 'someone-else@example.test');
-    expect(other).not.toBe(h1);
+  it('produces a self-describing, randomly salted server verifier', async () => {
+    // Upstream v1.8.1 replaced the email-salted '$s$' hash with '$s2$<iter>$<salt>$<digest>'
+    // using a random per-call salt, so the same input never yields the same verifier.
+    const h1 = await auth.hashPasswordServer('client-hash');
+    const h2 = await auth.hashPasswordServer('client-hash');
+    expect(h1).toMatch(/^\$s2\$100000\$[A-Za-z0-9+/]{43}=\$[A-Za-z0-9+/]{43}=$/);
+    expect(h1).not.toBe(h2);
+    // Verification does not depend on the email for the new format.
+    expect(await auth.verifyPassword('client-hash', h1, 'User@Example.test')).toBe(true);
+    expect(await auth.verifyPassword('client-hash', h2, 'someone-else@example.test')).toBe(true);
   });
 
   it('verifies server-hashed and legacy raw-hash credentials', async () => {
-    const stored = await auth.hashPasswordServer('the-hash', 'a@b.test');
+    const stored = await auth.hashPasswordServer('the-hash');
     expect(await auth.verifyPassword('the-hash', stored, 'a@b.test')).toBe(true);
     expect(await auth.verifyPassword('wrong-hash', stored, 'a@b.test')).toBe(false);
     // Legacy rows store the raw client hash without the server prefix.
