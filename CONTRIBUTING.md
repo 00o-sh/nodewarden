@@ -125,10 +125,13 @@ the major only (e.g. `24`): Workers Builds can only install Node versions baked
 into its build image, so an exact patch pin can fail the build. If a project
 sets `NODE_VERSION` in its dashboard, keep it aligned with this file.
 
-When regenerating the lockfile, use a directory without `node_modules` and
-verify `npm ci` with npm 10.9.2, the version used by Cloudflare's build image.
-Include optional dependencies so the lockfile also covers native and WASM
-dependencies on other platforms.
+Use the npm version pinned by `packageManager` in `package.json` (currently
+npm 12) for any change that touches `package-lock.json`. Older npm releases are
+not compatible with the lockfile: `npm ci` with npm 10.9.2 fails on it. When
+regenerating the lockfile, use a directory without `node_modules`, then verify
+it with `npm ci` on that npm version and the Node major from `.nvmrc`, for
+example `npx npm@12 ci`. Include optional dependencies so the lockfile also
+covers native and WASM dependencies on other platforms.
 
 For most backend or shared changes:
 
