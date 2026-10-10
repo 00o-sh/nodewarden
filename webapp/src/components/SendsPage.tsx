@@ -4,6 +4,7 @@ import { copyTextToClipboard } from '@/lib/clipboard';
 import LoadingState from '@/components/LoadingState';
 import type { Send, SendDraft } from '@/lib/types';
 import { t } from '@/lib/i18n';
+import { inputTypeProps } from '@/lib/input-type';
 
 interface SendsPageProps {
   sends: Send[];
@@ -492,7 +493,7 @@ export default function SendsPage(props: SendsPageProps) {
                   </div>
                 ) : (
                   <div className="password-wrap">
-                    <input className="input" type={showPassword ? 'text' : 'password'} value={draft.password} onInput={(e) => setDraft({ ...draft, password: (e.currentTarget as HTMLInputElement).value })} />
+                    <input className="input" {...inputTypeProps(showPassword, 'text', 'password')} value={draft.password} onInput={(e) => setDraft({ ...draft, password: (e.currentTarget as HTMLInputElement).value })} />
                     <button type="button" className="password-toggle" onClick={() => setShowPassword((v) => !v)}>
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>

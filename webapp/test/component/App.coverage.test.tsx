@@ -1145,7 +1145,9 @@ describe('App SignalR notification handling', () => {
       const utils = renderApp({ phase: 'app', session: appSession, profile: adminProfile, path: '/vault' });
       await screen.findByTestId('shell');
       await waitFor(() => expect(vi.mocked(apiNotifications.negotiateNotificationsHub)).toHaveBeenCalledWith(appSession.accessToken));
-      utils.unmount();
+      // Preact 11 defers useEffect cleanups until after paint; act() flushes
+      // them so the effect is disposed before negotiate resolves.
+      act(() => utils.unmount());
       await act(async () => {
         resolveNegotiate('late-ticket');
         await Promise.resolve();

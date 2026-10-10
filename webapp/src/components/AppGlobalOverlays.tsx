@@ -3,6 +3,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import ToastHost from '@/components/ToastHost';
 import { t } from '@/lib/i18n';
 import type { ToastMessage } from '@/lib/types';
+import { inputTypeProps } from '@/lib/input-type';
 
 export interface AppConfirmState {
   title: string;
@@ -182,7 +183,7 @@ export default function AppGlobalOverlays(props: AppGlobalOverlaysProps) {
         ) : (
           <label className="field">
             <span>{isYubiKeyOtp ? t('txt_otp_from_yubikey') : t('txt_totp_code')}</span>
-            <input className="input" type={isYubiKeyOtp ? 'password' : 'text'} value={props.totpCode} autoComplete="one-time-code" onInput={(e) => props.onTotpCodeChange((e.currentTarget as HTMLInputElement).value)} />
+            <input className="input" {...inputTypeProps(isYubiKeyOtp, 'password', 'text')} value={props.totpCode} autoComplete="one-time-code" onInput={(e) => props.onTotpCodeChange((e.currentTarget as HTMLInputElement).value)} />
           </label>
         )}
         <label className="check-line check-line-compact">

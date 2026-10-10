@@ -614,8 +614,8 @@ describe('<SettingsPage>', () => {
       .closest('.yubikey-config-panel')!
       .querySelector('input[type="password"]') as HTMLInputElement;
     fireEvent.input(otpField, { target: { value: 'ccccbootstrap' } });
-    const dialog = otpField.closest('[role="dialog"]') as HTMLElement;
-    fireEvent.submit(dialog);
+    // ConfirmDialog's form sits inside the role="dialog" container.
+    fireEvent.submit(otpField.closest('form')!);
     await waitFor(() =>
       expect(onBootstrapYubiKeyApiCredentials).toHaveBeenCalledWith('ccccbootstrap', 'master-pw'),
     );
@@ -900,8 +900,8 @@ describe('<SettingsPage>', () => {
     buildProps({ onGetYubiKeySettings, onSaveYubiKeySettings });
     openProviderManage('Yubico OTP security key');
     const dialog = (await screen.findByText('Yubico validation credentials')).closest('[role="dialog"]') as HTMLElement;
-    // Submitting the configured dialog routes onConfirm -> saveYubiKeyDialog.
-    fireEvent.submit(dialog);
+    // Submitting the configured dialog's form routes onConfirm -> saveYubiKeyDialog.
+    fireEvent.submit(dialog.querySelector('form')!);
     await waitFor(() => expect(onSaveYubiKeySettings).toHaveBeenCalledTimes(1));
   });
 
