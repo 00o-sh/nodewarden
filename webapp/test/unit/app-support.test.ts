@@ -305,11 +305,11 @@ describe('importCipherToDraft', () => {
       null
     );
     expect(draft.customFields).toEqual([
-      { type: 1, label: 'Hidden', value: 'h' },
-      { type: 2, label: 'Bool', value: 'true' },
-      { type: 3, label: 'Linked', value: 'l' },
-      { type: 0, label: 'Text', value: 't' },
-      { type: 0, label: 'Weird', value: 'w' },
+      { type: 1, label: 'Hidden', value: 'h', extra: {} },
+      { type: 2, label: 'Bool', value: 'true', extra: {} },
+      { type: 3, label: 'Linked', value: 'l', extra: {} },
+      { type: 0, label: 'Text', value: 't', extra: {} },
+      { type: 0, label: 'Weird', value: 'w', extra: {} },
     ]);
   });
 

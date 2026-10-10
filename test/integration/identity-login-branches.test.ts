@@ -54,9 +54,14 @@ describe('password grant — login branches', () => {
     const { account, id } = await makeUser('idlogin-banned');
     expect((await api('PUT', `/api/admin/users/${id}/status`, adminToken, { status: 'banned', masterPasswordHash: admin.account.masterPasswordHash })).status).toBe(200);
 
+    // Upstream v1.8.1: an inactive account gets the same generic invalid_grant
+    // as a wrong password, so login does not reveal account state.
     const res = await loginForm(account);
     expect(res.status).toBe(400);
-    expect(JSON.stringify(await res.json()).toLowerCase()).toContain('disabled');
+    const body = (await res.json()) as any;
+    expect(body.error).toBe('invalid_grant');
+    expect(body.access_token).toBeUndefined();
+    expect(JSON.stringify(body).toLowerCase()).not.toContain('disabled');
   });
 
   it('accepts a recovery code as the 2FA at login and disables TOTP', async () => {

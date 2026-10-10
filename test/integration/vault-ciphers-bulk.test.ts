@@ -51,7 +51,11 @@ describe('cipher bulk soft-delete / restore / permanent-delete', () => {
     let listed = (list.data ?? []).map((c: any) => c.id);
     expect(listed).not.toContain(a.id);
 
-    expect((await api('POST', '/api/ciphers/restore', token, { ids })).status).toBe(204);
+    // Upstream v1.8.1: bulk restore answers like Bitwarden, 200 with the restored ciphers.
+    const restored = await api('POST', '/api/ciphers/restore', token, { ids });
+    expect(restored.status).toBe(200);
+    const restoredIds = (((await restored.json()) as any).data ?? []).map((c: any) => c.id);
+    expect(restoredIds).toEqual(expect.arrayContaining(ids));
     list = (await (await api('GET', '/api/ciphers', token)).json()) as any;
     listed = (list.data ?? []).map((c: any) => c.id);
     expect(listed).toContain(a.id);

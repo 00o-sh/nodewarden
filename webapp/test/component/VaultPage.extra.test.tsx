@@ -140,6 +140,7 @@ vi.mock('@/components/vault/VaultEditor', () => ({
       <button type="button" data-testid="editor-toggle-empty-id" onClick={() => props.onToggleExistingAttachmentRemoval('')}>editor-toggle-empty-id</button>
       <button type="button" data-testid="editor-reorder-oob" onClick={() => props.onReorderDraftLoginUri(5, 9)}>editor-reorder-oob</button>
       <button type="button" data-testid="editor-seed-noforce" onClick={() => props.onSeedSshDefaults(false)}>editor-seed-noforce</button>
+      <button type="button" data-testid="editor-clear-id" onClick={() => props.onUpdateDraft({ id: undefined })}>editor-clear-id</button>
     </div>
   ),
 }));
@@ -198,6 +199,7 @@ vi.mock('@/lib/ssh', () => ({
 
 import VaultPage from '@/components/VaultPage';
 import type { Cipher, Folder } from '@/lib/types';
+import { t } from '@/lib/i18n';
 
 function makeCipher(overrides: Partial<Cipher> = {}): Cipher {
   return {
@@ -693,6 +695,54 @@ describe('<VaultPage> editor save + draft mutations', () => {
     expect(draft.name).toBe('Renamed Item');
     expect(options.addFiles).toHaveLength(1);
     expect(options.removeAttachmentIds).toEqual(['att1']);
+  });
+
+  it('saves the edit onto the item the draft was opened for after a sync refresh', async () => {
+    const c1 = makeCipher({ id: 'c1', decName: 'GitHub' });
+    const c2 = makeCipher({ id: 'c2', decName: 'GitLab' });
+    const { props, rerender } = setup({ ciphers: [c1, c2] });
+    expect(screen.getByTestId('detail-name')).toHaveTextContent('GitHub');
+    fireEvent.click(screen.getByText('start-edit'));
+    fireEvent.click(screen.getByTestId('editor-set-name'));
+
+    // A sync refreshes the item and reorders the list while the editor is open.
+    rerender(<VaultPage {...props} ciphers={[c2, { ...c1, revisionDate: '2024-03-03T00:00:00Z' }]} />);
+    fireEvent.click(screen.getByTestId('editor-save'));
+    await act(flush);
+    expect(props.onUpdate).toHaveBeenCalledTimes(1);
+    const [edited, draft] = props.onUpdate.mock.calls[0];
+    expect(edited.id).toBe('c1');
+    expect(draft.id).toBe('c1');
+    // The draft still carries the revision it was opened at.
+    expect(draft.revisionDate).toBe('2024-01-02T00:00:00Z');
+  });
+
+  it('keeps the draft and reports a conflict when the edited item disappeared during the edit', async () => {
+    const c1 = makeCipher({ id: 'c1', decName: 'GitHub' });
+    const c2 = makeCipher({ id: 'c2', decName: 'GitLab' });
+    const { props, rerender } = setup({ ciphers: [c1, c2] });
+    fireEvent.click(screen.getByText('start-edit'));
+    fireEvent.click(screen.getByTestId('editor-set-name'));
+
+    // Deleted elsewhere; the next sync no longer contains it.
+    rerender(<VaultPage {...props} ciphers={[c2]} />);
+    fireEvent.click(screen.getByTestId('editor-save'));
+    await act(flush);
+    expect(props.onUpdate).not.toHaveBeenCalled();
+    expect(screen.getByTestId('editor-local-error')).toHaveTextContent(t('txt_item_changed_elsewhere'));
+    // The editor (and the user's unsaved text) is retained.
+    expect(screen.getByTestId('editor-mode')).toHaveTextContent('edit');
+    expect(screen.getByTestId('editor-name')).toHaveTextContent('Renamed Item');
+  });
+
+  it('falls back to the selected item for a draft that carries no id', async () => {
+    const { props } = setup({ ciphers: [makeCipher({ id: 'c1', decName: 'GitHub' })] });
+    fireEvent.click(screen.getByText('start-edit'));
+    fireEvent.click(screen.getByTestId('editor-clear-id'));
+    fireEvent.click(screen.getByTestId('editor-save'));
+    await act(flush);
+    expect(props.onUpdate).toHaveBeenCalledTimes(1);
+    expect(props.onUpdate.mock.calls[0][0].id).toBe('c1');
   });
 
   it('toggling an existing attachment removal twice clears the flag', () => {

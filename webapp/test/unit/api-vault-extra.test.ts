@@ -8,6 +8,7 @@ import {
   sha256Base64,
 } from '@/lib/crypto';
 import type { Cipher, SessionState, VaultDraft } from '@/lib/types';
+import { t } from '@/lib/i18n';
 import {
   archiveCipher,
   bulkArchiveCiphers,
@@ -281,6 +282,36 @@ describe('api/vault createCipher / updateCipher / deleteCipher error paths', () 
     await expect(
       updateCipher(vi.fn(fail()) as any, unlockedSession(), { id: 'c1', type: 2 } as any, baseDraft({ type: 2, name: 'x' }))
     ).rejects.toThrow('Update item failed');
+  });
+
+  it('updateCipher refuses to save a draft onto a different item without calling the server', async () => {
+    // Upstream v1.8.1: a draft remembers which item it was opened for. If sync
+    // swapped the selection underneath the editor, saving must not overwrite
+    // whichever item happens to be selected now.
+    const fetchMock = vi.fn();
+    const err = await updateCipher(
+      fetchMock as any,
+      unlockedSession(),
+      { id: 'c2', type: 2 } as any,
+      baseDraft({ id: 'c1', type: 2, name: 'x' })
+    ).catch((error: unknown) => error as Error & { status?: number });
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe(t('txt_item_changed_elsewhere'));
+    expect((err as { status?: number }).status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('updateCipher sends the revision the draft was opened at when the ids match', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 'c1', type: 2 }), { status: 200 }));
+    await updateCipher(
+      fetchMock as any,
+      unlockedSession(),
+      { id: 'c1', type: 2, revisionDate: '2024-02-02T00:00:00.000Z' } as any,
+      baseDraft({ id: 'c1', revisionDate: '2024-01-01T00:00:00.000Z', type: 2, name: 'x' })
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse((fetchMock.mock.calls[0] as any)[1].body);
+    expect(body.lastKnownRevisionDate).toBe('2024-01-01T00:00:00.000Z');
   });
 
   it('deleteCipher throws on a non-ok response', async () => {

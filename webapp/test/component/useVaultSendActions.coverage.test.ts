@@ -593,3 +593,73 @@ describe('useVaultSendActions - export zip attachment pipeline', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('useVaultSendActions - upstream v1.8.1 edit safety', () => {
+  it('the optimistic update keeps per-field metadata and linked-field ids', async () => {
+    let resolveUpdate!: (value: unknown) => void;
+    v.updateCipher.mockImplementation(() => new Promise((resolve) => { resolveUpdate = resolve; }));
+    const prev = { id: 'c1', type: 1, name: 'enc', decName: 'plain', fields: [] } as any;
+    const { result, store } = render({ initialDecCiphers: [prev] });
+    const draft = {
+      ...DRAFT,
+      customFields: [
+        // Unknown encrypted properties from another client ride along in `extra`.
+        { type: 0, label: 'text', value: 'v', extra: { futureProp: 'kept' } },
+        { type: 3, label: 'linked', value: '', linkedId: 100 },
+        { type: 3, label: 'linked-unset', value: '' },
+        { type: 1, label: 'hidden', value: 'h' },
+      ],
+    };
+
+    let pending!: Promise<unknown>;
+    act(() => { pending = result.current.updateVaultItem(prev, draft); });
+    const optimistic = store.decCiphers.find((c) => c.id === 'c1');
+    expect(optimistic.fields).toEqual([
+      { futureProp: 'kept', type: 0, name: 'text', value: 'v', decName: 'text', decValue: 'v' },
+      { type: 3, linkedId: 100, name: 'linked', value: '', decName: 'linked', decValue: '' },
+      { type: 3, linkedId: null, name: 'linked-unset', value: '', decName: 'linked-unset', decValue: '' },
+      { type: 1, name: 'hidden', value: 'h', decName: 'hidden', decValue: 'h' },
+    ]);
+    // Only linked fields carry a linkedId.
+    expect('linkedId' in optimistic.fields[0]).toBe(false);
+    expect('linkedId' in optimistic.fields[3]).toBe(false);
+
+    await act(async () => {
+      resolveUpdate({ id: 'c1', type: 1, name: 'enc2' });
+      await pending;
+    });
+  });
+
+  it('an item changed elsewhere rolls back, refetches the current copy and rethrows', async () => {
+    v.updateCipher.mockRejectedValue(new Error('txt_item_changed_elsewhere'));
+    const prev = { id: 'c1', type: 1, name: 'enc', decName: 'plain' } as any;
+    const { result, store, options } = render({ initialDecCiphers: [prev] });
+    await expect(act(async () => { await result.current.updateVaultItem(prev, DRAFT); })).rejects.toThrow('txt_item_changed_elsewhere');
+    expect(store.decCiphers.find((c) => c.id === 'c1')?.decName).toBe('plain');
+    expect(options.refetchCiphers).toHaveBeenCalledTimes(1);
+    expect(options.onNotify).toHaveBeenCalledWith('error', 'txt_item_changed_elsewhere');
+  });
+
+  it('a failing refetch after a conflict does not mask the conflict error', async () => {
+    v.updateCipher.mockRejectedValue(new Error('txt_item_changed_elsewhere'));
+    const prev = { id: 'c1', type: 1, name: 'enc', decName: 'plain' } as any;
+    const refetchCiphers = vi.fn(async () => { throw new Error('offline'); });
+    const { result, options } = render({ initialDecCiphers: [prev], refetchCiphers });
+    await expect(act(async () => { await result.current.updateVaultItem(prev, DRAFT); })).rejects.toThrow('txt_item_changed_elsewhere');
+    expect(refetchCiphers).toHaveBeenCalledTimes(1);
+    expect(options.onNotify).toHaveBeenCalledWith('error', 'txt_item_changed_elsewhere');
+  });
+
+  it('other update failures do not trigger a refetch', async () => {
+    v.updateCipher.mockRejectedValue(new Error('nope'));
+    const prev = { id: 'c1', type: 1, name: 'enc', decName: 'plain' } as any;
+    const { result, options } = render({ initialDecCiphers: [prev] });
+    await expect(act(async () => { await result.current.updateVaultItem(prev, DRAFT); })).rejects.toThrow('nope');
+    expect(options.refetchCiphers).not.toHaveBeenCalled();
+    // Non-Error rejections fall back to the generic message.
+    v.updateCipher.mockRejectedValue('weird');
+    await expect(act(async () => { await result.current.updateVaultItem(prev, DRAFT); })).rejects.toBe('weird');
+    expect(options.refetchCiphers).not.toHaveBeenCalled();
+    expect(options.onNotify).toHaveBeenCalledWith('error', 'txt_update_item_failed');
+  });
+});

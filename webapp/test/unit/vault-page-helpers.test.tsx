@@ -462,7 +462,7 @@ describe('draftFromCipher plaintext-only ciphers stay blank but exercise fallbac
     expect(draft.favorite).toBe(true);
     expect(draft.reprompt).toBe(true);
     expect(draft.folderId).toBe('fold');
-    expect(draft.customFields).toEqual([{ type: 1, label: 'secret', value: 'v' }]);
+    expect(draft.customFields).toEqual([{ type: 1, label: 'secret', value: 'v', extra: {} }]);
   });
 });
 
