@@ -110,7 +110,7 @@
     "@zip.js/zip.js": "2.22.1",
     "fflate": "0.8.3",
     "jsqr": "1.4.0",
-    "lucide-preact": "1.50.0",
+    "lucide-preact": "1.51.0",
     "preact": "11.0.0",
     "qrcode-generator": "2.0.4",
     "wouter": "3.13.0"
