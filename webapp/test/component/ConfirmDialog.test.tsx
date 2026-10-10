@@ -118,4 +118,20 @@ describe('<ConfirmDialog> markup', () => {
     fireEvent.submit(form!);
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
+
+  it('ignores form submission while confirm is disabled', () => {
+    const onConfirm = vi.fn();
+    render(<ConfirmDialog open title="Locked" confirmDisabled onConfirm={onConfirm} onCancel={vi.fn()} />);
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form')!);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('ignores form submission while the dialog is closing', () => {
+    const onConfirm = vi.fn();
+    const { rerender } = render(<ConfirmDialog open title="Bye" onConfirm={onConfirm} onCancel={vi.fn()} />);
+    const form = screen.getByRole('dialog').querySelector('form')!;
+    rerender(<ConfirmDialog open={false} title="Bye" onConfirm={onConfirm} onCancel={vi.fn()} />);
+    fireEvent.submit(form);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
 });
