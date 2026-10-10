@@ -98,6 +98,31 @@ describe('conditional full update', () => {
   });
 });
 
+describe('StorageService.updateCipherIfUnchanged column defaults', () => {
+  it('stores a missing type as login, a missing reprompt as 0, favorite as 1 and keeps an archive stamp', async () => {
+    const created = await createCipher(token);
+    const storage = new StorageService(db);
+    const cipher = (await storage.getCipherForUser(created.id, userId))!;
+    const archivedAt = new Date().toISOString();
+    const next = { ...cipher, type: undefined, favorite: true, reprompt: undefined, archivedAt, updatedAt: new Date(Date.parse(cipher.updatedAt) + 1000).toISOString() } as any;
+    expect(await storage.updateCipherIfUnchanged(next, cipher.updatedAt)).toBe(true);
+    const row = await db.prepare('SELECT type, favorite, reprompt, archived_at FROM ciphers WHERE id = ?').bind(cipher.id).first();
+    expect(row).toEqual({ type: 1, favorite: 1, reprompt: 0, archived_at: archivedAt });
+  });
+
+  it('keeps an explicit reprompt and clears a missing archive stamp to NULL', async () => {
+    const created = await createCipher(token);
+    const storage = new StorageService(db);
+    const cipher = (await storage.getCipherForUser(created.id, userId))!;
+    const next = { ...cipher, reprompt: 1, archivedAt: undefined, updatedAt: new Date(Date.parse(cipher.updatedAt) + 1000).toISOString() } as any;
+    expect(await storage.updateCipherIfUnchanged(next, cipher.updatedAt)).toBe(true);
+    const row = await db.prepare('SELECT reprompt, archived_at FROM ciphers WHERE id = ?').bind(cipher.id).first<{ reprompt: number; archived_at: string | null }>();
+    expect(row).toEqual({ reprompt: 1, archived_at: null });
+    // The same expected timestamp no longer matches, so a replay is refused.
+    expect(await storage.updateCipherIfUnchanged(next, cipher.updatedAt)).toBe(false);
+  });
+});
+
 describe('Bitwarden-compatible permanent delete routes', () => {
   it('DELETE /api/ciphers permanently deletes the listed ciphers', async () => {
     const a = await createCipher(token);

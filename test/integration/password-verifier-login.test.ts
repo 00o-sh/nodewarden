@@ -7,6 +7,7 @@ import {
   verifyPasswordVerifier,
 } from '../../src/services/password-verifier';
 import { StorageService } from '../../src/services/storage';
+import { upgradePasswordVerifier as upgradeStoredPasswordVerifier } from '../../src/services/storage-user-repo';
 import { ENC_STRING, Session, TestAccount, api, authenticate, baseHeaders, newAccount, url } from './helpers';
 
 // Upstream v1.8.1 changed how the server stores the second-layer password hash:
@@ -220,6 +221,23 @@ describe('verifier upgrade is conditional and best-effort', () => {
     const after = (await storage.getUser(account.email))!;
     expect(after.securityStamp).toBe(user.securityStamp);
     expect(after.key).toBe(user.key);
+  });
+
+  it('treats a write result without a change count as not upgraded (fail closed)', async () => {
+    const calls: unknown[][] = [];
+    const fakeDb = {
+      prepare: (sql: string) => ({
+        bind: (...args: unknown[]) => {
+          calls.push([sql, ...args]);
+          return { run: async () => ({ success: true, meta: {} }) };
+        },
+      }),
+    } as unknown as D1Database;
+    expect(await upgradeStoredPasswordVerifier(fakeDb, 'uid', 'old', 'stamp', 'new')).toBe(false);
+    // The guarded UPDATE binds new verifier, id, expected verifier and stamp, in that order.
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toContain("status = 'active'");
+    expect(calls[0].slice(1)).toEqual(['new', 'uid', 'old', 'stamp']);
   });
 
   it('AuthService.upgradePasswordVerifier migrates legacy rows, skips current ones and leaves a lost race alone', async () => {
