@@ -14,13 +14,14 @@ runs).
 | File | Wiki page | Upstream source |
 |---|---|---|
 | `Home.md` | Home | `Home.md` |
-| `Quick-Start.md` | Quick Start | `快速开始.md` |
-| `Feature-Overview.md` | Feature Overview | `功能总览.md` |
-| `Import-and-Export.md` | Import and Export | `导入与导出.md` |
-| `Backup-and-Restore.md` | Backup and Restore | `备份与恢复.md` |
-| `FAQ.md` | FAQ | `常见问题.md` |
 
-Source: upstream wiki commit `1f26892`.
+Source: upstream wiki commit `db14ddf`.
+
+Upstream retired its GitHub wiki in `b0d88d3` ("Delete wiki") and moved the
+documentation to [nodewarden.app](https://nodewarden.app), which has English
+pages. The translated pages that used to live here (Quick Start, Feature
+Overview, Import and Export, Backup and Restore, FAQ) were removed to mirror
+that; they remain in git history if ever needed.
 
 ## Staying in sync with upstream
 
@@ -36,8 +37,9 @@ To resolve such an issue (or to re-pull manually):
 git clone https://github.com/shuaiplus/NodeWarden.wiki.git
 ```
 
-1. Translate each changed `*.md` page into English, keeping the English
-   filenames above so the page URLs and any cross-links stay valid.
+1. Translate each changed `*.md` page into English, giving new pages an
+   English filename and keeping existing filenames so page URLs and any
+   cross-links stay valid.
 2. Refresh the snapshot in `.upstream/` (copy the new upstream pages there and
    update `.upstream/UPSTREAM_COMMIT`) in the same PR.
 
