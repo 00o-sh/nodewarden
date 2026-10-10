@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { Eye, EyeOff, Send, X } from 'lucide-preact';
 import StandalonePageFrame from '@/components/StandalonePageFrame';
 import { t } from '@/lib/i18n';
+import { inputTypeProps } from '@/lib/input-type';
 
 interface RecoverTwoFactorPageProps {
   values: { email: string; password: string; recoveryCode: string };
@@ -40,7 +41,7 @@ export default function RecoverTwoFactorPage(props: RecoverTwoFactorPageProps) {
             <div className="password-wrap">
               <input
                 className="input"
-                type={showPassword ? 'text' : 'password'}
+                {...inputTypeProps(showPassword, 'text', 'password')}
                 value={props.values.password}
                 autoComplete="current-password"
                 onInput={(e) => props.onChange({ ...props.values, password: (e.currentTarget as HTMLInputElement).value })}

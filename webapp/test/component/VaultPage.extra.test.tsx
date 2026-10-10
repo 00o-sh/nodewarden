@@ -1518,8 +1518,9 @@ describe('<VaultPage> legacy matchMedia + focus guard', () => {
     })) as unknown as typeof window.matchMedia;
     const { unmount } = setup();
     expect(listeners.size).toBeGreaterThan(0);
-    // Unmount exercises the legacy removeListener cleanup path.
-    unmount();
+    // Unmount exercises the legacy removeListener cleanup path. Preact 11 runs
+    // useEffect cleanups after paint, so flush them with act().
+    act(() => unmount());
     expect(listeners.size).toBe(0);
   });
 

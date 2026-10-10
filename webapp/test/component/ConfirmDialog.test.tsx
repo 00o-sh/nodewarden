@@ -99,3 +99,39 @@ describe('<ConfirmDialog>', () => {
     expect(onCancel2).not.toHaveBeenCalled();
   });
 });
+
+describe('<ConfirmDialog> markup', () => {
+  it('puts the dialog role on a container that wraps the submit form', () => {
+    const onConfirm = vi.fn();
+    render(
+      <ConfirmDialog open title="Name it" confirmText="Save" onConfirm={onConfirm} onCancel={vi.fn()}>
+        <input aria-label="Name" />
+      </ConfirmDialog>
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Name it' });
+    expect(dialog.tagName).toBe('DIV');
+    const form = dialog.querySelector('form');
+    expect(form).not.toBeNull();
+    // Fields rendered as children live inside the form, so pressing Enter in
+    // them submits it and confirms the dialog.
+    expect(form!.contains(screen.getByLabelText('Name'))).toBe(true);
+    fireEvent.submit(form!);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores form submission while confirm is disabled', () => {
+    const onConfirm = vi.fn();
+    render(<ConfirmDialog open title="Locked" confirmDisabled onConfirm={onConfirm} onCancel={vi.fn()} />);
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form')!);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it('ignores form submission while the dialog is closing', () => {
+    const onConfirm = vi.fn();
+    const { rerender } = render(<ConfirmDialog open title="Bye" onConfirm={onConfirm} onCancel={vi.fn()} />);
+    const form = screen.getByRole('dialog').querySelector('form')!;
+    rerender(<ConfirmDialog open={false} title="Bye" onConfirm={onConfirm} onCancel={vi.fn()} />);
+    fireEvent.submit(form);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+});

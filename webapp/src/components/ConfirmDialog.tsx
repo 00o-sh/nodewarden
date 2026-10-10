@@ -84,7 +84,7 @@ export function useDialogLifecycle(active: boolean, onCancel?: (() => void) | nu
 export default function ConfirmDialog(props: ConfirmDialogProps) {
   const [present, setPresent] = useState(props.open);
   const [closing, setClosing] = useState(false);
-  const cardRef = useRef<HTMLFormElement | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
   const maskPointerStartedRef = useRef(false);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const lastTitleRef = useRef<ComponentChildren>(props.title);
@@ -190,7 +190,10 @@ export default function ConfirmDialog(props: ConfirmDialogProps) {
         props.onCancel();
       }}
     >
-      <form
+      {/* The dialog role lives on a plain container: ARIA (and Preact 11's
+          typings) don't allow role="dialog" on <form>. The form inside keeps
+          Enter-to-submit for any fields in the dialog body. */}
+      <div
         ref={cardRef}
         className={`dialog-card ${props.variant === 'warning' ? 'warning' : ''} ${props.open && !closing ? 'open' : ''} ${closing ? 'closing' : ''}`}
         role="dialog"
@@ -199,66 +202,69 @@ export default function ConfirmDialog(props: ConfirmDialogProps) {
         aria-describedby={hasMessage ? messageId : undefined}
         tabIndex={-1}
         onKeyDown={handleDialogKeyDown}
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (props.confirmDisabled || closing) return;
-          props.onConfirm();
-        }}
       >
-        {props.variant === 'warning' ? (
-          <>
-            <div className="dialog-warning-strip" aria-hidden="true" />
-            <div className="dialog-warning-head">
-              <div className="dialog-warning-badge" aria-hidden="true">
-                <TriangleAlert size={24} />
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (props.confirmDisabled || closing) return;
+            props.onConfirm();
+          }}
+        >
+          {props.variant === 'warning' ? (
+            <>
+              <div className="dialog-warning-strip" aria-hidden="true" />
+              <div className="dialog-warning-head">
+                <div className="dialog-warning-badge" aria-hidden="true">
+                  <TriangleAlert size={24} />
+                </div>
+                <div className="dialog-warning-kicker">{t('txt_warning')}</div>
               </div>
-              <div className="dialog-warning-kicker">{t('txt_warning')}</div>
-            </div>
-          </>
-        ) : null}
-        {props.closeButton && (
-          <button
-            type="button"
-            className="dialog-close-btn"
-            aria-label={t('txt_close')}
-            disabled={props.cancelDisabled}
-            onClick={() => {
-              if (props.cancelDisabled) return;
-              props.onCancel();
-            }}
-          >
-            <X size={18} />
-          </button>
-        )}
-        <h3 id={titleId} className="dialog-title">{props.open ? props.title : lastTitleRef.current}</h3>
-        {hasMessage && <div id={messageId} className={`dialog-message ${props.variant === 'warning' ? 'warning' : ''}`}>{props.message}</div>}
-        {props.children}
-        {!props.hideConfirm && (
-          <button
-            type="submit"
-            className={`btn ${props.danger ? 'btn-danger' : 'btn-primary'} dialog-btn`}
-            disabled={props.confirmDisabled}
-            data-dialog-confirm="true"
-          >
-            {props.confirmText || t('txt_yes')}
-          </button>
-        )}
-        {!props.hideCancel && (
-          <button
-            type="button"
-            className="btn btn-secondary dialog-btn"
-            disabled={props.cancelDisabled}
-            data-dialog-cancel="true"
-            onClick={() => {
-              if (props.cancelDisabled) return;
-              props.onCancel();
-            }}
-          >
-            {props.cancelText || t('txt_no')}
-          </button>
-        )}
-        {props.afterActions}
-      </form>
+            </>
+          ) : null}
+          {props.closeButton && (
+            <button
+              type="button"
+              className="dialog-close-btn"
+              aria-label={t('txt_close')}
+              disabled={props.cancelDisabled}
+              onClick={() => {
+                if (props.cancelDisabled) return;
+                props.onCancel();
+              }}
+            >
+              <X size={18} />
+            </button>
+          )}
+          <h3 id={titleId} className="dialog-title">{props.open ? props.title : lastTitleRef.current}</h3>
+          {hasMessage && <div id={messageId} className={`dialog-message ${props.variant === 'warning' ? 'warning' : ''}`}>{props.message}</div>}
+          {props.children}
+          {!props.hideConfirm && (
+            <button
+              type="submit"
+              className={`btn ${props.danger ? 'btn-danger' : 'btn-primary'} dialog-btn`}
+              disabled={props.confirmDisabled}
+              data-dialog-confirm="true"
+            >
+              {props.confirmText || t('txt_yes')}
+            </button>
+          )}
+          {!props.hideCancel && (
+            <button
+              type="button"
+              className="btn btn-secondary dialog-btn"
+              disabled={props.cancelDisabled}
+              data-dialog-cancel="true"
+              onClick={() => {
+                if (props.cancelDisabled) return;
+                props.onCancel();
+              }}
+            >
+              {props.cancelText || t('txt_no')}
+            </button>
+          )}
+          {props.afterActions}
+        </form>
+      </div>
     </div>
   ), document.body);
 }

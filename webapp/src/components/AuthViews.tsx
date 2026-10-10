@@ -4,6 +4,7 @@ import NetworkStatusBadge from '@/components/NetworkStatusBadge';
 import StandalonePageFrame from '@/components/StandalonePageFrame';
 import { t } from '@/lib/i18n';
 import { getCurrentNetworkStatus, subscribeNetworkStatus, type NetworkStatus } from '@/lib/network-status';
+import { inputTypeProps } from '@/lib/input-type';
 
 interface LoginValues {
   email: string;
@@ -69,7 +70,7 @@ function PasswordField(props: {
       <div className="password-wrap">
         <input
           className="input"
-          type={show ? 'text' : 'password'}
+          {...inputTypeProps(show, 'text', 'password')}
           value={props.value}
           onInput={(e) => props.onInput((e.currentTarget as HTMLInputElement).value)}
           autoFocus={props.autoFocus}
@@ -321,7 +322,7 @@ export default function AuthViews(props: AuthViewsProps) {
             <span>{t('txt_email')}</span>
             <input
               className="input"
-              type={props.relaxedLoginInput ? 'text' : 'email'}
+              {...inputTypeProps(!!props.relaxedLoginInput, 'text', 'email')}
               value={props.loginValues.email}
               autoComplete="username"
               placeholder={props.authPlaceholder}
