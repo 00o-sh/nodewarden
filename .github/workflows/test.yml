@@ -188,7 +188,7 @@ jobs:
         # the vitest.config.ts thresholds on the merged total, and writes
         # coverage/coverage-summary.json for the badge.
         if: needs.changes.outputs.backend == 'true'
-        run: npx vitest run --merge-reports --coverage
+        run: npx vitest run --merge-reports=.vitest-reports --coverage
 
       - name: Changed-line coverage gate (backend)
         # Fail-closed: every executable line this PR adds/changes under src/ or
