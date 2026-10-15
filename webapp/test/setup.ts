@@ -1,5 +1,6 @@
 // Shared setup for the jsdom-based frontend tests (unit + component).
 import '@testing-library/jest-dom/vitest';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { afterAll, afterEach } from 'vitest';
 import { act, cleanup } from '@testing-library/preact';
 
@@ -16,6 +17,7 @@ afterEach(() => {
 // assertion) still schedules its effects on Preact's after-paint timer, which in
 // jsdom is a 35ms setTimeout. If that timer is pending when the file ends, it
 // fires after jsdom is torn down. Let it run once while `window` still exists.
+// Node's own timer is used because a test may have swapped the global one.
 afterAll(async () => {
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await sleep(50);
 });
