@@ -7,7 +7,9 @@
     "security:openssf-scorecard",
     "helpers:pinGitHubActionDigests",
     "mergeConfidence:all-badges",
-    "replacements:all"
+    "replacements:all",
+    "abandonments:recommended",
+    "github>unabandoned/renovate-config:abandoned-exclusions"
   ],
   "rangeStrategy": "pin",
   "dependencyDashboard": true,
@@ -49,6 +51,12 @@
       "description": "Never auto-merge major upgrades; always review them by hand.",
       "matchUpdateTypes": ["major"],
       "automerge": false
+    },
+    {
+      "description": "jsqr (fallback QR decoder for TOTP setup, used only when the browser has no native BarcodeDetector) has had no release since 2021-04 but declares zero runtime dependencies and ships a prebuilt bundle, so nothing under it can rot: the unabandoned abandoned-exclusions test. A direct CVE is still raised by vulnerabilityAlerts. Revisit if it gains a dependency or an advisory.",
+      "matchDatasources": ["npm"],
+      "matchPackageNames": ["jsqr"],
+      "abandonmentThreshold": "50 years"
     }
   ]
 }
