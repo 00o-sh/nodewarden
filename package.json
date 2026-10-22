@@ -6,7 +6,7 @@
   "license": "LGPL-3.0",
   "main": "src/index.ts",
   "type": "module",
-  "packageManager": "npm@12.2.0",
+  "packageManager": "npm@12.2.1",
   "engines": {
     "node": "^22.19.0 || >=24.11.0",
     "npm": ">=10.0.0"
