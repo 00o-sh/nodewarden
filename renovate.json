@@ -9,7 +9,8 @@
     "mergeConfidence:all-badges",
     "replacements:all",
     "abandonments:recommended",
-    "github>unabandoned/renovate-config:abandoned-exclusions"
+    "github>unabandoned/renovate-config:abandoned-exclusions",
+    "github>unabandoned/renovate-config:typescript-eslint-compat"
   ],
   "rangeStrategy": "pin",
   "dependencyDashboard": true,
