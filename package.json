@@ -117,7 +117,7 @@
   },
   "overrides": {
     "qs": "6.16.1",
-    "undici": "8.11.2",
+    "undici": "8.12.2",
     "@babel/core": "8.0.7",
     "@vitest/coverage-istanbul": {
       "@babel/core": "8.0.7"
@@ -125,8 +125,10 @@
     "esbuild": "0.28.2",
     "ws": "8.22.0",
     "brace-expansion": "5.0.12",
-    "fast-uri": "4.2.2",
+    "fast-uri": "4.2.3",
     "nanoid": "6.0.2",
-    "sharp": "0.35.5"
+    "sharp": "0.35.5",
+    "zod": "4.6.6",
+    "minimatch": "11.0.3"
   }
 }
