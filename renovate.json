@@ -13,7 +13,9 @@
     "github>unabandoned/renovate-config:typescript-eslint-compat"
   ],
   "rangeStrategy": "pin",
-  "dependencyDashboard": true,
+  "dependencyDashboard": {
+    "enabled": true
+  },
   "semanticCommits": "enabled",
   "configMigration": true,
   "osvVulnerabilityAlerts": true,
