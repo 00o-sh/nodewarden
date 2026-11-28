@@ -30,7 +30,11 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
+<<<<<<< HEAD
           node-version-file: '.nvmrc'
+=======
+          node-version: "22.23.4"
+>>>>>>> a95df3af6a73d6288dbe7c89d51f3bcc55ea0978
 
       - name: Sync generated Bitwarden domains
         env:
